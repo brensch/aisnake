@@ -7,35 +7,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestVisualizeVoronoi(t *testing.T) {
-	// Set up a simple board with two snakes
-	board := Board{
-		Height: 5,
-		Width:  5,
-		Snakes: []Snake{
-			{ID: "snake1", Head: Point{X: 0, Y: 0}},
-			{ID: "snake2", Head: Point{X: 4, Y: 4}},
-		},
-	}
-
-	// Generate the Voronoi diagram
-	voronoi := GenerateVoronoi(board)
-
-	// Generate the visualization
-	output := VisualizeVoronoi(voronoi, board.Snakes)
-
-	// Define the expected output
-	expectedOutput := `A A A A . 
-A A A . B 
-A A . B B 
-A . B B B 
-. B B B B 
-`
-
-	// Compare the output with the expected output using testify's assert.Equal
-	assert.Equal(t, expectedOutput, output, "The Voronoi visualization output does not match the expected output")
-}
-
 type VoronoiTestCase struct {
 	Width       int
 	Height      int

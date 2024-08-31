@@ -34,13 +34,13 @@ type Point struct {
 }
 
 type Snake struct {
-	ID             string         `json:"id"`
-	Name           string         `json:"name"`
-	Health         int            `json:"health"`
-	Body           []Point        `json:"body"`
-	Latency        string         `json:"latency"`
-	Head           Point          `json:"head"`
-	Length         int            `json:"length"`
+	ID      string  `json:"id"`
+	Name    string  `json:"name"`
+	Health  int     `json:"health"`
+	Body    []Point `json:"body"`
+	Latency string  `json:"latency"`
+	Head    Point   `json:"head"`
+	// Length         int            `json:"length"`
 	Shout          string         `json:"shout"`
 	Customizations Customizations `json:"customizations"`
 }

@@ -1,9 +1,7 @@
 package main
 
 import (
-	"fmt"
 	"math"
-	"strings"
 )
 
 // GenerateVoronoi generates a Voronoi diagram for the given board.
@@ -44,21 +42,19 @@ func manhattanDistance(a, b Point) int {
 	return int(math.Abs(float64(a.X-b.X)) + math.Abs(float64(a.Y-b.Y)))
 }
 
-// VisualizeVoronoi visualizes the Voronoi diagram on the console.
-func VisualizeVoronoi(voronoi [][]int, snakes []Snake) string {
-	var sb strings.Builder
+// evaluateBoard evaluates the board and returns a score based on the Voronoi diagram.
+func evaluateBoard(board Board) float64 {
+	voronoi := GenerateVoronoi(board)
+	score := 0.0
 
-	for y := 0; y < len(voronoi); y++ {
-		for x := 0; x < len(voronoi[y]); x++ {
-			owner := voronoi[y][x]
-			if owner == -1 {
-				sb.WriteString(". ") // Unassigned cells
-			} else {
-				sb.WriteString(fmt.Sprintf("%c ", 'A'+owner)) // Each snake gets a unique letter
+	// Count the number of cells controlled by the snake at index 0
+	for y := 0; y < board.Height; y++ {
+		for x := 0; x < board.Width; x++ {
+			if voronoi[y][x] == 0 { // 0 represents the snake at index 0
+				score += 1.0
 			}
 		}
-		sb.WriteString("\n")
 	}
 
-	return sb.String()
+	return score
 }
