@@ -79,9 +79,19 @@ func handleMove(w http.ResponseWriter, r *http.Request) {
 
 // determineBestMove finds the best move from the MCTS result
 func determineBestMove(game BattleSnakeGame, node *Node) string {
-	// Identify the move that corresponds to the best child node
-	if len(node.Children) > 0 {
-		bestChild := node.Children[0]
+	var bestChild *Node
+	maxVisits := -1
+
+	// Iterate through the children to find the one with the highest visit count
+	for _, child := range node.Children {
+		if child.Visits > maxVisits {
+			bestChild = child
+			maxVisits = child.Visits
+		}
+	}
+
+	// If we found a best child, determine the direction to move
+	if bestChild != nil {
 		bestMove := determineMoveDirection(game.You.Head, bestChild.Board.Snakes[0].Head)
 		return bestMove
 	}

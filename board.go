@@ -1,10 +1,5 @@
 package main
 
-import (
-	"math"
-	"math/rand"
-)
-
 // applyMoves applies the moves directly to the provided board without returning a new board.
 func applyMoves(board *Board, moves Move) {
 	// First, create a map to track the initial head positions
@@ -166,109 +161,173 @@ func boardIsTerminal(board Board) bool {
 	return aliveSnakes <= 1
 }
 
-// safeMove generates a safe move for a single snake.
-func safeMove(board Board, snake Snake) Direction {
-	// Collect possible safe directions
-	var safeDirections []Direction
+// // safeMove generates a safe move for a single snake.
+// func safeMove(board Board, snake Snake) Direction {
+// 	// Collect possible safe directions
+// 	var safeDirections []Direction
 
-	for _, dir := range AllDirections {
-		newHead := moveHead(snake.Head, dir)
+// 	for _, dir := range AllDirections {
+// 		newHead := moveHead(snake.Head, dir)
 
-		// Check if the new head position is within the board boundaries
-		if newHead.X < 0 || newHead.X >= board.Width || newHead.Y < 0 || newHead.Y >= board.Height {
-			continue
-		}
+// 		// Check if the new head position is within the board boundaries
+// 		if newHead.X < 0 || newHead.X >= board.Width || newHead.Y < 0 || newHead.Y >= board.Height {
+// 			continue
+// 		}
 
-		// Check if the new head position is on the snake's own body (excluding the tail)
-		collidesWithSelf := false
-		for _, part := range snake.Body[:len(snake.Body)-1] { // Exclude tail
-			if newHead == part {
-				collidesWithSelf = true
-				break
-			}
-		}
-		if collidesWithSelf {
-			continue
-		}
+// 		// Check if the new head position is on the snake's own body (excluding the tail)
+// 		collidesWithSelf := false
+// 		for _, part := range snake.Body[:len(snake.Body)-1] { // Exclude tail
+// 			if newHead == part {
+// 				collidesWithSelf = true
+// 				break
+// 			}
+// 		}
+// 		if collidesWithSelf {
+// 			continue
+// 		}
 
-		// Check if the new head position is on any other snake's body
-		collidesWithOtherSnake := false
-		for _, otherSnake := range board.Snakes {
-			for _, part := range otherSnake.Body {
-				if newHead == part {
-					collidesWithOtherSnake = true
-					break
-				}
-			}
-			if collidesWithOtherSnake {
-				break
-			}
-		}
-		if collidesWithOtherSnake {
-			continue
-		}
+// 		// Check if the new head position is on any other snake's body
+// 		collidesWithOtherSnake := false
+// 		for _, otherSnake := range board.Snakes {
+// 			for _, part := range otherSnake.Body {
+// 				if newHead == part {
+// 					collidesWithOtherSnake = true
+// 					break
+// 				}
+// 			}
+// 			if collidesWithOtherSnake {
+// 				break
+// 			}
+// 		}
+// 		if collidesWithOtherSnake {
+// 			continue
+// 		}
 
-		// If the direction is safe, add it to the list
-		safeDirections = append(safeDirections, dir)
-	}
+// 		// If the direction is safe, add it to the list
+// 		safeDirections = append(safeDirections, dir)
+// 	}
 
-	// If there are safe directions, choose one at random
-	if len(safeDirections) > 0 {
-		return safeDirections[rand.Intn(len(safeDirections))]
-	}
+// 	// If there are safe directions, choose one at random
+// 	if len(safeDirections) > 0 {
+// 		return safeDirections[rand.Intn(len(safeDirections))]
+// 	}
 
-	// If no safe directions are found, make a random move as a fallback (risky)
-	return AllDirections[rand.Intn(len(AllDirections))]
-}
+// 	// If no safe directions are found, make a random move as a fallback (risky)
+// 	return AllDirections[rand.Intn(len(AllDirections))]
+// }
 
 // randomMove generates a safe move for all players.
 func randomMove(board Board) Move {
-	move := make(Move, len(board.Snakes))
-	for i, snake := range board.Snakes {
-		move[i] = safeMove(board, snake)
-	}
-	return move
+	moves := generateAllMoves(board)
+	return moves[0]
 }
 
-// generateAllMoves generates all possible combinations of valid moves for all players.
 func generateAllMoves(board Board) []Move {
 	numSnakes := len(board.Snakes)
-	numDirections := len(AllDirections)
 
 	if numSnakes == 0 {
 		return nil
 	}
-	totalMoves := int(math.Pow(float64(numDirections), float64(numSnakes)))
-	validMoves := []Move{}
 
-	for i := 0; i < totalMoves; i++ {
-		move := make(Move, numSnakes)
-		isValid := true
+	// Step 1: Prepare a modified version of the board where each snake's tail is temporarily removed
+	modifiedSnakes := make([]Snake, numSnakes)
+	for i, snake := range board.Snakes {
+		modifiedSnakes[i] = Snake{
+			Head: snake.Head,
+			Body: append([]Point{}, snake.Body...),
+		}
+		if len(modifiedSnakes[i].Body) > 1 {
+			modifiedSnakes[i].Body = modifiedSnakes[i].Body[:len(modifiedSnakes[i].Body)-1] // Chop off the tail
+		}
+	}
+	modifiedBoard := Board{
+		Width:  board.Width,
+		Height: board.Height,
+		Snakes: modifiedSnakes,
+	}
 
-		for j := 0; j < numSnakes; j++ {
-			move[j] = AllDirections[(i/int(math.Pow(float64(numDirections), float64(j))))%numDirections]
-			newHead := moveHead(board.Snakes[j].Head, move[j])
+	// Step 2: Generate the set of safe moves for each snake
+	safeMovesPerSnake := make([][]Direction, numSnakes)
+
+	for i := 0; i < numSnakes; i++ {
+		snake := board.Snakes[i]
+		safeMoves := []Direction{}
+
+		for _, direction := range AllDirections {
+			newHead := moveHead(snake.Head, direction)
 
 			// Check if the new head is within the board boundaries
 			if newHead.X < 0 || newHead.X >= board.Width || newHead.Y < 0 || newHead.Y >= board.Height {
-				isValid = false
-				break
+				continue
 			}
 
 			// Check if the move causes the snake to move back on itself
-			if len(board.Snakes[j].Body) > 1 {
-				neck := board.Snakes[j].Body[1] // The segment right after the head
+			if len(snake.Body) > 1 {
+				neck := snake.Body[1] // The segment right after the head
 				if newHead == neck {
-					isValid = false
+					continue
+				}
+			}
+
+			// Check for collisions with other snakes
+			collision := false
+			for j := 0; j < numSnakes; j++ {
+				otherSnake := modifiedBoard.Snakes[j]
+
+				// Check for collisions with other snakes' bodies
+				for _, segment := range otherSnake.Body {
+					if newHead == segment {
+						collision = true
+						break
+					}
+				}
+
+				// Check for head-to-head collisions where the other snake is longer or equal
+				if !collision && newHead == otherSnake.Head && len(otherSnake.Body) >= len(snake.Body) {
+					collision = true
 					break
 				}
 			}
+
+			// If there's no collision, add the direction to safe moves
+			if !collision {
+				safeMoves = append(safeMoves, direction)
+			}
 		}
 
-		if isValid {
-			validMoves = append(validMoves, move)
+		// If no safe moves, default to Up
+		if len(safeMoves) == 0 {
+			safeMoves = append(safeMoves, Up)
+		}
+
+		safeMovesPerSnake[i] = safeMoves
+	}
+
+	// Step 3: Generate all permutations of the safe moves
+	return generatePermutations(safeMovesPerSnake)
+}
+
+// Helper function to generate all permutations of moves
+func generatePermutations(safeMovesPerSnake [][]Direction) []Move {
+	if len(safeMovesPerSnake) == 0 {
+		return []Move{}
+	}
+
+	var helper func([][]Direction, int, Move, *[]Move)
+	helper = func(arrays [][]Direction, depth int, current Move, result *[]Move) {
+		if depth == len(arrays) {
+			// Copy the current move and append to result
+			moveCopy := append(Move(nil), current...)
+			*result = append(*result, moveCopy)
+			return
+		}
+		for _, dir := range arrays[depth] {
+			helper(arrays, depth+1, append(current, dir), result)
 		}
 	}
 
-	return validMoves
+	var result []Move
+	helper(safeMovesPerSnake, 0, Move{}, &result)
+
+	return result
 }

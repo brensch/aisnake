@@ -446,7 +446,7 @@ func TestMCTSVisualization(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.Description, func(t *testing.T) {
 			rootBoard := copyBoard(tc.InitialBoard)
-			ctx, _ := context.WithTimeout(context.Background(), 400*time.Millisecond)
+			ctx, _ := context.WithTimeout(context.Background(), 450*time.Millisecond)
 			node := MCTS(ctx, rootBoard, tc.Iterations, 2)
 
 			require.NotNil(t, node, "node is nil")

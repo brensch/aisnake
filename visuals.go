@@ -14,6 +14,7 @@ func visualizeBoard(game Board, options ...func(*boardOptions)) string {
 	opts := &boardOptions{
 		indent:           "",
 		newlineCharacter: "\n",
+		move:             nil,
 	}
 
 	// Apply any options provided
@@ -26,78 +27,119 @@ func visualizeBoard(game Board, options ...func(*boardOptions)) string {
 		return opts.indent + "Invalid board dimensions"
 	}
 
-	// Create a 2D slice to represent the board
-	board := make([][]rune, game.Height)
+	// Display moves at the top if provided
+	if opts.move != nil {
+		sb.WriteString(opts.indent)
+		for i, direction := range opts.move {
+			if i >= len(game.Snakes) {
+				continue
+			}
+			snakeChar := rune('a' + i)
+			var arrow rune
+			switch direction {
+			case Up:
+				arrow = '↑'
+			case Down:
+				arrow = '↓'
+			case Left:
+				arrow = '←'
+			case Right:
+				arrow = '→'
+			}
+			sb.WriteRune(snakeChar)
+			sb.WriteRune(arrow)
+			sb.WriteRune(' ')
+		}
+		sb.WriteString(opts.newlineCharacter)
+	}
+
+	// Extend the board by 1 in every direction
+	extendedHeight := game.Height + 2
+	extendedWidth := game.Width + 2
+
+	// Create a 2D slice to represent the extended board
+	board := make([][]rune, extendedHeight)
 	for i := range board {
-		board[i] = make([]rune, game.Width)
+		board[i] = make([]rune, extendedWidth)
 		for j := range board[i] {
-			board[i][j] = '.' // Initialize all positions as empty
+			if i == 0 || i == extendedHeight-1 || j == 0 || j == extendedWidth-1 {
+				board[i][j] = 'x' // Set the boundary to 'x'
+			} else {
+				board[i][j] = '.' // Initialize all positions as empty
+			}
 		}
 	}
 
 	// Function to adjust the Y coordinate to match the expected orientation
 	adjustY := func(y int) int {
-		return game.Height - 1 - y
-	}
-
-	// Helper function to check for out-of-bounds errors
-	checkOOB := func(x, y int) bool {
-		return x >= 0 && x < game.Width && y >= 0 && y < game.Height
+		return extendedHeight - 1 - (y + 1)
 	}
 
 	// Place food on the board
 	for _, food := range game.Food {
-		if checkOOB(food.X, food.Y) {
-			board[adjustY(food.Y)][food.X] = '🍎'
-		} else {
-			sb.WriteString(fmt.Sprintf("%sFood OOB at (%d, %d)%s", opts.indent, food.X, food.Y, opts.newlineCharacter))
-		}
+		board[adjustY(food.Y)][food.X+1] = '🍎'
 	}
 
 	// Place hazards on the board
 	for _, hazard := range game.Hazards {
-		if checkOOB(hazard.X, hazard.Y) {
-			board[adjustY(hazard.Y)][hazard.X] = 'H'
-		} else {
-			sb.WriteString(fmt.Sprintf("%sHazard OOB at (%d, %d)%s", opts.indent, hazard.X, hazard.Y, opts.newlineCharacter))
-		}
+		board[adjustY(hazard.Y)][hazard.X+1] = 'H'
 	}
 
 	// Place snakes on the board
 	for snakeIndex, snake := range game.Snakes {
-		if len(snake.Body) == 0 {
-			sb.WriteString(fmt.Sprintf("%sSnake has 0 length %s%s", opts.indent, snake.ID, opts.newlineCharacter))
-			continue
-		}
-
-		// Calculate the character to represent this snake
 		snakeChar := rune('a' + snakeIndex)
 		if snakeChar > 'z' {
 			snakeChar = '?' // Fallback in case of too many snakes
 		}
 
-		// Place snake head first
-		if checkOOB(snake.Head.X, snake.Head.Y) {
-			board[adjustY(snake.Head.Y)][snake.Head.X] = unicode.ToUpper(snakeChar)
-		} else {
-			sb.WriteString(fmt.Sprintf("%sSnake head OOB at (%d, %d)%s", opts.indent, snake.Head.X, snake.Head.Y, opts.newlineCharacter))
+		board[adjustY(snake.Head.Y)][snake.Head.X+1] = unicode.ToUpper(snakeChar)
+		for _, part := range snake.Body[1:] {
+			board[adjustY(part.Y)][part.X+1] = snakeChar
 		}
+	}
 
-		// Place snake body
-		for _, part := range snake.Body {
-			if part != snake.Head { // Skip the head position
-				if checkOOB(part.X, part.Y) {
-					board[adjustY(part.Y)][part.X] = snakeChar
-				} else {
-					sb.WriteString(fmt.Sprintf("%sSnake body OOB at (%d, %d)%s", opts.indent, part.X, part.Y, opts.newlineCharacter))
+	// Overlay arrows for moves if the option is provided
+	if opts.move != nil {
+		for i, direction := range opts.move {
+			if i >= len(game.Snakes) {
+				continue
+			}
+			snake := game.Snakes[i]
+			newHead := moveHead(snake.Head, direction)
+
+			var arrow rune
+			switch direction {
+			case Up:
+				arrow = '↑'
+			case Down:
+				arrow = '↓'
+			case Left:
+				arrow = '←'
+			case Right:
+				arrow = '→'
+			}
+
+			if checkOOB(newHead.X, newHead.Y, game.Width, game.Height) {
+				// Place the arrow on the boundary 'x' if the move is out of bounds
+				switch direction {
+				case Up:
+					board[adjustY(game.Height)][snake.Head.X+1] = arrow
+				case Down:
+					board[adjustY(-1)][snake.Head.X+1] = arrow
+				case Left:
+					board[adjustY(snake.Head.Y)][0] = arrow
+				case Right:
+					board[adjustY(snake.Head.Y)][extendedWidth-1] = arrow
 				}
+			} else {
+				board[adjustY(newHead.Y)][newHead.X+1] = arrow
 			}
 		}
 	}
 
 	// Build the string representation of the board
 	for _, row := range board {
-		sb.WriteString(opts.indent) // Apply indentation for each row
+		sb.WriteString(opts.indent)
 		for _, cell := range row {
 			sb.WriteRune(cell)
 			sb.WriteRune(' ')
@@ -108,10 +150,62 @@ func visualizeBoard(game Board, options ...func(*boardOptions)) string {
 	return sb.String()
 }
 
+// Helper function to check for out-of-bounds errors
+func checkOOB(x, y, width, height int) bool {
+	return x < 0 || x >= width || y < 0 || y >= height
+}
+
+// Helper function to mark the boundary when an arrow exceeds the board's dimensions
+func markBoundary(overlay [][]rune, x, y int, move Direction, width, height int) {
+	switch move {
+	case Up:
+		if y < height-1 {
+			overlay[0][x] = '↑'
+		} else {
+			overlay[height-1][x] = 'x'
+		}
+	case Down:
+		if y > 0 {
+			overlay[height-1][x] = '↓'
+		} else {
+			overlay[0][x] = 'x'
+		}
+	case Left:
+		if x > 0 {
+			overlay[y][0] = '←'
+		} else {
+			overlay[y][width-1] = 'x'
+		}
+	case Right:
+		if x < width-1 {
+			overlay[y][width-1] = '→'
+		} else {
+			overlay[y][0] = 'x'
+		}
+	}
+}
+
+// Helper function to extend the board with 'x' characters when an arrow exceeds the board's dimensions
+func extendBoardWithArrows(board *[][]rune, x, y, width, height int) {
+	if y >= height {
+		*board = append(*board, make([]rune, width))
+		height++
+	}
+	for i := 0; i < height; i++ {
+		if x >= width {
+			(*board)[i] = append((*board)[i], 'x')
+		}
+		if y >= height {
+			(*board)[y] = append((*board)[y], 'x')
+		}
+	}
+}
+
 // Options struct to hold the customizable parameters
 type boardOptions struct {
 	indent           string
 	newlineCharacter string
+	move             Move
 }
 
 // Option functions to set optional parameters
@@ -124,6 +218,12 @@ func WithIndent(indent string) func(*boardOptions) {
 func WithNewlineCharacter(newlineCharacter string) func(*boardOptions) {
 	return func(o *boardOptions) {
 		o.newlineCharacter = newlineCharacter
+	}
+}
+
+func WithMove(move Move) func(*boardOptions) {
+	return func(o *boardOptions) {
+		o.move = move
 	}
 }
 

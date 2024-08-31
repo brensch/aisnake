@@ -8,6 +8,7 @@ require (
 )
 
 require (
+	github.com/BattlesnakeOfficial/rules v1.2.3 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dlclark/regexp2 v1.11.4 // indirect
 	github.com/go-sourcemap/sourcemap v2.1.3+incompatible // indirect

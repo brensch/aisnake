@@ -154,9 +154,8 @@ func MCTS(ctx context.Context, rootBoard Board, iterations, numGoroutines int) *
 				defer wg.Done()
 
 				moves := 0
-				simBoard := copyBoard(boardCopy) // Create a copy of the board for simulation
 
-				for !boardIsTerminal(simBoard) {
+				for !boardIsTerminal(boardCopy) {
 					// Check if the context has been cancelled during the simulation
 					select {
 					case <-ctx.Done():
@@ -164,8 +163,8 @@ func MCTS(ctx context.Context, rootBoard Board, iterations, numGoroutines int) *
 					default:
 					}
 
-					move := randomMove(simBoard)
-					applyMoves(&simBoard, move)
+					move := randomMove(boardCopy)
+					applyMoves(&boardCopy, move)
 					moves++
 					if moves == maxMovesToIterate {
 						break
@@ -173,7 +172,7 @@ func MCTS(ctx context.Context, rootBoard Board, iterations, numGoroutines int) *
 				}
 
 				// Evaluate the final board state
-				score := evaluateBoard(simBoard)
+				score := evaluateBoard(boardCopy)
 				results <- score
 
 			}(copyBoard(board)) // Pass a copy of the board to each goroutine
