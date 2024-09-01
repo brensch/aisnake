@@ -8,41 +8,29 @@ import (
 
 const maxMovesToIterate = 100
 
-// Direction represents possible movement directions for a snake.
-type Direction int
-
-const (
-	Up Direction = iota
-	Down
-	Left
-	Right
-)
-
-// AllDirections provides a slice of all possible directions.
-var AllDirections = []Direction{Up, Down, Left, Right}
-
 // Node represents a node in the MCTS tree.
 type Node struct {
-	Board        Board   // The current state of the game board
-	Parent       *Node   // The parent node
-	Children     []*Node // The children nodes
-	Visits       int     // Number of times this node has been visited
-	Score        float64 // The total score accumulated through simulations
-	UntriedMoves []Move  // Moves that haven't been tried yet
+	Board        Board       // The current state of the game board
+	Parent       *Node       // The parent node
+	Children     []*Node     // The children nodes
+	Visits       int         // Number of times this node has been visited
+	Score        float64     // The total score accumulated through simulations
+	UntriedMoves []Direction // Moves that haven't been tried yet for the current snake
+	SnakeIndex   int         // Index of the snake whose move is being evaluated
+	Move         Direction   // The move that was applied to reach this node
 }
 
-// Move represents the moves for all players in the game.
-type Move []Direction
-
 // NewNode creates a new MCTS node.
-func NewNode(board Board, parent *Node) *Node {
+func NewNode(board Board, parent *Node, snakeIndex int, move Direction) *Node {
 	return &Node{
 		Board:        board,
 		Parent:       parent,
 		Children:     []*Node{},
 		Visits:       0,
 		Score:        0,
-		UntriedMoves: generateAllMoves(board),
+		UntriedMoves: generateSafeMoves(board, snakeIndex),
+		SnakeIndex:   snakeIndex,
+		Move:         move,
 	}
 }
 
@@ -82,7 +70,7 @@ func (n *Node) SelectChild() *Node {
 	return selected
 }
 
-// Expand adds new child nodes by generating all possible moves for all players.
+// Expand adds new child nodes by generating all possible moves for the current snake.
 func (n *Node) Expand() []*Node {
 	if len(n.UntriedMoves) == 0 {
 		return nil
@@ -91,14 +79,17 @@ func (n *Node) Expand() []*Node {
 	children := []*Node{}
 	for _, move := range n.UntriedMoves {
 		newBoard := copyBoard(n.Board)
-		applyMoves(&newBoard, move)
-		childNode := NewNode(newBoard, n)
+		applyMove(&newBoard, n.SnakeIndex, move)
+
+		nextSnakeIndex := (n.SnakeIndex + 1) % len(newBoard.Snakes) // Determine the next snake's turn
+
+		childNode := NewNode(newBoard, n, nextSnakeIndex, move)
 		n.Children = append(n.Children, childNode)
 		children = append(children, childNode)
 	}
 
 	// Clear untried moves since all have been expanded
-	n.UntriedMoves = []Move{}
+	n.UntriedMoves = []Direction{}
 	return children
 }
 
@@ -110,9 +101,9 @@ func (n *Node) Update(score float64) {
 
 // MCTS runs the Monte Carlo Tree Search algorithm with context for cancellation.
 func MCTS(ctx context.Context, rootBoard Board, iterations, numGoroutines int) *Node {
-	rootNode := NewNode(rootBoard, nil)
+	rootNode := NewNode(rootBoard, nil, 0, -1) // Start with the first snake
 
-	// we need to do at least 2 iterations or we will have no children
+	// We need to do at least 2 iterations, or we will have no children
 	if iterations < 2 {
 		iterations = 2
 	}
@@ -150,10 +141,11 @@ func MCTS(ctx context.Context, rootBoard Board, iterations, numGoroutines int) *
 
 		for g := 0; g < numGoroutines; g++ {
 			wg.Add(1)
-			go func(boardCopy Board) {
+			go func(boardCopy Board, startSnakeIndex int) {
 				defer wg.Done()
 
 				moves := 0
+				currentSnakeIndex := startSnakeIndex
 
 				for !boardIsTerminal(boardCopy) {
 					// Check if the context has been cancelled during the simulation
@@ -163,8 +155,10 @@ func MCTS(ctx context.Context, rootBoard Board, iterations, numGoroutines int) *
 					default:
 					}
 
-					move := randomMove(boardCopy)
-					applyMoves(&boardCopy, move)
+					move := randomSafeMove(boardCopy, currentSnakeIndex)
+					applyMove(&boardCopy, currentSnakeIndex, move)
+
+					currentSnakeIndex = (currentSnakeIndex + 1) % len(boardCopy.Snakes) // Move to the next snake
 					moves++
 					if moves == maxMovesToIterate {
 						break
@@ -175,7 +169,7 @@ func MCTS(ctx context.Context, rootBoard Board, iterations, numGoroutines int) *
 				score := evaluateBoard(boardCopy)
 				results <- score
 
-			}(copyBoard(board)) // Pass a copy of the board to each goroutine
+			}(copyBoard(board), node.SnakeIndex) // Pass a copy of the board and the starting snake index to each goroutine
 		}
 
 		// Wait for all rollouts to complete
@@ -211,4 +205,10 @@ func MCTS(ctx context.Context, rootBoard Board, iterations, numGoroutines int) *
 	}
 
 	return rootNode
+}
+
+// randomSafeMove generates a random safe move for the given snake.
+func randomSafeMove(board Board, snakeIndex int) Direction {
+	safeMoves := generateSafeMoves(board, snakeIndex)
+	return safeMoves[0] // Return the first safe move; you might want to randomize this selection
 }

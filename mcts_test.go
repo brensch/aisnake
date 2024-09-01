@@ -104,7 +104,7 @@ type ExpandTestCase struct {
 	Description      string
 	InitialNode      *Node
 	ExpectedChildren int
-	ExpectedMoves    []Move
+	ExpectedMoves    []Direction
 }
 
 func TestExpand(t *testing.T) {
@@ -118,16 +118,12 @@ func TestExpand(t *testing.T) {
 						{ID: "snake1", Head: Point{X: 2, Y: 2}},
 					},
 				}
-				node := NewNode(board, nil)
-				node.UntriedMoves = []Move{
-					{Up},
-				}
+				node := NewNode(board, nil, 0, Up)
+				node.UntriedMoves = []Direction{Up}
 				return node
 			}(),
 			ExpectedChildren: 1,
-			ExpectedMoves: []Move{
-				{Up},
-			},
+			ExpectedMoves:    []Direction{Up},
 		},
 		{
 			Description: "Expand with multiple untried moves for one snake",
@@ -138,19 +134,15 @@ func TestExpand(t *testing.T) {
 						{ID: "snake1", Head: Point{X: 2, Y: 2}},
 					},
 				}
-				node := NewNode(board, nil)
-				node.UntriedMoves = []Move{
-					{Up}, {Down}, {Left}, {Right},
-				}
+				node := NewNode(board, nil, 0, Up)
+				node.UntriedMoves = []Direction{Up, Down, Left, Right}
 				return node
 			}(),
 			ExpectedChildren: 4,
-			ExpectedMoves: []Move{
-				{Up}, {Down}, {Left}, {Right},
-			},
+			ExpectedMoves:    []Direction{Up, Down, Left, Right},
 		},
 		{
-			Description: "Expand with two snakes and multiple untried moves",
+			Description: "Expand with two snakes and one untried move for each",
 			InitialNode: func() *Node {
 				board := Board{
 					Height: 5, Width: 5,
@@ -159,16 +151,12 @@ func TestExpand(t *testing.T) {
 						{ID: "snake2", Head: Point{X: 3, Y: 3}},
 					},
 				}
-				node := NewNode(board, nil)
-				node.UntriedMoves = []Move{
-					{Up, Down}, {Left, Right},
-				}
+				node := NewNode(board, nil, 0, Up)
+				node.UntriedMoves = []Direction{Up, Left} // For snake 1
 				return node
 			}(),
 			ExpectedChildren: 2,
-			ExpectedMoves: []Move{
-				{Up, Down}, {Left, Right},
-			},
+			ExpectedMoves:    []Direction{Up, Left},
 		},
 		{
 			Description: "Expand when no untried moves remain",
@@ -179,35 +167,12 @@ func TestExpand(t *testing.T) {
 						{ID: "snake1", Head: Point{X: 2, Y: 2}},
 					},
 				}
-				node := NewNode(board, nil)
-				node.UntriedMoves = []Move{}
+				node := NewNode(board, nil, 0, Up)
+				node.UntriedMoves = []Direction{}
 				return node
 			}(),
 			ExpectedChildren: 0,
-			ExpectedMoves:    []Move{},
-		},
-		{
-			Description: "Expand with multiple snakes and all possible moves",
-			InitialNode: func() *Node {
-				board := Board{
-					Height: 5, Width: 5,
-					Snakes: []Snake{
-						{ID: "snake1", Head: Point{X: 2, Y: 2}},
-						{ID: "snake2", Head: Point{X: 3, Y: 3}},
-					},
-				}
-				node := NewNode(board, nil)
-				node.UntriedMoves = generateAllMoves(board)
-				return node
-			}(),
-			ExpectedChildren: 16, // 4 directions per snake, so 4 * 4 = 16 combinations
-			ExpectedMoves: generateAllMoves(Board{
-				Height: 5, Width: 5,
-				Snakes: []Snake{
-					{ID: "snake1", Head: Point{X: 2, Y: 2}},
-					{ID: "snake2", Head: Point{X: 3, Y: 3}},
-				},
-			}),
+			ExpectedMoves:    []Direction{},
 		},
 		{
 			Description: "Expand with a snake at the board edge",
@@ -218,16 +183,12 @@ func TestExpand(t *testing.T) {
 						{ID: "snake1", Head: Point{X: 4, Y: 4}}, // At the bottom-right corner
 					},
 				}
-				node := NewNode(board, nil)
-				node.UntriedMoves = []Move{
-					{Up}, {Left},
-				}
+				node := NewNode(board, nil, 0, Up)
+				node.UntriedMoves = []Direction{Up, Left}
 				return node
 			}(),
 			ExpectedChildren: 2,
-			ExpectedMoves: []Move{
-				{Up}, {Left},
-			},
+			ExpectedMoves:    []Direction{Up, Left},
 		},
 		{
 			Description: "Expand with multiple snakes and hazard on the board",
@@ -242,16 +203,12 @@ func TestExpand(t *testing.T) {
 						{ID: "snake2", Head: Point{X: 3, Y: 3}},
 					},
 				}
-				node := NewNode(board, nil)
-				node.UntriedMoves = []Move{
-					{Right, Left}, {Down, Up},
-				}
+				node := NewNode(board, nil, 0, Up)
+				node.UntriedMoves = []Direction{Right, Down} // For snake 1
 				return node
 			}(),
 			ExpectedChildren: 2,
-			ExpectedMoves: []Move{
-				{Right, Left}, {Down, Up},
-			},
+			ExpectedMoves:    []Direction{Right, Down},
 		},
 	}
 
@@ -270,7 +227,7 @@ func TestExpand(t *testing.T) {
 
 				// Generate the expected board state
 				expectedBoard := copyBoard(tc.InitialNode.Board)
-				applyMoves(&expectedBoard, tc.ExpectedMoves[i])
+				applyMove(&expectedBoard, tc.InitialNode.SnakeIndex, tc.ExpectedMoves[i])
 
 				// Compare the actual child board with the expected board state
 				if !assert.Equal(t, expectedBoard, child.Board, "The child's board state does not match the expected state after applying the move") {
@@ -287,15 +244,16 @@ func TestExpand(t *testing.T) {
 	}
 }
 
-type ApplyMovesTestCase struct {
+type ApplyMoveTestCase struct {
 	Description   string
 	InitialBoard  Board
-	Moves         Move
+	Move          Direction
+	SnakeIndex    int
 	ExpectedBoard Board
 }
 
-func TestApplyMoves(t *testing.T) {
-	testCases := []ApplyMovesTestCase{
+func TestApplyMove(t *testing.T) {
+	testCases := []ApplyMoveTestCase{
 		{
 			Description: "Single snake moves up and loses health",
 			InitialBoard: Board{
@@ -304,7 +262,8 @@ func TestApplyMoves(t *testing.T) {
 					{ID: "snake1", Health: 100, Head: Point{X: 2, Y: 2}, Body: []Point{{X: 2, Y: 2}, {X: 2, Y: 1}}},
 				},
 			},
-			Moves: Move{Up},
+			Move:       Up,
+			SnakeIndex: 0,
 			ExpectedBoard: Board{
 				Height: 5, Width: 5,
 				Snakes: []Snake{
@@ -321,7 +280,8 @@ func TestApplyMoves(t *testing.T) {
 					{ID: "snake1", Health: 98, Head: Point{X: 2, Y: 2}, Body: []Point{{X: 2, Y: 2}, {X: 2, Y: 1}}},
 				},
 			},
-			Moves: Move{Up},
+			Move:       Up,
+			SnakeIndex: 0,
 			ExpectedBoard: Board{
 				Height: 5, Width: 5,
 				Food: []Point{}, // Food is consumed
@@ -338,7 +298,8 @@ func TestApplyMoves(t *testing.T) {
 					{ID: "snake1", Health: 100, Head: Point{X: 4, Y: 4}, Body: []Point{{X: 4, Y: 4}, {X: 3, Y: 4}}},
 				},
 			},
-			Moves: Move{Right},
+			Move:       Right,
+			SnakeIndex: 0,
 			ExpectedBoard: Board{
 				Height: 5, Width: 5,
 				Snakes: []Snake{}, // Snake dies
@@ -353,7 +314,8 @@ func TestApplyMoves(t *testing.T) {
 					{ID: "snake2", Health: 100, Head: Point{X: 3, Y: 2}, Body: []Point{{X: 3, Y: 2}, {X: 4, Y: 2}}},
 				},
 			},
-			Moves: Move{Right, Left},
+			Move:       Right,
+			SnakeIndex: 0,
 			ExpectedBoard: Board{
 				Height: 5, Width: 5,
 				Snakes: []Snake{
@@ -371,7 +333,8 @@ func TestApplyMoves(t *testing.T) {
 					{ID: "snake2", Health: 100, Head: Point{X: 3, Y: 3}, Body: []Point{{X: 3, Y: 3}, {X: 3, Y: 4}}},
 				},
 			},
-			Moves: Move{Right, Down},
+			Move:       Right,
+			SnakeIndex: 0,
 			ExpectedBoard: Board{
 				Height: 5, Width: 5,
 				Snakes: []Snake{
@@ -390,7 +353,8 @@ func TestApplyMoves(t *testing.T) {
 					{ID: "snake2", Health: 100, Head: Point{X: 3, Y: 3}, Body: []Point{{X: 3, Y: 3}, {X: 3, Y: 4}}},
 				},
 			},
-			Moves: Move{Right, Down},
+			Move:       Right,
+			SnakeIndex: 0,
 			ExpectedBoard: Board{
 				Height: 5, Width: 5,
 				Snakes: []Snake{
@@ -402,7 +366,7 @@ func TestApplyMoves(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.Description, func(t *testing.T) {
-			applyMoves(&tc.InitialBoard, tc.Moves)
+			applyMove(&tc.InitialBoard, tc.SnakeIndex, tc.Move)
 			assert.Equal(t, tc.ExpectedBoard, tc.InitialBoard, "The resulting board state does not match the expected board state")
 		})
 	}

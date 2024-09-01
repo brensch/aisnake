@@ -7,6 +7,7 @@ import (
 	"unicode"
 )
 
+// visualizeBoard renders the board state along with the move of the current snake
 func visualizeBoard(game Board, options ...func(*boardOptions)) string {
 	var sb strings.Builder
 
@@ -14,7 +15,8 @@ func visualizeBoard(game Board, options ...func(*boardOptions)) string {
 	opts := &boardOptions{
 		indent:           "",
 		newlineCharacter: "\n",
-		move:             nil,
+		snakeIndex:       -1,    // Default: no snake selected
+		move:             Unset, // Default: no move selected
 	}
 
 	// Apply any options provided
@@ -27,29 +29,25 @@ func visualizeBoard(game Board, options ...func(*boardOptions)) string {
 		return opts.indent + "Invalid board dimensions"
 	}
 
-	// Display moves at the top if provided
-	if opts.move != nil {
+	// Display the move at the top if a move is set
+	var arrow rune
+	if opts.move != Unset && opts.snakeIndex != -1 {
 		sb.WriteString(opts.indent)
-		for i, direction := range opts.move {
-			if i >= len(game.Snakes) {
-				continue
-			}
-			snakeChar := rune('a' + i)
-			var arrow rune
-			switch direction {
-			case Up:
-				arrow = '↑'
-			case Down:
-				arrow = '↓'
-			case Left:
-				arrow = '←'
-			case Right:
-				arrow = '→'
-			}
-			sb.WriteRune(snakeChar)
-			sb.WriteRune(arrow)
-			sb.WriteRune(' ')
+		snakeChar := rune('a' + opts.snakeIndex)
+		switch opts.move {
+		case Up:
+			arrow = '↑'
+		case Down:
+			arrow = '↓'
+		case Left:
+			arrow = '←'
+		case Right:
+			arrow = '→'
+		default:
+			arrow = ' ' // Handle unexpected cases
 		}
+		sb.WriteRune(snakeChar)
+		sb.WriteRune(arrow)
 		sb.WriteString(opts.newlineCharacter)
 	}
 
@@ -86,8 +84,8 @@ func visualizeBoard(game Board, options ...func(*boardOptions)) string {
 	}
 
 	// Place snakes on the board
-	for snakeIndex, snake := range game.Snakes {
-		snakeChar := rune('a' + snakeIndex)
+	for i, snake := range game.Snakes {
+		snakeChar := rune('a' + i)
 		if snakeChar > 'z' {
 			snakeChar = '?' // Fallback in case of too many snakes
 		}
@@ -98,42 +96,11 @@ func visualizeBoard(game Board, options ...func(*boardOptions)) string {
 		}
 	}
 
-	// Overlay arrows for moves if the option is provided
-	if opts.move != nil {
-		for i, direction := range opts.move {
-			if i >= len(game.Snakes) {
-				continue
-			}
-			snake := game.Snakes[i]
-			newHead := moveHead(snake.Head, direction)
-
-			var arrow rune
-			switch direction {
-			case Up:
-				arrow = '↑'
-			case Down:
-				arrow = '↓'
-			case Left:
-				arrow = '←'
-			case Right:
-				arrow = '→'
-			}
-
-			if checkOOB(newHead.X, newHead.Y, game.Width, game.Height) {
-				// Place the arrow on the boundary 'x' if the move is out of bounds
-				switch direction {
-				case Up:
-					board[adjustY(game.Height)][snake.Head.X+1] = arrow
-				case Down:
-					board[adjustY(-1)][snake.Head.X+1] = arrow
-				case Left:
-					board[adjustY(snake.Head.Y)][0] = arrow
-				case Right:
-					board[adjustY(snake.Head.Y)][extendedWidth-1] = arrow
-				}
-			} else {
-				board[adjustY(newHead.Y)][newHead.X+1] = arrow
-			}
+	// Overlay the arrow for the current snake's move without OOB check
+	if opts.move != Unset && opts.snakeIndex != -1 {
+		newHead := moveHead(game.Snakes[opts.snakeIndex].Head, opts.move)
+		if arrow != ' ' { // Ensure arrow is set
+			board[adjustY(newHead.Y)][newHead.X+1] = arrow
 		}
 	}
 
@@ -155,57 +122,12 @@ func checkOOB(x, y, width, height int) bool {
 	return x < 0 || x >= width || y < 0 || y >= height
 }
 
-// Helper function to mark the boundary when an arrow exceeds the board's dimensions
-func markBoundary(overlay [][]rune, x, y int, move Direction, width, height int) {
-	switch move {
-	case Up:
-		if y < height-1 {
-			overlay[0][x] = '↑'
-		} else {
-			overlay[height-1][x] = 'x'
-		}
-	case Down:
-		if y > 0 {
-			overlay[height-1][x] = '↓'
-		} else {
-			overlay[0][x] = 'x'
-		}
-	case Left:
-		if x > 0 {
-			overlay[y][0] = '←'
-		} else {
-			overlay[y][width-1] = 'x'
-		}
-	case Right:
-		if x < width-1 {
-			overlay[y][width-1] = '→'
-		} else {
-			overlay[y][0] = 'x'
-		}
-	}
-}
-
-// Helper function to extend the board with 'x' characters when an arrow exceeds the board's dimensions
-func extendBoardWithArrows(board *[][]rune, x, y, width, height int) {
-	if y >= height {
-		*board = append(*board, make([]rune, width))
-		height++
-	}
-	for i := 0; i < height; i++ {
-		if x >= width {
-			(*board)[i] = append((*board)[i], 'x')
-		}
-		if y >= height {
-			(*board)[y] = append((*board)[y], 'x')
-		}
-	}
-}
-
 // Options struct to hold the customizable parameters
 type boardOptions struct {
 	indent           string
 	newlineCharacter string
-	move             Move
+	move             Direction // Represents the move of a single snake
+	snakeIndex       int       // The index of the snake whose move is being visualized
 }
 
 // Option functions to set optional parameters
@@ -221,9 +143,10 @@ func WithNewlineCharacter(newlineCharacter string) func(*boardOptions) {
 	}
 }
 
-func WithMove(move Move) func(*boardOptions) {
+func WithMove(move Direction, snakeIndex int) func(*boardOptions) {
 	return func(o *boardOptions) {
 		o.move = move
+		o.snakeIndex = snakeIndex
 	}
 }
 
@@ -293,12 +216,20 @@ func generateMermaidTreeForNode(node *Node, depth int, edgeCount *int, nodeSet m
 	// Generate a unique identifier for the node
 	nodeID := fmt.Sprintf("Node_%p", node)
 
+	// Determine the move that led to this node
+	move := node.Move
+
+	// Add which snake is moving at the top
+	snakeLabel := fmt.Sprintf("Snake %d moved %s<br/>", node.SnakeIndex+1, directionToString(move))
+
 	// Node details for root (without UCB value)
-	nodeLabel := fmt.Sprintf("Visits: %d<br/>Average Score: %.2f<br/>Untried Moves: %d",
-		node.Visits, node.Score/float64(node.Visits), len(node.UntriedMoves))
+	nodeLabel := fmt.Sprintf("%sVisits: %d<br/>Average Score: %.2f<br/>Untried Moves: %d",
+		snakeLabel, node.Visits, node.Score/float64(node.Visits), len(node.UntriedMoves))
 
 	// Add the board state using visualizeBoard with <br/> for newlines
-	boardVisualization := visualizeBoard(node.Board, WithNewlineCharacter("<br/>"))
+	boardVisualization := visualizeBoard(node.Board,
+		WithMove(move, node.SnakeIndex),
+		WithNewlineCharacter("<br/>"))
 	nodeLabel += "<br/>" + boardVisualization
 
 	// Add the Voronoi visualization with <br/> for newlines
@@ -333,6 +264,22 @@ func generateMermaidTreeForNode(node *Node, depth int, edgeCount *int, nodeSet m
 	}
 
 	return sb.String()
+}
+
+// directionToString converts a Direction to a string representation.
+func directionToString(direction Direction) string {
+	switch direction {
+	case Up:
+		return "Up"
+	case Down:
+		return "Down"
+	case Left:
+		return "Left"
+	case Right:
+		return "Right"
+	default:
+		return "Unknown"
+	}
 }
 
 // Path represents a path in the tree with its corresponding depth

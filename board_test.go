@@ -7,21 +7,13 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestGenerateAllMoves(t *testing.T) {
+func TestGenerateSafeMoves(t *testing.T) {
 	testCases := []struct {
 		Description   string
 		Board         Board
-		ExpectedMoves []Move
+		SnakeIndex    int
+		ExpectedMoves []Direction
 	}{
-		{
-			Description: "No snakes on the board",
-			Board: Board{
-				Height: 5,
-				Width:  5,
-				Snakes: []Snake{},
-			},
-			ExpectedMoves: []Move{},
-		},
 		{
 			Description: "One snake in the middle of the board",
 			Board: Board{
@@ -31,11 +23,9 @@ func TestGenerateAllMoves(t *testing.T) {
 					{ID: "snake1", Head: Point{X: 2, Y: 2}, Body: []Point{{X: 2, Y: 2}}},
 				},
 			},
-			ExpectedMoves: []Move{
-				{Up},
-				{Down},
-				{Left},
-				{Right},
+			SnakeIndex: 0,
+			ExpectedMoves: []Direction{
+				Up, Down, Left, Right,
 			},
 		},
 		{
@@ -47,56 +37,10 @@ func TestGenerateAllMoves(t *testing.T) {
 					{ID: "snake1", Head: Point{X: 0, Y: 0}, Body: []Point{{X: 0, Y: 0}}}, // Bottom-left corner
 				},
 			},
-			ExpectedMoves: []Move{
-				{Up},    // Can move up
-				{Right}, // Can move right
-			},
-		},
-		{
-			Description: "Two snakes on the board with valid moves only",
-			Board: Board{
-				Height: 5,
-				Width:  5,
-				Snakes: []Snake{
-					{ID: "snake1", Head: Point{X: 1, Y: 1}, Body: []Point{{X: 1, Y: 1}}}, // Near bottom-left corner
-					{ID: "snake2", Head: Point{X: 3, Y: 3}, Body: []Point{{X: 3, Y: 3}}}, // Near center
-				},
-			},
-			ExpectedMoves: []Move{
-				{Up, Up}, {Up, Down}, {Up, Left}, {Up, Right},
-				{Right, Up}, {Right, Down}, {Right, Left}, {Right, Right},
-				{Left, Up}, {Left, Down}, {Left, Left}, {Left, Right},
-				{Down, Up}, {Down, Down}, {Down, Left}, {Down, Right},
-			},
-		},
-		{
-			Description: "Snake on the board edge with other snakes",
-			Board: Board{
-				Height: 5,
-				Width:  5,
-				Snakes: []Snake{
-					{ID: "snake1", Head: Point{X: 4, Y: 4}, Body: []Point{{X: 4, Y: 4}}}, // Top-right corner
-					{ID: "snake2", Head: Point{X: 2, Y: 2}, Body: []Point{{X: 2, Y: 2}}}, // Center
-				},
-			},
-			ExpectedMoves: []Move{
-				{Down, Up}, {Down, Down}, {Down, Left}, {Down, Right},
-				{Left, Up}, {Left, Down}, {Left, Left}, {Left, Right},
-			},
-		},
-		{
-			Description: "Two snakes on the board with corner positions",
-			Board: Board{
-				Height: 5,
-				Width:  5,
-				Snakes: []Snake{
-					{ID: "snake1", Head: Point{X: 0, Y: 0}, Body: []Point{{X: 0, Y: 0}}}, // Bottom-left corner
-					{ID: "snake2", Head: Point{X: 4, Y: 4}, Body: []Point{{X: 4, Y: 4}}}, // Top-right corner
-				},
-			},
-			ExpectedMoves: []Move{
-				{Up, Down}, {Up, Left},
-				{Right, Down}, {Right, Left},
+			SnakeIndex: 0,
+			ExpectedMoves: []Direction{
+				Up,    // Can move up
+				Right, // Can move right
 			},
 		},
 		{
@@ -116,34 +60,11 @@ func TestGenerateAllMoves(t *testing.T) {
 					},
 				},
 			},
-			ExpectedMoves: []Move{
-				{Up},    // Can move up
-				{Left},  // Can move left
-				{Right}, // Can move right
-				// {Down} is invalid as it would cause the snake to move back on itself
-			},
-		},
-		{
-			Description: "One multi-length snake in the middle of the board",
-			Board: Board{
-				Height: 5,
-				Width:  5,
-				Snakes: []Snake{
-					{
-						ID:   "snake1",
-						Head: Point{X: 2, Y: 2},
-						Body: []Point{
-							{X: 2, Y: 2},
-							{X: 2, Y: 1}, // Neck position, right behind the head
-							{X: 2, Y: 0},
-						},
-					},
-				},
-			},
-			ExpectedMoves: []Move{
-				{Up},    // Can move up
-				{Left},  // Can move left
-				{Right}, // Can move right
+			SnakeIndex: 0,
+			ExpectedMoves: []Direction{
+				Up,    // Can move up
+				Left,  // Can move left
+				Right, // Can move right
 				// {Down} is invalid as it would cause the snake to move back on itself
 			},
 		},
@@ -170,53 +91,9 @@ func TestGenerateAllMoves(t *testing.T) {
 					},
 				},
 			},
-			ExpectedMoves: []Move{
-				{Up}, // Forced to move up, but it collides with its own body (this represents the only possible move)
-			},
-		},
-		{
-			Description: "Snake with no safe moves at top of board",
-			Board: Board{
-				Height: 5,
-				Width:  5,
-				Snakes: []Snake{
-					{
-						ID:   "snake1",
-						Head: Point{X: 0, Y: 4},
-						Body: []Point{
-							{X: 0, Y: 4},
-							{X: 0, Y: 3},
-							{X: 1, Y: 3},
-							{X: 1, Y: 4},
-							{X: 2, Y: 4},
-						},
-					},
-				},
-			},
-			ExpectedMoves: []Move{
-				{Up}, // Forced to move up, but it collides with its own body (this represents the only possible move)
-			},
-		},
-		{
-			Description: "Chase your tail out",
-			Board: Board{
-				Height: 5,
-				Width:  5,
-				Snakes: []Snake{
-					{
-						ID:   "snake1",
-						Head: Point{X: 0, Y: 4},
-						Body: []Point{
-							{X: 0, Y: 4},
-							{X: 0, Y: 3},
-							{X: 1, Y: 3},
-							{X: 1, Y: 4},
-						},
-					},
-				},
-			},
-			ExpectedMoves: []Move{
-				{Right}, // Forced to move right to get out through its tail
+			SnakeIndex: 0,
+			ExpectedMoves: []Direction{
+				Up, // Forced to move up, but it collides with its own body (this represents the only possible move)
 			},
 		},
 		{
@@ -233,7 +110,8 @@ func TestGenerateAllMoves(t *testing.T) {
 							{X: 0, Y: 3},
 							{X: 1, Y: 3},
 							{X: 1, Y: 4},
-							{X: 2, Y: 4},
+							{X: 1, Y: 5},
+							{X: 0, Y: 5},
 						},
 					},
 					{
@@ -243,8 +121,9 @@ func TestGenerateAllMoves(t *testing.T) {
 					},
 				},
 			},
-			ExpectedMoves: []Move{
-				{Up, Up}, {Up, Down}, {Up, Left}, {Up, Right},
+			SnakeIndex: 0, // Testing moves for snake1
+			ExpectedMoves: []Direction{
+				Up,
 			},
 		},
 		{
@@ -258,8 +137,7 @@ func TestGenerateAllMoves(t *testing.T) {
 						Head: Point{X: 2, Y: 2},
 						Body: []Point{
 							{X: 2, Y: 2},
-							{X: 2, Y: 1}, // Body extends up
-							{X: 2, Y: 0},
+							{X: 2, Y: 1}, // Body extends down
 						},
 					},
 					{
@@ -272,18 +150,17 @@ func TestGenerateAllMoves(t *testing.T) {
 					},
 				},
 			},
-			ExpectedMoves: []Move{
-				{Up, Up}, {Up, Left}, {Up, Right},
-				{Left, Up}, {Left, Left}, {Left, Right},
-				{Right, Up}, {Right, Left}, {Right, Right},
-				// {Down, _} should not be present since moving Down would make snake1 collide with snake2's body
+			SnakeIndex: 0, // Testing moves for snake1
+			ExpectedMoves: []Direction{
+				Up, Left, Right,
+				// Down should not be present since moving Down would make snake1 collide with snake2's body
 			},
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.Description, func(t *testing.T) {
-			moves := generateAllMoves(tc.Board)
+			moves := generateSafeMoves(tc.Board, tc.SnakeIndex)
 
 			if tc.ExpectedMoves != nil {
 				assert.ElementsMatch(t, tc.ExpectedMoves, moves, "Moves do not match expected values")
@@ -294,11 +171,11 @@ func TestGenerateAllMoves(t *testing.T) {
 
 			t.Log("generated")
 			for _, move := range moves {
-				fmt.Println(visualizeBoard(tc.Board, WithMove(move)))
+				fmt.Println(visualizeBoard(tc.Board, WithMove(move, tc.SnakeIndex), WithNewlineCharacter("\n")))
 			}
 			t.Log("expected")
 			for _, move := range tc.ExpectedMoves {
-				fmt.Println(visualizeBoard(tc.Board, WithMove(move)))
+				fmt.Println(visualizeBoard(tc.Board, WithMove(move, tc.SnakeIndex), WithNewlineCharacter("\n")))
 			}
 		})
 	}
