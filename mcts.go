@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"math"
+	"math/rand"
 	"sync"
 )
 
@@ -10,27 +11,29 @@ const maxMovesToIterate = 100
 
 // Node represents a node in the MCTS tree.
 type Node struct {
-	Board        Board       // The current state of the game board
-	Parent       *Node       // The parent node
-	Children     []*Node     // The children nodes
-	Visits       int         // Number of times this node has been visited
-	Score        float64     // The total score accumulated through simulations
-	UntriedMoves []Direction // Moves that haven't been tried yet for the current snake
-	SnakeIndex   int         // Index of the snake whose move is being evaluated
-	Move         Direction   // The move that was applied to reach this node
+	Board              Board       // The current state of the game board
+	Parent             *Node       // The parent node
+	Children           []*Node     // The children nodes
+	Visits             int         // Number of times this node has been visited
+	Score              float64     // The total score accumulated through simulations
+	UntriedMoves       []Direction // Moves that haven't been tried yet for the current snake
+	SnakeIndex         int         // Index of the snake whose move is being evaluated
+	SnakeIndexWhoMoved int
+	Move               Direction // The move that was applied to reach this node
 }
 
 // NewNode creates a new MCTS node.
-func NewNode(board Board, parent *Node, snakeIndex int, move Direction) *Node {
+func NewNode(board Board, parent *Node, snakeIndex, snakeIndexWhoMoved int, move Direction) *Node {
 	return &Node{
-		Board:        board,
-		Parent:       parent,
-		Children:     []*Node{},
-		Visits:       0,
-		Score:        0,
-		UntriedMoves: generateSafeMoves(board, snakeIndex),
-		SnakeIndex:   snakeIndex,
-		Move:         move,
+		Board:              board,
+		Parent:             parent,
+		Children:           []*Node{},
+		Visits:             0,
+		Score:              0,
+		UntriedMoves:       generateSafeMoves(board, snakeIndex),
+		SnakeIndex:         snakeIndex,
+		SnakeIndexWhoMoved: snakeIndexWhoMoved,
+		Move:               move,
 	}
 }
 
@@ -80,16 +83,16 @@ func (n *Node) Expand() []*Node {
 	for _, move := range n.UntriedMoves {
 		newBoard := copyBoard(n.Board)
 		applyMove(&newBoard, n.SnakeIndex, move)
+		// The next snake's turn, but keep the index for evaluation of this move
+		nextSnakeIndex := (n.SnakeIndex + 1) % len(newBoard.Snakes)
 
-		nextSnakeIndex := (n.SnakeIndex + 1) % len(newBoard.Snakes) // Determine the next snake's turn
-
-		childNode := NewNode(newBoard, n, nextSnakeIndex, move)
-		n.Children = append(n.Children, childNode)
+		childNode := NewNode(newBoard, n, nextSnakeIndex, n.SnakeIndex, move)
 		children = append(children, childNode)
 	}
 
 	// Clear untried moves since all have been expanded
 	n.UntriedMoves = []Direction{}
+	n.Children = append(n.Children, children...) // Save the expanded children to the node
 	return children
 }
 
@@ -99,56 +102,57 @@ func (n *Node) Update(score float64) {
 	n.Score += score
 }
 
-// MCTS runs the Monte Carlo Tree Search algorithm with context for cancellation.
 func MCTS(ctx context.Context, rootBoard Board, iterations, numGoroutines int) *Node {
-	rootNode := NewNode(rootBoard, nil, 0, -1) // Start with the first snake
+	rootNode := NewNode(rootBoard, nil, 0, -1, Unset) // Start with the first snake, with an Unset move
+	// fmt.Println("root", rootNode.SnakeIndex)
+	// fmt.Println(visualizeBoard(rootNode.Board))
 
-	// We need to do at least 2 iterations, or we will have no children
 	if iterations < 2 {
 		iterations = 2
 	}
 
 	for i := 0; i < iterations; i++ {
-		// Check if the context has been cancelled
 		select {
 		case <-ctx.Done():
-			return rootNode // Return the current state of the tree if cancelled
+			return rootNode // Exit early if the context is canceled
 		default:
 		}
 
 		node := rootNode
-		board := rootBoard
 
-		// Selection with early expansion
+		// Selection and early expansion
 		for len(node.Children) > 0 && len(node.UntriedMoves) == 0 {
+			// fmt.Println("doing selection")
 			node = node.SelectChild()
-			board = node.Board
 		}
 
-		// Expansion: Expand all untried moves before any simulation
-		if !boardIsTerminal(board) && len(node.UntriedMoves) > 0 {
+		// Expansion
+		if !boardIsTerminal(node.Board) && len(node.UntriedMoves) > 0 {
 			children := node.Expand()
+			// fmt.Println("expanding", children)
 			if len(children) > 0 {
-				// Continue with a randomly selected child from the expanded nodes
-				node = children[0] // Adjust this selection logic if needed
-				board = node.Board
+				node.Children = children // Save the expanded children to the node
+				node = children[0]       // Proceed with one of the expanded children
 			}
 		}
 
-		// Parallel Simulation (rollout)
+		// Parallel Simulation (Rollout)
 		results := make(chan float64, numGoroutines)
 		var wg sync.WaitGroup
 
+		// Start each rollout from the board state of the selected node
 		for g := 0; g < numGoroutines; g++ {
 			wg.Add(1)
-			go func(boardCopy Board, startSnakeIndex int) {
+			go func(node *Node) {
 				defer wg.Done()
 
+				// fmt.Println("base", node.SnakeIndex)
+				// fmt.Println(visualizeBoard(node.Board))
+				boardCopy := copyBoard(node.Board) // Start from the board state at the current node
+				currentSnakeIndex := node.SnakeIndex
 				moves := 0
-				currentSnakeIndex := startSnakeIndex
 
 				for !boardIsTerminal(boardCopy) {
-					// Check if the context has been cancelled during the simulation
 					select {
 					case <-ctx.Done():
 						return
@@ -158,35 +162,37 @@ func MCTS(ctx context.Context, rootBoard Board, iterations, numGoroutines int) *
 					move := randomSafeMove(boardCopy, currentSnakeIndex)
 					applyMove(&boardCopy, currentSnakeIndex, move)
 
-					currentSnakeIndex = (currentSnakeIndex + 1) % len(boardCopy.Snakes) // Move to the next snake
+					// Update snake index for the next move
+					currentSnakeIndex = (currentSnakeIndex + 1) % len(boardCopy.Snakes) // Next snake's turn
 					moves++
 					if moves == maxMovesToIterate {
+						// fmt.Println("max iters")
 						break
 					}
 				}
 
-				// Evaluate the final board state
-				score := evaluateBoard(boardCopy)
+				// Evaluate from the perspective of the snake that led to this node, not the current snake
+				score := evaluateBoard(boardCopy, node.SnakeIndexWhoMoved)
 				results <- score
 
-			}(copyBoard(board), node.SnakeIndex) // Pass a copy of the board and the starting snake index to each goroutine
+				// fmt.Println("rolled", score, boardCopy.Height*boardCopy.Width, node.SnakeIndex)
+				// fmt.Println(visualizeBoard(boardCopy))
+				// fmt.Println(VisualizeVoronoi(GenerateVoronoi(boardCopy), boardCopy.Snakes))
+
+			}(node) // Pass the node to start the rollout from
 		}
 
-		// Wait for all rollouts to complete
-		go func() {
-			wg.Wait()
-			close(results)
-		}()
+		// Collect and average the results
+		wg.Wait()
+		close(results)
 
-		// Aggregate the results
 		totalScore := 0.0
 		count := 0
 
 		for score := range results {
-			// Check if the context has been cancelled during result aggregation
 			select {
 			case <-ctx.Done():
-				return rootNode // Return the current state of the tree if cancelled
+				return rootNode
 			default:
 			}
 
@@ -194,10 +200,9 @@ func MCTS(ctx context.Context, rootBoard Board, iterations, numGoroutines int) *
 			count++
 		}
 
-		// Calculate the average score
 		averageScore := totalScore / float64(count)
 
-		// Backpropagation: Update the node with the average score
+		// Backpropagation
 		for node != nil {
 			node.Update(averageScore)
 			node = node.Parent
@@ -207,8 +212,11 @@ func MCTS(ctx context.Context, rootBoard Board, iterations, numGoroutines int) *
 	return rootNode
 }
 
-// randomSafeMove generates a random safe move for the given snake.
 func randomSafeMove(board Board, snakeIndex int) Direction {
 	safeMoves := generateSafeMoves(board, snakeIndex)
-	return safeMoves[0] // Return the first safe move; you might want to randomize this selection
+	if len(safeMoves) == 0 {
+		return Up // Default move if no safe moves are found (this should generally not happen)
+	}
+
+	return safeMoves[rand.Intn(len(safeMoves))] // Return a random move from the list of safe moves
 }

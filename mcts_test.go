@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"math"
 	"testing"
 	"time"
 
@@ -118,7 +119,7 @@ func TestExpand(t *testing.T) {
 						{ID: "snake1", Head: Point{X: 2, Y: 2}},
 					},
 				}
-				node := NewNode(board, nil, 0, Up)
+				node := NewNode(board, nil, 0, -1, Up)
 				node.UntriedMoves = []Direction{Up}
 				return node
 			}(),
@@ -134,7 +135,7 @@ func TestExpand(t *testing.T) {
 						{ID: "snake1", Head: Point{X: 2, Y: 2}},
 					},
 				}
-				node := NewNode(board, nil, 0, Up)
+				node := NewNode(board, nil, 0, -1, Up)
 				node.UntriedMoves = []Direction{Up, Down, Left, Right}
 				return node
 			}(),
@@ -151,7 +152,7 @@ func TestExpand(t *testing.T) {
 						{ID: "snake2", Head: Point{X: 3, Y: 3}},
 					},
 				}
-				node := NewNode(board, nil, 0, Up)
+				node := NewNode(board, nil, 0, -1, Up)
 				node.UntriedMoves = []Direction{Up, Left} // For snake 1
 				return node
 			}(),
@@ -167,7 +168,7 @@ func TestExpand(t *testing.T) {
 						{ID: "snake1", Head: Point{X: 2, Y: 2}},
 					},
 				}
-				node := NewNode(board, nil, 0, Up)
+				node := NewNode(board, nil, 0, -1, Up)
 				node.UntriedMoves = []Direction{}
 				return node
 			}(),
@@ -183,7 +184,7 @@ func TestExpand(t *testing.T) {
 						{ID: "snake1", Head: Point{X: 4, Y: 4}}, // At the bottom-right corner
 					},
 				}
-				node := NewNode(board, nil, 0, Up)
+				node := NewNode(board, nil, 0, -1, Up)
 				node.UntriedMoves = []Direction{Up, Left}
 				return node
 			}(),
@@ -203,7 +204,7 @@ func TestExpand(t *testing.T) {
 						{ID: "snake2", Head: Point{X: 3, Y: 3}},
 					},
 				}
-				node := NewNode(board, nil, 0, Up)
+				node := NewNode(board, nil, 0, -1, Up)
 				node.UntriedMoves = []Direction{Right, Down} // For snake 1
 				return node
 			}(),
@@ -278,12 +279,12 @@ func TestMCTSVisualization(t *testing.T) {
 				Height: 7,
 				Width:  7,
 				Snakes: []Snake{
-					{ID: "snake1", Head: Point{X: 1, Y: 1}, Health: 100, Body: []Point{{X: 1, Y: 1}, {X: 1, Y: 2}}},
-					{ID: "snake2", Head: Point{X: 5, Y: 5}, Health: 100, Body: []Point{{X: 5, Y: 5}, {X: 5, Y: 4}}},
+					{ID: "snake1", Head: Point{X: 1, Y: 1}, Health: 100, Body: []Point{{X: 1, Y: 1}, {X: 1, Y: 0}}},
+					{ID: "snake2", Head: Point{X: 5, Y: 5}, Health: 100, Body: []Point{{X: 5, Y: 5}, {X: 5, Y: 6}}},
 				},
 				Food: []Point{{X: 3, Y: 3}},
 			},
-			Iterations: 10000000,
+			Iterations: math.MaxInt,
 		},
 	}
 
@@ -291,7 +292,7 @@ func TestMCTSVisualization(t *testing.T) {
 		t.Run(tc.Description, func(t *testing.T) {
 			rootBoard := copyBoard(tc.InitialBoard)
 			ctx, _ := context.WithTimeout(context.Background(), 450*time.Millisecond)
-			node := MCTS(ctx, rootBoard, tc.Iterations, 2)
+			node := MCTS(ctx, rootBoard, tc.Iterations, 8)
 
 			require.NotNil(t, node, "node is nil")
 
