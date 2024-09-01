@@ -53,26 +53,33 @@ func applyMove(board *Board, snakeIndex int, direction Direction) {
 	}
 
 	// Handle collisions
-	resolveCollisions(board, snakeIndex, initialHead, newHead)
+	resolveCollisions(board, snakeIndex, newHead)
 }
 
-// resolveCollisions handles head-on and general collisions for the specified snake.
-func resolveCollisions(board *Board, snakeIndex int, initialHead, newHead Point) {
+// resolveCollisions handles collisions for the specified snake after it moves.
+func resolveCollisions(board *Board, snakeIndex int, newHead Point) {
 	deadSnakes := make(map[int]bool)
 
-	// Handle head-on collisions
+	// Check if the snake's new head position results in a collision with another snake's head or body
 	for i := range board.Snakes {
 		if i != snakeIndex {
-			if initialHead == board.Snakes[i].Head && newHead == initialHead {
-				// Head-on collision detected
+			// Check for collision with the head of another snake
+			if newHead == board.Snakes[i].Head {
 				if len(board.Snakes[snakeIndex].Body) > len(board.Snakes[i].Body) {
-					deadSnakes[i] = true // Other snake dies
+					deadSnakes[i] = true // The other snake dies
 				} else if len(board.Snakes[snakeIndex].Body) < len(board.Snakes[i].Body) {
-					deadSnakes[snakeIndex] = true // Current snake dies
+					deadSnakes[snakeIndex] = true // The current snake dies
 				} else {
 					// If both are of the same length, both die
 					deadSnakes[snakeIndex] = true
 					deadSnakes[i] = true
+				}
+			} else {
+				// Check for collision with the body of another snake
+				for _, segment := range board.Snakes[i].Body {
+					if newHead == segment {
+						deadSnakes[snakeIndex] = true // Current snake dies if it collides with another snake's body
+					}
 				}
 			}
 		}
@@ -86,7 +93,10 @@ func resolveCollisions(board *Board, snakeIndex int, initialHead, newHead Point)
 func removeDeadSnakes(board *Board, deadSnakes map[int]bool) {
 	liveSnakes := board.Snakes[:0]
 	for i, snake := range board.Snakes {
-		if !deadSnakes[i] && snake.Head.X >= 0 && snake.Head.X < board.Width && snake.Head.Y >= 0 && snake.Head.Y < board.Height {
+		// Check if the snake is not marked as dead and is within the board boundaries
+		if !deadSnakes[i] &&
+			snake.Head.X >= 0 && snake.Head.X < board.Width &&
+			snake.Head.Y >= 0 && snake.Head.Y < board.Height {
 			liveSnakes = append(liveSnakes, snake)
 		}
 	}
