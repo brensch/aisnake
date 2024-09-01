@@ -44,12 +44,12 @@ func applyMove(board *Board, snakeIndex int, direction Direction) {
 		}
 	}
 
-	// If the snake ate food, reset health and add back the last tail segment
+	// remove the last segment for the move
+	snake.Body = snake.Body[:len(snake.Body)-1]
+	// If the snake ate food, reset health and add an additional segment on the tail
 	if ateFood {
 		snake.Health = 100
-	} else {
-		// If no food was eaten, remove the last segment (shrink the tail)
-		snake.Body = snake.Body[:len(snake.Body)-1]
+		snake.Body = append(snake.Body, snake.Body[len(snake.Body)-1])
 	}
 
 	// Handle collisions

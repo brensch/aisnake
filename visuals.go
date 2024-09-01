@@ -117,11 +117,6 @@ func visualizeBoard(game Board, options ...func(*boardOptions)) string {
 	return sb.String()
 }
 
-// Helper function to check for out-of-bounds errors
-func checkOOB(x, y, width, height int) bool {
-	return x < 0 || x >= width || y < 0 || y >= height
-}
-
 // Options struct to hold the customizable parameters
 type boardOptions struct {
 	indent           string
@@ -220,7 +215,23 @@ func generateMermaidTreeForNode(node *Node, depth int, edgeCount *int, nodeSet m
 	move := node.Move
 
 	// Add which snake is moving at the top
-	snakeLabel := fmt.Sprintf("Snake %d moved %s<br/>", node.SnakeIndex+1, directionToString(move))
+
+	var arrow rune
+	switch move {
+	case Up:
+		arrow = '↑'
+	case Down:
+		arrow = '↓'
+	case Left:
+		arrow = '←'
+	case Right:
+		arrow = '→'
+	default:
+		arrow = ' ' // Handle unexpected cases
+	}
+
+	snakeFromPrevMove := (node.SnakeIndex - 1 + len(node.Board.Snakes)) % len(node.Board.Snakes)
+	snakeLabel := fmt.Sprintf(" %c %c<br/>", rune('a'+snakeFromPrevMove), arrow)
 
 	// Node details for root (without UCB value)
 	nodeLabel := fmt.Sprintf("%sVisits: %d<br/>Average Score: %.2f<br/>Untried Moves: %d",
@@ -228,7 +239,6 @@ func generateMermaidTreeForNode(node *Node, depth int, edgeCount *int, nodeSet m
 
 	// Add the board state using visualizeBoard with <br/> for newlines
 	boardVisualization := visualizeBoard(node.Board,
-		WithMove(move, node.SnakeIndex),
 		WithNewlineCharacter("<br/>"))
 	nodeLabel += "<br/>" + boardVisualization
 

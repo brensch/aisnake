@@ -215,7 +215,7 @@ func TestApplyMove(t *testing.T) {
 				Height: 5, Width: 5,
 				Food: []Point{}, // Food is consumed
 				Snakes: []Snake{
-					{ID: "snake1", Health: 100, Head: Point{X: 2, Y: 3}, Body: []Point{{X: 2, Y: 3}, {X: 2, Y: 2}, {X: 2, Y: 1}}},
+					{ID: "snake1", Health: 100, Head: Point{X: 2, Y: 3}, Body: []Point{{X: 2, Y: 3}, {X: 2, Y: 2}, {X: 2, Y: 2}}},
 				},
 			},
 		},
