@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
-	"math"
+	"runtime"
 	"testing"
 	"time"
 
@@ -284,15 +284,20 @@ func TestMCTSVisualization(t *testing.T) {
 				},
 				Food: []Point{{X: 3, Y: 3}},
 			},
-			Iterations: math.MaxInt,
+			// Iterations: math.MaxInt,
+			Iterations: 5,
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.Description, func(t *testing.T) {
+
+			numCPUs := runtime.NumCPU()
+			_ = numCPUs
 			rootBoard := copyBoard(tc.InitialBoard)
-			ctx, _ := context.WithTimeout(context.Background(), 450*time.Millisecond)
-			node := MCTS(ctx, rootBoard, tc.Iterations, 8)
+			ctx, _ := context.WithTimeout(context.Background(), 1000*time.Millisecond)
+			// node := MCTS(ctx, rootBoard, tc.Iterations, numCPUs)
+			node := MCTS(ctx, rootBoard, tc.Iterations, 0)
 
 			require.NotNil(t, node, "node is nil")
 

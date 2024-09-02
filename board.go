@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 )
 
@@ -123,7 +122,7 @@ func moveHead(head Point, direction Direction) Point {
 func generateSafeMoves(board Board, snakeIndex int) []Direction {
 	if snakeIndex >= len(board.Snakes) {
 		log.Printf("invalid snakeindex: %d. board snake length: %d\n", snakeIndex, len(board.Snakes))
-		fmt.Println(visualizeBoard(board))
+		// fmt.Println(visualizeBoard(board))
 		return []Direction{Up}
 	}
 	snake := board.Snakes[snakeIndex]

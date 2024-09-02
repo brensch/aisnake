@@ -5,10 +5,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"runtime"
 	"time"
 )
 
 func main() {
+
+	numCPUs := runtime.NumCPU()
+	fmt.Printf("Number of available CPUs: %d\n", numCPUs)
 	// Define the test game state
 	gameState := BattleSnakeGame{
 		Game: Game{

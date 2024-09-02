@@ -2,12 +2,14 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"math"
 	"math/rand"
 	"sync"
 )
 
-const maxMovesToIterate = 1
+const maxMovesToIterate = 100
+const explorationParameter = 1.414
 
 // Node represents a node in the MCTS tree.
 type Node struct {
@@ -37,11 +39,13 @@ func NewNode(board Board, parent *Node, snakeIndex, snakeIndexWhoMoved int, move
 	}
 }
 
-const explorationParameter = 100
-
 func (n *Node) UCTValue(c *Node) float64 {
-	exploitation := c.Score / float64(c.Visits)
-	exploration := explorationParameter * math.Sqrt(math.Log(float64(n.Visits))/float64(c.Visits))
+	exploitation := 0.0
+	exploration := 0.0
+	if c.Visits != 0 {
+		exploitation = c.Score / float64(c.Visits)
+		exploration = explorationParameter * math.Sqrt(math.Log(float64(n.Visits))/float64(c.Visits))
+	}
 	return exploitation + exploration
 }
 
@@ -60,6 +64,7 @@ func (n *Node) SelectChild() *Node {
 
 		// Handle NaN values
 		if math.IsNaN(uctValue) {
+			fmt.Println("got nan")
 			continue // Skip this child if UCB calculation results in NaN
 		}
 
@@ -75,7 +80,7 @@ func (n *Node) SelectChild() *Node {
 
 // Expand adds new child nodes by generating all possible moves for the current snake.
 func (n *Node) Expand() []*Node {
-	if len(n.UntriedMoves) == 0 {
+	if len(n.UntriedMoves) == 0 || len(n.Board.Snakes) == 0 {
 		return nil
 	}
 
@@ -83,7 +88,13 @@ func (n *Node) Expand() []*Node {
 	for _, move := range n.UntriedMoves {
 		newBoard := copyBoard(n.Board)
 		applyMove(&newBoard, n.SnakeIndex, move)
-		// The next snake's turn, but keep the index for evaluation of this move
+
+		// Ensure there are still snakes on the board before calculating the next index
+		if len(newBoard.Snakes) == 0 {
+			// If no snakes are left after applying the move, return the children created so far
+			return children
+		}
+
 		nextSnakeIndex := (n.SnakeIndex + 1) % len(newBoard.Snakes)
 
 		childNode := NewNode(newBoard, n, nextSnakeIndex, n.SnakeIndex, move)
@@ -122,14 +133,13 @@ func MCTS(ctx context.Context, rootBoard Board, iterations, numGoroutines int) *
 
 		// Selection and early expansion
 		for len(node.Children) > 0 && len(node.UntriedMoves) == 0 {
-			// fmt.Println("doing selection")
 			node = node.SelectChild()
+			// fmt.Println("doing selection")
 		}
 
 		// Expansion
 		if !boardIsTerminal(node.Board) && len(node.UntriedMoves) > 0 {
 			children := node.Expand()
-			// fmt.Println("expanding", children)
 			if len(children) > 0 {
 				node.Children = children // Save the expanded children to the node
 				node = children[0]       // Proceed with one of the expanded children
@@ -205,11 +215,15 @@ func MCTS(ctx context.Context, rootBoard Board, iterations, numGoroutines int) *
 			count++
 		}
 
-		averageScore := totalScore / float64(count)
+		// do an instantaneous evaluation of the current position
+		instantScore := evaluateBoard(node.Board, node.SnakeIndexWhoMoved) / (float64(node.Board.Height) * float64(node.Board.Width))
+
+		// averageScoreMonte := totalScore / float64(count)
+		// finalNodeScore := (instantScore + averageScoreMonte) / 2
 
 		// Backpropagation
 		for node != nil {
-			node.Update(averageScore)
+			node.Update(instantScore)
 			node = node.Parent
 		}
 	}
