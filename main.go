@@ -45,6 +45,7 @@ func handleStart(w http.ResponseWriter, r *http.Request) {
 
 	// Log the start of the game
 	fmt.Printf("Game %s started\n", game.Game.ID)
+	fmt.Println(game.You)
 
 	writeJSON(w, map[string]string{})
 }
@@ -53,17 +54,23 @@ func handleStart(w http.ResponseWriter, r *http.Request) {
 func handleMove(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
 	var game BattleSnakeGame
-	if err := json.NewDecoder(r.Body).Decode(&game); err != nil {
+	err := json.NewDecoder(r.Body).Decode(&game)
+	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
+	fmt.Println("Received move request for snake", game.You.ID)
+
+	// Reorder the snakes array so that 'You' is the first snake.
+	reorderedBoard := reorderSnakes(game.Board, game.You.ID)
+
 	// Create a context with a timeout to ensure MCTS doesn't run indefinitely
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(game.Game.Timeout-50)*time.Millisecond)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(game.Game.Timeout-100)*time.Millisecond)
 	defer cancel()
 
 	// Run MCTS to determine the best move
-	mctsResult := MCTS(ctx, game.Board, math.MaxInt, 4)
+	mctsResult := MCTS(ctx, reorderedBoard, math.MaxInt, 4)
 
 	// Determine the move based on the best child node returned by MCTS
 	bestMove := determineBestMove(game, mctsResult)
@@ -74,7 +81,24 @@ func handleMove(w http.ResponseWriter, r *http.Request) {
 		"shout": "This is a nice move.",
 	}
 	writeJSON(w, response)
-	log.Println("made move", bestMove, time.Since(start).Milliseconds())
+	log.Println("Made move:", bestMove, "in", time.Since(start).Milliseconds(), "ms with", mctsResult.Visits, "visits")
+
+	fmt.Println(GenerateMermaidTree(mctsResult, 0))
+	fmt.Println(visualizeBoard(reorderedBoard))
+}
+
+// Reorder the snakes in the board so that the snake with the given ID is first.
+func reorderSnakes(board Board, youID string) Board {
+	var youIndex int
+	for index, snake := range board.Snakes {
+		if snake.ID == youID {
+			youIndex = index
+			break
+		}
+	}
+	// Place the 'You' snake at the first position
+	board.Snakes[0], board.Snakes[youIndex] = board.Snakes[youIndex], board.Snakes[0]
+	return board
 }
 
 // determineBestMove finds the best move from the MCTS result

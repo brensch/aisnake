@@ -156,6 +156,28 @@ func TestGenerateSafeMoves(t *testing.T) {
 				// Down should not be present since moving Down would make snake1 collide with snake2's body
 			},
 		},
+		{
+			Description: "Don't hit neck",
+			Board: Board{
+				Height: 11,
+				Width:  11,
+				Snakes: []Snake{
+					{
+						ID:   "snake1",
+						Head: Point{X: 5, Y: 9},
+						Body: []Point{
+							{X: 5, Y: 9},
+							{X: 6, Y: 9},
+							{X: 6, Y: 8},
+						},
+					},
+				},
+			},
+			SnakeIndex: 0, // Testing moves for snake1
+			ExpectedMoves: []Direction{
+				Up, Left, Down,
+			},
+		},
 	}
 
 	for _, tc := range testCases {

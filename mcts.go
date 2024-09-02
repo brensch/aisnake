@@ -7,7 +7,7 @@ import (
 	"sync"
 )
 
-const maxMovesToIterate = 100
+const maxMovesToIterate = 1
 
 // Node represents a node in the MCTS tree.
 type Node struct {
@@ -37,7 +37,7 @@ func NewNode(board Board, parent *Node, snakeIndex, snakeIndexWhoMoved int, move
 	}
 }
 
-const explorationParameter = 1.414
+const explorationParameter = 100
 
 func (n *Node) UCTValue(c *Node) float64 {
 	exploitation := c.Score / float64(c.Visits)
@@ -161,6 +161,11 @@ func MCTS(ctx context.Context, rootBoard Board, iterations, numGoroutines int) *
 
 					move := randomSafeMove(boardCopy, currentSnakeIndex)
 					applyMove(&boardCopy, currentSnakeIndex, move)
+					// everyone died
+					if len(boardCopy.Snakes) == 0 {
+						results <- 0
+						return
+					}
 
 					// Update snake index for the next move
 					currentSnakeIndex = (currentSnakeIndex + 1) % len(boardCopy.Snakes) // Next snake's turn
