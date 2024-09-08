@@ -25,15 +25,15 @@ func NewNode(board Board, snakeIndex int) *Node {
 }
 
 func expand(node *Node) {
-	if isTerminal(node.Board) {
-		// Assign a losing score if the current node is a terminal state
-		if isSnakeDead(node.Board.Snakes[node.SnakeIndex]) {
-			node.Score = -1.0 // Losing score (negative) - the snake is dead
-		} else {
-			node.Score = 1.0 // Winning score (positive) - the snake is alive and no other snakes are left
-		}
-		return
-	}
+	// if isTerminal(node.Board) {
+	// 	// Assign a losing score if the current node is a terminal state
+	// 	if isSnakeDead(node.Board.Snakes[node.SnakeIndex]) {
+	// 		node.Score = -1.0 // Losing score (negative) - the snake is dead
+	// 	} else {
+	// 		node.Score = 1.0 // Winning score (positive) - the snake is alive and no other snakes are left
+	// 	}
+	// 	return
+	// }
 
 	moves := generateSafeMoves(node.Board, node.SnakeIndex)
 	// cannot have 0 or it will seem like nothing bad happens at the end. need to see the death.
@@ -76,10 +76,10 @@ func (n *Node) UCT(parent *Node, explorationParam float64) float64 {
 	exploitation := n.Score / float64(n.Visits)
 	exploration := explorationParam * math.Sqrt(math.Log(float64(parent.Visits))/float64(n.Visits))
 
-	// Penalize states where the current snake is dead
-	if isSnakeDead(n.Board.Snakes[n.SnakeIndex]) {
-		return exploitation - 10 // Strong penalty (negative) to discourage exploring dead states
-	}
+	// // Penalize states where the current snake is dead
+	// if isSnakeDead(n.Board.Snakes[n.SnakeIndex]) {
+	// 	return exploitation - 10 // Strong penalty (negative) to discourage exploring dead states
+	// }
 
 	return exploitation + exploration
 }
@@ -128,7 +128,7 @@ func MCTS(ctx context.Context, rootBoard Board, iterations int) *Node {
 			// score := simulate(node.Board, node.SnakeIndex)
 
 			// Backpropagation using parent pointers, ensuring we don't hit nil
-			score = -score
+			// score = -score
 			for n := node; n != nil; n = n.Parent {
 				n.Visits++
 				n.Score += score
@@ -160,22 +160,23 @@ func MCTS(ctx context.Context, rootBoard Board, iterations int) *Node {
 // }
 
 func evaluateBoard(board Board, snakeIndex int) float64 {
-	// If the current snake is dead, it's losing
-	if isSnakeDead(board.Snakes[snakeIndex]) {
-		return -1.0 // Losing
-	}
 
 	// Check if all other snakes are dead (except the current snake)
-	aliveSnakesCount := 0
+	aliveSnakes := 0
 	for i, snake := range board.Snakes {
 		if i != snakeIndex && !isSnakeDead(snake) {
-			aliveSnakesCount++
+			aliveSnakes++
 		}
 	}
 
-	// If there are no other alive snakes, this snake wins
-	if aliveSnakesCount == 0 {
-		return -1.0 // Winning
+	// If all other snakes are dead, the current snake wins
+	if aliveSnakes == 0 {
+		return -1.0 // losing
+	}
+
+	// If the current snake is dead, it's losing
+	if isSnakeDead(board.Snakes[snakeIndex]) {
+		return -1.0 // Losing
 	}
 
 	// Voronoi evaluation: Calculate the area controlled by each snake
@@ -195,15 +196,15 @@ func evaluateBoard(board Board, snakeIndex int) float64 {
 		}
 	}
 
-	// Check if it's a draw
-	if controlledCells == opponentsCells {
-		return 0.0 // Draw
-	}
+	// // If both snakes control the same area, it's a draw
+	// if controlledCells == opponentsCells {
+	// 	return 0.0 // Draw
+	// }
 
 	// Return a score based on the controlled area
 	if controlledCells > opponentsCells {
 		return 1.0 // Winning by area control
-	} else {
-		return -1.0 // Losing by area control
 	}
+	return -1.0 // Losing by area control
+
 }
