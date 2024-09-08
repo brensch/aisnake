@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"math"
-	"math/rand"
 )
 
 type Node struct {
@@ -37,6 +36,11 @@ func expand(node *Node) {
 	}
 
 	moves := generateSafeMoves(node.Board, node.SnakeIndex)
+	// cannot have 0 or it will seem like nothing bad happens at the end. need to see the death.
+	if len(moves) == 0 {
+		moves = append(moves, Up)
+	}
+
 	for _, move := range moves {
 		newBoard := copyBoard(node.Board)
 		applyMove(&newBoard, node.SnakeIndex, move)
@@ -120,7 +124,8 @@ func MCTS(ctx context.Context, rootBoard Board, iterations int) *Node {
 			}
 
 			// Simulation
-			score := simulate(node.Board, node.SnakeIndex)
+			score := evaluateBoard(node.Board, node.SnakeIndex)
+			// score := simulate(node.Board, node.SnakeIndex)
 
 			// Backpropagation using parent pointers, ensuring we don't hit nil
 			score = -score
@@ -134,25 +139,25 @@ func MCTS(ctx context.Context, rootBoard Board, iterations int) *Node {
 	return rootNode
 }
 
-func simulate(board Board, startingSnakeIndex int) float64 {
-	currentBoard := copyBoard(board)
-	currentSnakeIndex := startingSnakeIndex
-	depth := 0
-	maxDepth := 100 // Prevent infinite loops
+// func simulate(board Board, startingSnakeIndex int) float64 {
+// 	currentBoard := copyBoard(board)
+// 	currentSnakeIndex := startingSnakeIndex
+// 	depth := 0
+// 	maxDepth := 100 // Prevent infinite loops
 
-	for !isTerminal(currentBoard) && depth < maxDepth {
-		moves := generateSafeMoves(currentBoard, currentSnakeIndex)
-		if len(moves) == 0 {
-			break
-		}
-		move := moves[rand.Intn(len(moves))]
-		applyMove(&currentBoard, currentSnakeIndex, move)
-		currentSnakeIndex = (currentSnakeIndex + 1) % len(currentBoard.Snakes)
-		depth++
-	}
+// 	for !isTerminal(currentBoard) && depth < maxDepth {
+// 		moves := generateSafeMoves(currentBoard, currentSnakeIndex)
+// 		if len(moves) == 0 {
+// 			break
+// 		}
+// 		move := moves[rand.Intn(len(moves))]
+// 		applyMove(&currentBoard, currentSnakeIndex, move)
+// 		currentSnakeIndex = (currentSnakeIndex + 1) % len(currentBoard.Snakes)
+// 		depth++
+// 	}
 
-	return evaluateBoard(currentBoard, startingSnakeIndex)
-}
+// 	return evaluateBoard(currentBoard, startingSnakeIndex)
+// }
 
 func evaluateBoard(board Board, snakeIndex int) float64 {
 	// If the current snake is dead, it's losing
@@ -160,52 +165,45 @@ func evaluateBoard(board Board, snakeIndex int) float64 {
 		return -1.0 // Losing
 	}
 
+	// Check if all other snakes are dead (except the current snake)
+	aliveSnakesCount := 0
+	for i, snake := range board.Snakes {
+		if i != snakeIndex && !isSnakeDead(snake) {
+			aliveSnakesCount++
+		}
+	}
+
+	// If there are no other alive snakes, this snake wins
+	if aliveSnakesCount == 0 {
+		return -1.0 // Winning
+	}
+
 	// Voronoi evaluation: Calculate the area controlled by each snake
 	voronoi := GenerateVoronoi(board)
-	// snakeAreas := make([]float64, len(board.Snakes))
-	totalCells := float64(board.Width * board.Height)
+	// totalCells := float64(board.Width * board.Height)
 	controlledCells := 0.0
+	opponentsCells := 0.0
 
 	// Count the number of cells each snake controls in the Voronoi diagram
 	for y := 0; y < board.Height; y++ {
 		for x := 0; x < board.Width; x++ {
 			if voronoi[y][x] == snakeIndex {
 				controlledCells++
+			} else if voronoi[y][x] != -1 {
+				opponentsCells++
 			}
-			// owner := voronoi[y][x]
-			// if owner >= 0 && owner < len(snakeAreas) {
-			// 	snakeAreas[owner]++
-			// }
 		}
 	}
-	return controlledCells / totalCells
 
-	// // Normalize the areas (optional, but could be useful for debugging)
-	// for i := range snakeAreas {
-	// 	snakeAreas[i] = snakeAreas[i] / totalCells
-	// }
+	// Check if it's a draw
+	if controlledCells == opponentsCells {
+		return 0.0 // Draw
+	}
 
-	// // Get the area controlled by the current snake
-	// currentSnakeArea := snakeAreas[snakeIndex]
-
-	// // Check if the current snake controls more area than all others
-	// for i, area := range snakeAreas {
-	// 	if i != snakeIndex && !isSnakeDead(board.Snakes[i]) {
-	// 		if area > currentSnakeArea {
-	// 			return -1.0 // Losing: Another snake controls more area
-	// 		}
-	// 	}
-	// }
-
-	// // Check if the current snake controls the same area as any other snake
-	// for i, area := range snakeAreas {
-	// 	if i != snakeIndex && !isSnakeDead(board.Snakes[i]) {
-	// 		if math.Abs(area-currentSnakeArea) < 1e-5 {
-	// 			return 0.0 // Draw: Areas are equal (or close enough to call it a draw)
-	// 		}
-	// 	}
-	// }
-
-	// // If no other snake controls more area and areas are not equal, the current snake is winning
-	// return 1.0 // Winning
+	// Return a score based on the controlled area
+	if controlledCells > opponentsCells {
+		return 1.0 // Winning by area control
+	} else {
+		return -1.0 // Losing by area control
+	}
 }

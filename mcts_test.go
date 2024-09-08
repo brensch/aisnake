@@ -301,16 +301,36 @@ func TestMCTSVisualizationJSON(t *testing.T) {
 		InitialBoard string
 		Iterations   int
 	}{
-		{
-			Description:  "should not get transfixed by death",
-			InitialBoard: `{"height":11,"width":11,"food":[{"x":0,"y":4},{"x":1,"y":4}],"hazards":[],"snakes":[{"id":"5baad214-ed5e-4794-bd30-f110e488c474","name":"mcts","health":97,"body":[{"x":3,"y":4},{"x":4,"y":4},{"x":4,"y":5},{"x":5,"y":5},{"x":6,"y":5}],"latency":"405","head":{"x":3,"y":4},"shout":"","customizations":{"color":"#888888","head":"default","tail":"default"}},{"id":"e55aa73a-a108-406c-af9e-9192a380c027","name":"soba","health":89,"body":[{"x":2,"y":5},{"x":2,"y":6},{"x":3,"y":6},{"x":4,"y":6}],"latency":"400","head":{"x":2,"y":5},"shout":"","customizations":{"color":"#118645","head":"replit-mark","tail":"replit-notmark"}}]}`,
-			Iterations:   math.MaxInt,
-		},
+		// {
+		// 	Description:  "should not get transfixed by death",
+		// 	InitialBoard: `{"height":11,"width":11,"food":[{"x":0,"y":4},{"x":1,"y":4}],"hazards":[],"snakes":[{"id":"5baad214-ed5e-4794-bd30-f110e488c474","name":"mcts","health":97,"body":[{"x":3,"y":4},{"x":4,"y":4},{"x":4,"y":5},{"x":5,"y":5},{"x":6,"y":5}],"latency":"405","head":{"x":3,"y":4},"shout":"","customizations":{"color":"#888888","head":"default","tail":"default"}},{"id":"e55aa73a-a108-406c-af9e-9192a380c027","name":"soba","health":89,"body":[{"x":2,"y":5},{"x":2,"y":6},{"x":3,"y":6},{"x":4,"y":6}],"latency":"400","head":{"x":2,"y":5},"shout":"","customizations":{"color":"#118645","head":"replit-mark","tail":"replit-notmark"}}]}`,
+		// 	Iterations:   math.MaxInt,
+		// },
 		// {
 		// 	Description:  "should not butt heads",
 		// 	InitialBoard: `{"height":11,"width":11,"food":[{"x":4,"y":0},{"x":7,"y":4},{"x":9,"y":3},{"x":0,"y":4}],"hazards":[],"snakes":[{"id":"a82fcde3-2bed-4cc5-ac42-a19cc10175ca","name":"mcts","health":66,"body":[{"x":1,"y":9},{"x":0,"y":9},{"x":0,"y":8},{"x":0,"y":7}],"latency":"902","head":{"x":1,"y":9},"shout":"","customizations":{"color":"#888888","head":"default","tail":"default"}},{"id":"4a147cce-14d9-42ba-b5b2-e72b2ecf04a7","name":"soba","health":93,"body":[{"x":3,"y":9},{"x":3,"y":8},{"x":4,"y":8},{"x":5,"y":8},{"x":6,"y":8}],"latency":"401","head":{"x":3,"y":9},"shout":"","customizations":{"color":"#118645","head":"replit-mark","tail":"replit-notmark"}}]}`,
 		// 	Iterations:   math.MaxInt,
 		// },
+		// {
+		// 	Description:  "should not go into corner",
+		// 	InitialBoard: `{"height":11,"width":11,"food":[{"x":5,"y":5},{"x":0,"y":2},{"x":1,"y":2},{"x":6,"y":1},{"x":8,"y":3},{"x":7,"y":4}],"hazards":[],"snakes":[{"id":"732e98bd-90f7-4c74-bb0d-08a59c3d1604","name":"mcts","health":88,"body":[{"x":9,"y":10},{"x":9,"y":9},{"x":10,"y":9},{"x":10,"y":8},{"x":10,"y":7}],"latency":"902","head":{"x":9,"y":10},"shout":"","customizations":{"color":"#888888","head":"default","tail":"default"}},{"id":"f9b45e5b-af6a-47f0-9bcb-7b78f7caa534","name":"soba","health":89,"body":[{"x":1,"y":10},{"x":0,"y":10},{"x":0,"y":9},{"x":1,"y":9},{"x":2,"y":9},{"x":3,"y":9}],"latency":"401","head":{"x":1,"y":10},"shout":"","customizations":{"color":"#118645","head":"replit-mark","tail":"replit-notmark"}}]}`,
+		// 	Iterations:   math.MaxInt,
+		// },
+		// {
+		// 	Description:  "don't pass through yourself",
+		// 	InitialBoard: `{"height":11,"width":11,"food":[{"x":2,"y":9}],"hazards":[],"snakes":[{"id":"0238ebfc-896f-4cd8-a132-3b06a92a3b02","name":"mcts","health":97,"body":[{"x":10,"y":9},{"x":9,"y":9},{"x":9,"y":8},{"x":9,"y":7},{"x":10,"y":7},{"x":10,"y":6},{"x":10,"y":5}],"latency":"907","head":{"x":10,"y":9},"shout":"","customizations":{"color":"#888888","head":"default","tail":"default"}},{"id":"983869f1-491d-4323-951d-dc822d7cc787","name":"soba","health":61,"body":[{"x":3,"y":6},{"x":4,"y":6},{"x":5,"y":6},{"x":5,"y":5},{"x":5,"y":4}],"latency":"400","head":{"x":3,"y":6},"shout":"","customizations":{"color":"#118645","head":"replit-mark","tail":"replit-notmark"}}]}`,
+		// 	Iterations:   math.MaxInt,
+		// },
+		// {
+		// 	Description:  "should go towards center",
+		// 	InitialBoard: `{"height":11,"width":11,"food":[{"x":0,"y":0},{"x":1,"y":3},{"x":2,"y":3},{"x":1,"y":4},{"x":4,"y":9}],"hazards":[],"snakes":[{"id":"a5053727-e14f-43aa-ba60-8bb43c54610c","name":"mcts","health":77,"body":[{"x":8,"y":5},{"x":8,"y":6},{"x":9,"y":6},{"x":9,"y":7},{"x":9,"y":8},{"x":9,"y":9},{"x":9,"y":10},{"x":10,"y":10},{"x":10,"y":9},{"x":10,"y":8},{"x":10,"y":7}],"latency":"904","head":{"x":8,"y":5},"shout":"","customizations":{"color":"#888888","head":"default","tail":"default"}},{"id":"6653a691-0d7e-4f0f-a9ed-e430e87b003d","name":"soba","health":76,"body":[{"x":5,"y":6},{"x":6,"y":6},{"x":6,"y":7},{"x":5,"y":7},{"x":4,"y":7},{"x":3,"y":7},{"x":3,"y":6},{"x":2,"y":6},{"x":1,"y":6},{"x":1,"y":5},{"x":2,"y":5}],"latency":"400","head":{"x":5,"y":6},"shout":"","customizations":{"color":"#118645","head":"replit-mark","tail":"replit-notmark"}}]}`,
+		// 	Iterations:   math.MaxInt,
+		// },
+		{
+			Description:  "don't get transfixed by draws",
+			InitialBoard: `{"height":11,"width":11,"food":[{"x":8,"y":0},{"x":5,"y":5},{"x":5,"y":10},{"x":10,"y":4}],"hazards":[],"snakes":[{"id":"6fb7c491-2ad6-4718-83c6-613840dfe0ea","name":"mcts","health":96,"body":[{"x":6,"y":0},{"x":5,"y":0},{"x":4,"y":0},{"x":3,"y":0}],"latency":"902","head":{"x":6,"y":0},"shout":"","customizations":{"color":"#888888","head":"default","tail":"default"}},{"id":"eaf1ae04-8bcb-4e74-8ab7-6328d207f797","name":"soba","health":94,"body":[{"x":4,"y":2},{"x":5,"y":2},{"x":5,"y":1}],"latency":"401","head":{"x":4,"y":2},"shout":"","customizations":{"color":"#118645","head":"replit-mark","tail":"replit-notmark"}}]}`,
+			Iterations:   math.MaxInt,
+		},
 	}
 
 	for _, tc := range testCases {

@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"log"
 )
 
 // Direction represents possible movement directions for a snake.
@@ -36,6 +35,13 @@ func applyMove(board *Board, snakeIndex int, direction Direction) {
 	snake.Body = append([]Point{newHead}, snake.Body...) // Add new head to the body
 	snake.Head = newHead                                 // Update the head position
 
+	// Check if the snake went out of bounds
+	if !isPointInsideBoard(board, newHead) {
+		// Mark the snake as dead
+		markDeadSnake(board, snakeIndex)
+		return
+	}
+
 	// Decrement health and handle food consumption
 	snake.Health -= 1 // Reduce health by 1
 
@@ -64,24 +70,27 @@ func applyMove(board *Board, snakeIndex int, direction Direction) {
 func resolveCollisions(board *Board, snakeIndex int, newHead Point) {
 	deadSnakes := make(map[int]bool)
 
-	// Check if the snake's new head position results in a collision with another snake's head or body
+	// First check if the new head has moved onto any other snake's head
 	for i := range board.Snakes {
 		if i != snakeIndex && board.Snakes[i].Health > 0 { // Skip dead snakes
-			// Check for head-to-head collision or body collision
+			// Check for head-to-head collision
 			if newHead == board.Snakes[i].Head {
-				if len(board.Snakes[snakeIndex].Body) > len(board.Snakes[i].Body) {
-					deadSnakes[i] = true
-				} else if len(board.Snakes[snakeIndex].Body) < len(board.Snakes[i].Body) {
+				// Kill both snakes if head-to-head collision
+				deadSnakes[snakeIndex] = true
+				deadSnakes[i] = true
+				break
+			}
+		}
+	}
+
+	// After head collisions are resolved, check if the new head overlaps any snake's body
+	for i := range board.Snakes {
+		if board.Snakes[i].Health > 0 { // Skip dead snakes
+			for _, segment := range board.Snakes[i].Body[1:] {
+				if newHead == segment {
+					// If the new head overlaps any body part, kill the snake
 					deadSnakes[snakeIndex] = true
-				} else {
-					deadSnakes[snakeIndex] = true
-					deadSnakes[i] = true
-				}
-			} else {
-				for _, segment := range board.Snakes[i].Body {
-					if newHead == segment {
-						deadSnakes[snakeIndex] = true
-					}
+					break
 				}
 			}
 		}
@@ -101,6 +110,12 @@ func markDeadSnakes(board *Board, deadSnakes map[int]bool) {
 	}
 }
 
+// markDeadSnake marks a specific snake as dead by clearing its body and setting health to 0.
+func markDeadSnake(board *Board, snakeIndex int) {
+	board.Snakes[snakeIndex].Body = []Point{} // Clear the body to mark the snake as dead
+	board.Snakes[snakeIndex].Health = 0       // Set health to 0 to indicate death
+}
+
 // moveHead calculates the new head position based on the direction.
 func moveHead(head Point, direction Direction) Point {
 	switch direction {
@@ -117,87 +132,106 @@ func moveHead(head Point, direction Direction) Point {
 	}
 }
 
-// generateSafeMoves generates the set of safe moves for a given snake.
-func generateSafeMoves(board Board, snakeIndex int) []Direction {
-	if snakeIndex >= len(board.Snakes) {
-		log.Printf("invalid snakeindex: %d. board snake length: %d\n", snakeIndex, len(board.Snakes))
-		// fmt.Println(visualizeBoard(board))
-		return []Direction{Up}
+// Helper function to get all possible moves a snake can make
+func getPossibleMoves(snake Snake) []Point {
+	head := snake.Body[0]
+	moves := []Point{
+		{X: head.X, Y: head.Y + 1}, // Move up
+		{X: head.X, Y: head.Y - 1}, // Move down
+		{X: head.X + 1, Y: head.Y}, // Move right
+		{X: head.X - 1, Y: head.Y}, // Move left
 	}
-	snake := board.Snakes[snakeIndex]
-	safeMoves := []Direction{}
+	return moves
+}
 
-	for _, direction := range AllDirections {
-		newHead := moveHead(snake.Head, direction)
+// Mark danger zones around snakes that are yet to move in this round
+// Only snakes after the current snake in the turn order are considered dangerous.
+// The dangerZones grid contains the minimum length required to win a head-to-head collision.
+func markDangerZones(board *Board, snakeIndex int) [][]int {
+	// Initialize the danger zones grid
+	dangerZones := make([][]int, board.Height)
+	for i := range dangerZones {
+		dangerZones[i] = make([]int, board.Width)
+	}
 
-		// Check if the new head is within the board boundaries
-		if newHead.X < 0 || newHead.X >= board.Width || newHead.Y < 0 || newHead.Y >= board.Height {
+	// Mark potential dangerous squares for snakes that have not yet moved in this round
+	for i := snakeIndex + 1; i < len(board.Snakes); i++ {
+		snake := board.Snakes[i]
+		if isSnakeDead(snake) {
 			continue
 		}
-
-		// Check if the move causes the snake to move back on itself
-		if len(snake.Body) > 1 {
-			neck := snake.Body[1] // The segment right after the head
-			if newHead == neck {
-				continue
+		possibleMoves := getPossibleMoves(snake)
+		for _, move := range possibleMoves {
+			if isPointInsideBoard(board, move) && !isOccupied(board, move) {
+				// Mark the danger zone with the length of the threatening snake
+				dangerZones[move.Y][move.X] = len(snake.Body)
 			}
-		}
-
-		// Check for collisions with other snakes
-		collision := false
-		for i := range board.Snakes {
-			otherSnake := board.Snakes[i]
-
-			// don't consider ded sneks
-			if len(otherSnake.Body) == 0 || otherSnake.Health == 0 {
-				continue
-			}
-
-			// Check for collisions with other snakes' bodies.
-			// ensure that we imagine their tail will be disappeared on the next move
-			snakeWithoutTail := otherSnake.Body[0 : len(otherSnake.Body)-1]
-			for _, segment := range snakeWithoutTail {
-				if newHead == segment {
-					collision = true
-					break
-				}
-			}
-
-			// Check for head-to-head collisions where the other snake is longer or equal
-			if !collision && newHead == otherSnake.Head && len(otherSnake.Body) >= len(snake.Body) {
-				collision = true
-				break
-			}
-
-		}
-
-		// If there's no collision, add the direction to safe moves
-		if !collision {
-			safeMoves = append(safeMoves, direction)
 		}
 	}
+	return dangerZones
+}
 
-	// // If no safe moves, default to Up
-	// if len(safeMoves) == 0 {
-	// 	safeMoves = append(safeMoves, Up)
-	// }
+// Generate safe moves (directions), taking into account other snakes' potential movements
+// and only marking them dangerous if the snake is larger or the same size.
+func generateSafeMoves(board Board, snakeIndex int) []Direction {
+	snake := board.Snakes[snakeIndex]
+	if isSnakeDead(snake) {
+		return nil
+	}
+
+	head := snake.Body[0]
+	possibleDirections := []Direction{Up, Down, Left, Right}
+	dangerZones := markDangerZones(&board, snakeIndex) // Only consider remaining snakes
+	safeMoves := []Direction{}
+
+	for _, direction := range possibleDirections {
+		nextMove := moveInDirection(head, direction)
+
+		// Check if the move is within the board, not occupied, and check danger zones
+		if isPointInsideBoard(&board, nextMove) && !isOccupied(&board, nextMove) {
+			// Check if the move leads into a danger zone
+			dangerLength := dangerZones[nextMove.Y][nextMove.X]
+			if dangerLength == 0 || len(snake.Body) > dangerLength {
+				// Safe if there's no danger or the current snake is longer
+				safeMoves = append(safeMoves, direction)
+			}
+		}
+	}
 
 	return safeMoves
 }
 
-// boardIsTerminal checks if the game has ended.
-func boardIsTerminal(board Board) bool {
-	// Count the number of alive snakes
-	aliveSnakes := 0
+// Check if the point is within the board boundaries
+func isPointInsideBoard(board *Board, point Point) bool {
+	return point.X >= 0 && point.X < board.Width && point.Y >= 0 && point.Y < board.Height
+}
 
+// Check if a point is occupied by a snake's body
+func isOccupied(board *Board, point Point) bool {
 	for _, snake := range board.Snakes {
-		if snake.Health > 0 && len(snake.Body) > 0 {
-			aliveSnakes++
+		for _, bodyPart := range snake.Body {
+			if bodyPart.X == point.X && bodyPart.Y == point.Y {
+				return true
+			}
 		}
 	}
+	return false
+}
 
-	// The game is terminal if there is only one snake left alive or no snakes are alive
-	return aliveSnakes <= 1
+// Helper function to map a direction to a point
+func moveInDirection(head Point, direction Direction) Point {
+	switch direction {
+	case Up:
+		return Point{X: head.X, Y: head.Y + 1}
+	case Down:
+		return Point{X: head.X, Y: head.Y - 1}
+	case Right:
+		return Point{X: head.X + 1, Y: head.Y}
+	case Left:
+		return Point{X: head.X - 1, Y: head.Y}
+	default:
+		return head
+	}
 }
 
 // copyBoard creates and returns a deep copy of the provided board.
