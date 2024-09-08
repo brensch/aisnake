@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -12,7 +13,6 @@ import (
 	"github.com/google/uuid"
 )
 
-// visualizeBoard renders the board state along with the move of the current snake, with manual spacing for alignment
 func visualizeBoard(game Board, options ...func(*boardOptions)) string {
 	var sb strings.Builder
 
@@ -29,14 +29,14 @@ func visualizeBoard(game Board, options ...func(*boardOptions)) string {
 		opt(opts)
 	}
 
-	// Ensure board dimensions are positive
+	// Validate board dimensions
 	if game.Height <= 0 || game.Width <= 0 {
 		return opts.indent + "Invalid board dimensions"
 	}
 
 	// Display the move at the top if a move is set
 	var arrow rune
-	if opts.move != Unset && opts.snakeIndex != -1 {
+	if opts.move != Unset && opts.snakeIndex >= 0 && opts.snakeIndex < len(game.Snakes) {
 		sb.WriteString(opts.indent)
 		snakeChar := rune('a' + opts.snakeIndex)
 		switch opts.move {
@@ -73,39 +73,58 @@ func visualizeBoard(game Board, options ...func(*boardOptions)) string {
 		}
 	}
 
-	// Function to adjust the Y coordinate to match the expected orientation
+	// Function to adjust the Y coordinate safely
 	adjustY := func(y int) int {
+		if y < 0 || y >= game.Height {
+			return -1 // Return invalid index if out of bounds
+		}
 		return extendedHeight - 1 - (y + 1)
 	}
 
-	// Place food on the board
+	// Place food on the board safely
 	for _, food := range game.Food {
-		board[adjustY(food.Y)][food.X+1] = '♥'
+		adjustedY := adjustY(food.Y)
+		if adjustedY != -1 && food.X+1 < extendedWidth {
+			board[adjustedY][food.X+1] = '♥'
+		}
 	}
 
-	// Place hazards on the board
+	// Place hazards on the board safely
 	for _, hazard := range game.Hazards {
-		board[adjustY(hazard.Y)][hazard.X+1] = 'H'
+		adjustedY := adjustY(hazard.Y)
+		if adjustedY != -1 && hazard.X+1 < extendedWidth {
+			board[adjustedY][hazard.X+1] = 'H'
+		}
 	}
 
-	// Place snakes on the board
+	// Place snakes on the board safely
 	for i, snake := range game.Snakes {
+		if len(snake.Body) == 0 || snake.Health == 0 {
+			continue
+		}
 		snakeChar := rune('a' + i)
 		if snakeChar > 'z' {
 			snakeChar = '?' // Fallback in case of too many snakes
 		}
 
-		board[adjustY(snake.Head.Y)][snake.Head.X+1] = unicode.ToUpper(snakeChar)
+		headY := adjustY(snake.Head.Y)
+		if headY != -1 && snake.Head.X+1 < extendedWidth {
+			board[headY][snake.Head.X+1] = unicode.ToUpper(snakeChar)
+		}
 		for _, part := range snake.Body[1:] {
-			board[adjustY(part.Y)][part.X+1] = snakeChar
+			partY := adjustY(part.Y)
+			if partY != -1 && part.X+1 < extendedWidth {
+				board[partY][part.X+1] = snakeChar
+			}
 		}
 	}
 
-	// Overlay the arrow for the current snake's move without OOB check
-	if opts.move != Unset && opts.snakeIndex != -1 {
+	// Overlay the arrow for the current snake's move safely
+	if opts.move != Unset && opts.snakeIndex != -1 && arrow != ' ' {
 		newHead := moveHead(game.Snakes[opts.snakeIndex].Head, opts.move)
-		if arrow != ' ' { // Ensure arrow is set
-			board[adjustY(newHead.Y)][newHead.X+1] = arrow
+		adjustedY := adjustY(newHead.Y)
+		if adjustedY != -1 && newHead.X+1 < extendedWidth {
+			board[adjustedY][newHead.X+1] = arrow
 		}
 	}
 
@@ -118,6 +137,16 @@ func visualizeBoard(game Board, options ...func(*boardOptions)) string {
 		}
 		sb.WriteString(opts.newlineCharacter)
 	}
+
+	// Append the health status of each snake at the bottom
+	sb.WriteString(opts.indent + "Snake Health: ")
+	for i, snake := range game.Snakes {
+		if i > 0 {
+			sb.WriteString(", ")
+		}
+		sb.WriteString(fmt.Sprintf("Snake %c: %d", 'a'+i, snake.Health))
+	}
+	sb.WriteString(opts.newlineCharacter)
 
 	return sb.String()
 }
@@ -185,8 +214,8 @@ func generateMostVisitedPathWithAlternatives(node *Node, depth int, edgeCount *i
 
 	// Generate Voronoi diagram and count controlled positions for each snake
 	voronoi := GenerateVoronoi(node.Board)
-	// voronoiVisualization := VisualizeVoronoi(voronoi, node.Board.Snakes, WithNewlineCharacter("<br/>"))
-	// nodeLabel += "<br/>" + voronoiVisualization
+	voronoiVisualization := VisualizeVoronoi(voronoi, node.Board.Snakes, WithNewlineCharacter("<br/>"))
+	nodeLabel += "<br/>" + voronoiVisualization
 
 	// Count controlled positions by each snake (A, B, etc.)
 	controlledPositions := make([]int, len(node.Board.Snakes))
@@ -232,8 +261,8 @@ func generateMostVisitedPathWithAlternatives(node *Node, depth int, edgeCount *i
 
 		// Generate Voronoi diagram and count controlled positions for each snake in the child
 		childVoronoi := GenerateVoronoi(child.Board)
-		// childVoronoiVisualization := VisualizeVoronoi(childVoronoi, child.Board.Snakes, WithNewlineCharacter("<br/>"))
-		// childLabel += "<br/>" + childVoronoiVisualization
+		childVoronoiVisualization := VisualizeVoronoi(childVoronoi, child.Board.Snakes, WithNewlineCharacter("<br/>"))
+		childLabel += "<br/>" + childVoronoiVisualization
 
 		// Count controlled positions for each snake in the child
 		childControlledPositions := make([]int, len(child.Board.Snakes))
@@ -274,26 +303,6 @@ type Path struct {
 	Depth int
 }
 
-// findDeepestPaths recursively finds the deepest paths in the tree
-func findDeepestPaths(node *Node, currentPath []*Node, paths *[]Path) {
-	if node == nil {
-		return
-	}
-
-	// Append the current node to the path
-	currentPath = append(currentPath, node)
-
-	// If the node has no children, this is a leaf node, so record the path
-	if len(node.Children) == 0 {
-		*paths = append(*paths, Path{Nodes: append([]*Node(nil), currentPath...), Depth: len(currentPath)})
-	} else {
-		// Recurse for each child
-		for _, child := range node.Children {
-			findDeepestPaths(child, currentPath, paths)
-		}
-	}
-}
-
 func VisualizeVoronoi(voronoi [][]int, snakes []Snake, options ...func(*boardOptions)) string {
 	var sb strings.Builder
 
@@ -326,12 +335,17 @@ func VisualizeVoronoi(voronoi [][]int, snakes []Snake, options ...func(*boardOpt
 }
 
 func GenerateMostVisitedPathWithAlternativesHtmlTree(node *Node) error {
-	timestamp := time.Now().Format("20060102_150405")
+	timestamp := time.Now().Format("20060102_150405.000000")
 	uuid := uuid.New().String()
 	filename := filepath.Join("movetrees", fmt.Sprintf("%s_%s.html", timestamp, uuid))
 
 	// Generate DOT structure for Graphviz, pruning to most visited path + direct neighbors
 	dotData := generatePrunedDotTreeData(node)
+
+	board, err := json.Marshal(node.Board)
+	if err != nil {
+		return err
+	}
 
 	// Write the HTML file with embedded viz.js for visualization
 	htmlContent := fmt.Sprintf(`
@@ -345,6 +359,7 @@ func GenerateMostVisitedPathWithAlternativesHtmlTree(node *Node) error {
 		<script src="https://cdnjs.cloudflare.com/ajax/libs/viz.js/2.1.2/full.render.js"></script>
 	</head>
 	<body>
+		<div>%s</div>
 		<div id="graph" style="width:100vw; height:100vh;"></div>
 		<script>
 			const dot = %q;
@@ -360,10 +375,10 @@ func GenerateMostVisitedPathWithAlternativesHtmlTree(node *Node) error {
 				});
 		</script>
 	</body>
-	</html>`, dotData)
+	</html>`, string(board), dotData)
 
 	// Write the HTML file to disk
-	err := os.WriteFile(filename, []byte(htmlContent), 0644)
+	err = os.WriteFile(filename, []byte(htmlContent), 0644)
 	if err != nil {
 		return fmt.Errorf("failed to write file: %w", err)
 	}
@@ -388,6 +403,8 @@ func visualizeNode(node *Node) string {
 
 	// Add controlled positions from the Voronoi diagram
 	voronoi := GenerateVoronoi(node.Board)
+	nodeVoronoiVisualization := VisualizeVoronoi(voronoi, node.Board.Snakes, WithNewlineCharacter("\\n"))
+	nodeLabel += "\\n" + nodeVoronoiVisualization
 	controlledPositions := make([]int, len(node.Board.Snakes))
 	for _, row := range voronoi {
 		for _, owner := range row {
@@ -416,27 +433,55 @@ func generatePrunedDotTreeData(node *Node) string {
 	sb.WriteString("  edge [ fontname=\"Lato\" ]\n")
 
 	// Generate the pruned tree, focusing on the most visited path and direct neighbors
-	traversePrunedDotTree(node, &sb)
+	// traversePrunedDotTree(node, &sb)
+	traverseMostVisitedPaths(node, &sb)
 
 	sb.WriteString("}\n")
 	return sb.String()
 }
 
-// traversePrunedDotTree recursively generates the most visited path and direct neighbors in DOT format
-func traversePrunedDotTree(node *Node, sb *strings.Builder) {
-	if node == nil {
+// traverseMostVisitedPaths traverses the most visited path starting from each of the first-layer children.
+func traverseMostVisitedPaths(root *Node, sb *strings.Builder) {
+	if root == nil {
 		return
 	}
 
-	// Use the visualizeNode function to add the current node's representation to the DOT data
-	sb.WriteString(visualizeNode(node))
+	// Use the visualizeNode function to add the root node's representation to the DOT data
+	sb.WriteString(visualizeNode(root))
+
+	// Sort children of the root node by visit count, descending
+	sort.Slice(root.Children, func(i, j int) bool {
+		return root.Children[i].Visits > root.Children[j].Visits
+	})
+
+	// For each child in the first layer of nodes
+	for _, firstLayerChild := range root.Children {
+		// Visualize the first layer child
+		sb.WriteString(visualizeNode(firstLayerChild))
+
+		// Add the edge between the root node and the first layer child
+		childID := fmt.Sprintf("Node_%p", firstLayerChild)
+		rootID := fmt.Sprintf("Node_%p", root)
+		ucbValue := firstLayerChild.UCT(root, 1.41)
+		sb.WriteString(fmt.Sprintf("  %s -> %s [label=\"UCB: %.5f\"];\n", rootID, childID, ucbValue))
+
+		// Recursively traverse the most visited path starting from this child
+		traverseMostVisitedPath(firstLayerChild, sb)
+	}
+}
+
+// traverseMostVisitedPath recursively generates the most visited path from a given node in DOT format
+func traverseMostVisitedPath(node *Node, sb *strings.Builder) {
+	if node == nil {
+		return
+	}
 
 	// Sort children by visit count, descending
 	sort.Slice(node.Children, func(i, j int) bool {
 		return node.Children[i].Visits > node.Children[j].Visits
 	})
 
-	// Follow only the most visited child path and show its direct neighbors
+	// If the node has children, follow the most visited path
 	if len(node.Children) > 0 {
 		// Add direct neighbors (children) as nodes using visualizeNode
 		for _, child := range node.Children {
@@ -447,7 +492,7 @@ func traversePrunedDotTree(node *Node, sb *strings.Builder) {
 			childID := fmt.Sprintf("Node_%p", child)
 			nodeID := fmt.Sprintf("Node_%p", node)
 			ucbValue := child.UCT(node, 1.41)
-			sb.WriteString(fmt.Sprintf("  %s -> %s [label=\"UCB: %.2f\"];\n", nodeID, childID, ucbValue))
+			sb.WriteString(fmt.Sprintf("  %s -> %s [label=\"UCB: %.5f\"];\n", nodeID, childID, ucbValue))
 		}
 
 		// Recursively process only the most visited child
@@ -455,6 +500,6 @@ func traversePrunedDotTree(node *Node, sb *strings.Builder) {
 
 		// Add rank=same to ensure the most visited node is in the center
 		sb.WriteString(fmt.Sprintf("{ rank=same; %s; }\n", fmt.Sprintf("Node_%p", mostVisitedChild)))
-		traversePrunedDotTree(mostVisitedChild, sb)
+		traverseMostVisitedPath(mostVisitedChild, sb)
 	}
 }

@@ -1,11 +1,12 @@
 package main
 
 import (
+	"container/list"
 	"math"
 )
 
 // GenerateVoronoi generates a Voronoi diagram for the given board.
-func GenerateVoronoi(board Board) [][]int {
+func GenerateVoronoi2(board Board) [][]int {
 	voronoi := make([][]int, board.Height)
 	for i := range voronoi {
 		voronoi[i] = make([]int, board.Width)
@@ -42,40 +43,95 @@ func manhattanDistance(a, b Point) int {
 	return int(math.Abs(float64(a.X-b.X)) + math.Abs(float64(a.Y-b.Y)))
 }
 
-// // evaluateBoard evaluates the board from the perspective of the snake at the current index.
-// func evaluateBoard(board Board, snakeIndex int) float64 {
-// 	voronoi := GenerateVoronoi(board)
-// 	score := 0.0
+// GenerateFloodFill generates a flood-fill diagram for the given board, where each cell is filled with the closest snake according to legal moves.
+func GenerateVoronoi(board Board) [][]int {
+	floodFill := make([][]int, board.Height)
+	for i := range floodFill {
+		floodFill[i] = make([]int, board.Width)
+		for j := range floodFill[i] {
+			floodFill[i][j] = -1 // Initialize all positions as unassigned
+		}
+	}
 
-// 	// Count the number of cells controlled by the snake at the specified index
-// 	for y := 0; y < board.Height; y++ {
-// 		for x := 0; x < board.Width; x++ {
-// 			if voronoi[y][x] == snakeIndex { // Score for the snake at the current index
-// 				score += 1.0
-// 			}
-// 		}
-// 	}
+	// Queue for flood fill, each element contains the current point, snake index, and the current depth (distance from snake head)
+	queue := list.New()
 
-// 	return score
-// }
+	// Initialize the queue with the heads of all snakes
+	for k, snake := range board.Snakes {
+		if snake.Health > 0 && len(snake.Body) > 0 { // Skip dead or empty snakes
+			queue.PushBack(floodFillNode{snake.Head, k, 0})
+			floodFill[snake.Head.Y][snake.Head.X] = k
+		}
+	}
 
-func evaluateBoard(board Board) float64 {
-	voronoi := GenerateVoronoi(board)
-	score := 0.0
-	opponent := 0.0
-	for y := 0; y < board.Height; y++ {
-		for x := 0; x < board.Width; x++ {
-			if voronoi[y][x] == 0 {
-				score++
-			} else if voronoi[y][x] != -1 {
-				opponent++
+	// Perform flood fill
+	for queue.Len() > 0 {
+		element := queue.Front()
+		node := element.Value.(floodFillNode)
+		queue.Remove(element)
+
+		snakeIndex := node.snakeIndex
+		currentPoint := node.point
+
+		// Get legal moves for the current point
+		for _, direction := range AllDirections {
+			newPoint := moveHead(currentPoint, direction)
+
+			// Ensure new point is within bounds and unassigned
+			if newPoint.X >= 0 && newPoint.X < board.Width && newPoint.Y >= 0 && newPoint.Y < board.Height {
+				if floodFill[newPoint.Y][newPoint.X] == -1 {
+					// Check if the move is legal for the snake at snakeIndex
+					if isLegalMove(board, snakeIndex, newPoint) {
+						floodFill[newPoint.Y][newPoint.X] = snakeIndex
+						queue.PushBack(floodFillNode{newPoint, snakeIndex, node.depth + 1})
+					}
+				}
 			}
 		}
 	}
 
-	if score > opponent {
-		return 1
-	}
-	return -1
+	return floodFill
+}
 
+// floodFillNode represents a node in the flood-fill queue.
+type floodFillNode struct {
+	point      Point
+	snakeIndex int
+	depth      int // Depth is the number of moves from the snake's head
+}
+
+// isLegalMove checks if a move to a new point is legal for the snake.
+func isLegalMove(board Board, snakeIndex int, newHead Point) bool {
+	snake := board.Snakes[snakeIndex]
+
+	// Check if the new head is within the board boundaries
+	if newHead.X < 0 || newHead.X >= board.Width || newHead.Y < 0 || newHead.Y >= board.Height {
+		return false
+	}
+
+	// Check for collisions with other snakes
+	for i := range board.Snakes {
+		otherSnake := board.Snakes[i]
+
+		// Don't consider dead snakes
+		if len(otherSnake.Body) == 0 || otherSnake.Health == 0 {
+			continue
+		}
+
+		// Check for collisions with other snakes' bodies
+		snakeWithoutTail := otherSnake.Body[0 : len(otherSnake.Body)-1]
+		for _, segment := range snakeWithoutTail {
+			if newHead == segment {
+				return false
+			}
+		}
+
+		// Check for head-to-head collisions where the other snake is longer or equal
+		if newHead == otherSnake.Head && len(otherSnake.Body) >= len(snake.Body) {
+			return false
+		}
+	}
+
+	// If no collision, the move is legal
+	return true
 }

@@ -66,45 +66,39 @@ func resolveCollisions(board *Board, snakeIndex int, newHead Point) {
 
 	// Check if the snake's new head position results in a collision with another snake's head or body
 	for i := range board.Snakes {
-		if i != snakeIndex {
-			// Check for collision with the head of another snake
+		if i != snakeIndex && board.Snakes[i].Health > 0 { // Skip dead snakes
+			// Check for head-to-head collision or body collision
 			if newHead == board.Snakes[i].Head {
 				if len(board.Snakes[snakeIndex].Body) > len(board.Snakes[i].Body) {
-					deadSnakes[i] = true // The other snake dies
+					deadSnakes[i] = true
 				} else if len(board.Snakes[snakeIndex].Body) < len(board.Snakes[i].Body) {
-					deadSnakes[snakeIndex] = true // The current snake dies
+					deadSnakes[snakeIndex] = true
 				} else {
-					// If both are of the same length, both die
 					deadSnakes[snakeIndex] = true
 					deadSnakes[i] = true
 				}
 			} else {
-				// Check for collision with the body of another snake
 				for _, segment := range board.Snakes[i].Body {
 					if newHead == segment {
-						deadSnakes[snakeIndex] = true // Current snake dies if it collides with another snake's body
+						deadSnakes[snakeIndex] = true
 					}
 				}
 			}
 		}
 	}
 
-	// Remove any dead snakes from the board
-	removeDeadSnakes(board, deadSnakes)
+	// Mark dead snakes
+	markDeadSnakes(board, deadSnakes)
 }
 
-// removeDeadSnakes removes any snakes marked as dead from the board.
-func removeDeadSnakes(board *Board, deadSnakes map[int]bool) {
-	liveSnakes := board.Snakes[:0]
-	for i, snake := range board.Snakes {
-		// Check if the snake is not marked as dead and is within the board boundaries
-		if !deadSnakes[i] &&
-			snake.Head.X >= 0 && snake.Head.X < board.Width &&
-			snake.Head.Y >= 0 && snake.Head.Y < board.Height {
-			liveSnakes = append(liveSnakes, snake)
+// markDeadSnakes marks snakes as dead by clearing their body and setting health to 0.
+func markDeadSnakes(board *Board, deadSnakes map[int]bool) {
+	for i := range board.Snakes {
+		if deadSnakes[i] {
+			board.Snakes[i].Body = []Point{} // Clear the body to mark the snake as dead
+			board.Snakes[i].Health = 0       // Set health to 0 to indicate death
 		}
 	}
-	board.Snakes = liveSnakes
 }
 
 // moveHead calculates the new head position based on the direction.
@@ -154,6 +148,11 @@ func generateSafeMoves(board Board, snakeIndex int) []Direction {
 		for i := range board.Snakes {
 			otherSnake := board.Snakes[i]
 
+			// don't consider ded sneks
+			if len(otherSnake.Body) == 0 || otherSnake.Health == 0 {
+				continue
+			}
+
 			// Check for collisions with other snakes' bodies.
 			// ensure that we imagine their tail will be disappeared on the next move
 			snakeWithoutTail := otherSnake.Body[0 : len(otherSnake.Body)-1]
@@ -178,10 +177,10 @@ func generateSafeMoves(board Board, snakeIndex int) []Direction {
 		}
 	}
 
-	// If no safe moves, default to Up
-	if len(safeMoves) == 0 {
-		safeMoves = append(safeMoves, Up)
-	}
+	// // If no safe moves, default to Up
+	// if len(safeMoves) == 0 {
+	// 	safeMoves = append(safeMoves, Up)
+	// }
 
 	return safeMoves
 }

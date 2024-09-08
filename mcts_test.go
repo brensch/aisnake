@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"math"
 	"runtime"
 	"testing"
@@ -271,7 +272,7 @@ func TestMCTSVisualization(t *testing.T) {
 				Food: []Point{{X: 3, Y: 3}},
 			},
 			Iterations: math.MaxInt,
-			// Iterations: 100,
+			// Iterations: 1000,
 		},
 	}
 
@@ -289,6 +290,47 @@ func TestMCTSVisualization(t *testing.T) {
 
 			// assert.NoError(t, writeNodeAsMermaidToHTMLFile(node))
 			assert.NoError(t, GenerateMostVisitedPathWithAlternativesHtmlTree(node))
+
+		})
+	}
+}
+
+func TestMCTSVisualizationJSON(t *testing.T) {
+	testCases := []struct {
+		Description  string
+		InitialBoard string
+		Iterations   int
+	}{
+		{
+			Description:  "should not get transfixed by death",
+			InitialBoard: `{"height":11,"width":11,"food":[{"x":0,"y":4},{"x":1,"y":4}],"hazards":[],"snakes":[{"id":"5baad214-ed5e-4794-bd30-f110e488c474","name":"mcts","health":97,"body":[{"x":3,"y":4},{"x":4,"y":4},{"x":4,"y":5},{"x":5,"y":5},{"x":6,"y":5}],"latency":"405","head":{"x":3,"y":4},"shout":"","customizations":{"color":"#888888","head":"default","tail":"default"}},{"id":"e55aa73a-a108-406c-af9e-9192a380c027","name":"soba","health":89,"body":[{"x":2,"y":5},{"x":2,"y":6},{"x":3,"y":6},{"x":4,"y":6}],"latency":"400","head":{"x":2,"y":5},"shout":"","customizations":{"color":"#118645","head":"replit-mark","tail":"replit-notmark"}}]}`,
+			Iterations:   math.MaxInt,
+		},
+		// {
+		// 	Description:  "should not butt heads",
+		// 	InitialBoard: `{"height":11,"width":11,"food":[{"x":4,"y":0},{"x":7,"y":4},{"x":9,"y":3},{"x":0,"y":4}],"hazards":[],"snakes":[{"id":"a82fcde3-2bed-4cc5-ac42-a19cc10175ca","name":"mcts","health":66,"body":[{"x":1,"y":9},{"x":0,"y":9},{"x":0,"y":8},{"x":0,"y":7}],"latency":"902","head":{"x":1,"y":9},"shout":"","customizations":{"color":"#888888","head":"default","tail":"default"}},{"id":"4a147cce-14d9-42ba-b5b2-e72b2ecf04a7","name":"soba","health":93,"body":[{"x":3,"y":9},{"x":3,"y":8},{"x":4,"y":8},{"x":5,"y":8},{"x":6,"y":8}],"latency":"401","head":{"x":3,"y":9},"shout":"","customizations":{"color":"#118645","head":"replit-mark","tail":"replit-notmark"}}]}`,
+		// 	Iterations:   math.MaxInt,
+		// },
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.Description, func(t *testing.T) {
+
+			numCPUs := runtime.NumCPU()
+			_ = numCPUs
+			var board Board
+			assert.NoError(t, json.Unmarshal([]byte(tc.InitialBoard), &board))
+			rootBoard := copyBoard(board)
+			ctx, _ := context.WithTimeout(context.Background(), 1000*time.Millisecond)
+			// node := MCTS(ctx, rootBoard, tc.Iterations, numCPUs)
+			// for i := 0; i < tc.Iterations; i++ {
+
+			node := MCTS(ctx, rootBoard, tc.Iterations)
+			require.NotNil(t, node, "node is nil")
+
+			// assert.NoError(t, writeNodeAsMermaidToHTMLFile(node))
+			assert.NoError(t, GenerateMostVisitedPathWithAlternativesHtmlTree(node))
+			// }
 
 		})
 	}

@@ -9,10 +9,7 @@ import (
 	"math/rand"
 	"net/http"
 	"os"
-	"path/filepath"
 	"time"
-
-	"github.com/google/uuid"
 )
 
 func main() {
@@ -53,120 +50,49 @@ func handleStart(w http.ResponseWriter, r *http.Request) {
 
 func handleMove(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
+
+	// Decode the incoming JSON to the game structure
 	var game BattleSnakeGame
-	err := json.NewDecoder(r.Body).Decode(&game)
-	if err != nil {
+	if err := json.NewDecoder(r.Body).Decode(&game); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	fmt.Println("Received move request for snake", game.You.ID)
-
+	// Pre-process the game board and set up the context for MCTS
 	reorderedBoard := reorderSnakes(game.Board, game.You.ID)
-
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(game.Game.Timeout-100)*time.Millisecond)
 	defer cancel()
 
+	// Perform MCTS to find the best move
 	mctsResult := MCTS(ctx, reorderedBoard, math.MaxInt)
-
 	bestMove := determineBestMove(game, mctsResult)
 
+	// Prepare and send the response immediately
 	response := map[string]string{
 		"move":  bestMove,
 		"shout": "This is a nice move.",
 	}
 	writeJSON(w, response)
 
-	// Ensure the movetrees directory exists
-	err = os.MkdirAll("movetrees", os.ModePerm)
-	if err != nil {
-		log.Println("Error creating movetrees directory:", err)
-		return
-	}
+	// Perform non-essential operations after sending the response
+	defer func() {
+		// Ensure the movetrees directory exists
+		if err := os.MkdirAll("movetrees", os.ModePerm); err != nil {
+			log.Println("Error creating movetrees directory:", err)
+			return
+		}
 
-	err = writeNodeAsMermaidToHTMLFile(mctsResult)
-	if err != nil {
-		log.Println("Error saving mermaid tree:", err)
-		return
-	}
-
-	fmt.Println(visualizeBoard(game.Board))
-
-	// Log the filename with a format that makes it clickable in VS Code terminal
-	log.Println("Made move:", bestMove, "in", time.Since(start).Milliseconds(), "ms with", mctsResult.Visits, "visits")
-
-}
-
-func writeNodeAsMermaidToHTMLFile(node *Node) error {
-	// Generate Mermaid content
-	timestamp := time.Now().Format("20060102_150405")
-	uuid := uuid.New().String()
-	filename := filepath.Join("movetrees", fmt.Sprintf("%s_%s.html", timestamp, uuid))
-	mermaidContent := GenerateMostVisitedPathWithAlternativesMermaidTree(node)
-
-	// Write the Mermaid diagram to the file with a proper HTML template
-	htmlContent := fmt.Sprintf(`
-	<!DOCTYPE html>
-	<html lang="en">
-	<head>
-		<meta charset="UTF-8">
-		<meta name="viewport" content="width=device-width, initial-scale=1.0">
-		<title>Mermaid Diagram</title>
-		<style>
-			body {
-				margin: 0;
-				font-family: Arial, sans-serif;
-				display: flex;
-				justify-content: center;
-				align-items: center;
-				height: 100vh;
-				overflow: hidden;
-			}
-			.mermaid-container {
-				width: 100%%;
-				max-width: 1000px;
-				height: 80vh;
-				overflow: auto;
-				border: 1px solid #ccc;
-				padding: 10px;
-			}
-		</style>
-		<script type="module">
-			import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
-			mermaid.initialize({ 
-				startOnLoad: true,
-				maxTextSize: 100000000 // Increase max character count
-			});
-
-			// Add zoom functionality
-			document.addEventListener('keydown', (event) => {
-				const svgElement = document.querySelector('.mermaid svg');
-				let scale = parseFloat(svgElement.getAttribute('data-scale')) || 1;
-
-				if (event.ctrlKey && event.key === '+') { // Zoom in
-					scale += 0.1;
-				} else if (event.ctrlKey && event.key === '-') { // Zoom out
-					scale = Math.max(0.1, scale - 0.1);
-				}
-
-				svgElement.setAttribute('data-scale', scale);
-				svgElement.style.transform = 'scale(' + scale + ')';
-				svgElement.style.transformOrigin = '0 0';
-			});
-		</script>
-	</head>
-	<body>
-		<div class="mermaid-container">
-			<div class="mermaid">
-				%s
-			</div>
-		</div>
-	</body>
-	</html>`, mermaidContent)
-
-	fmt.Printf("Generated move tree: %s\nFile: %s\n", uuid, filepath.Join(".", filename))
-
-	return os.WriteFile(filename, []byte(htmlContent), 0644)
+		fmt.Println("--------------------------")
+		// Logging additional information
+		fmt.Println(visualizeBoard(game.Board))
+		fmt.Println("Received move request for snake", game.You.ID)
+		log.Println("Made move:", bestMove, "in", time.Since(start).Milliseconds(), "ms with", mctsResult.Visits, "visits")
+		// Generate and log the tree diagram
+		if err := GenerateMostVisitedPathWithAlternativesHtmlTree(mctsResult); err != nil {
+			log.Println("Error saving mermaid tree:", err)
+			return
+		}
+	}()
 }
 
 func reorderSnakes(board Board, youID string) Board {
