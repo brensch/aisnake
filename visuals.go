@@ -334,58 +334,91 @@ func VisualizeVoronoi(voronoi [][]int, snakes []Snake, options ...func(*boardOpt
 	return sb.String()
 }
 
-func GenerateMostVisitedPathWithAlternativesHtmlTree(node *Node) error {
-	timestamp := time.Now().Format("20060102_150405.000000")
-	uuid := uuid.New().String()
-	filename := filepath.Join("movetrees", fmt.Sprintf("%s_%s.html", timestamp, uuid))
+// func GenerateMostVisitedPathWithAlternativesHtmlTreeOld(node *Node) error {
+// 	timestamp := time.Now().Format("20060102_150405.000000")
+// 	uuid := uuid.New().String()
+// 	filename := filepath.Join("movetrees", fmt.Sprintf("%s_%s.html", timestamp, uuid))
 
-	// Generate DOT structure for Graphviz, pruning to most visited path + direct neighbors
-	dotData := generatePrunedDotTreeData(node)
+// 	// Generate DOT structure for Graphviz, pruning to most visited path + direct neighbors
+// 	dotData := generatePrunedDotTreeData(node)
 
-	board, err := json.Marshal(node.Board)
-	if err != nil {
-		return err
-	}
+// 	board, err := json.Marshal(node.Board)
+// 	if err != nil {
+// 		return err
+// 	}
 
-	// Write the HTML file with embedded viz.js for visualization
-	htmlContent := fmt.Sprintf(`
-	<!DOCTYPE html>
-	<html lang="en">
-	<head>
-		<meta charset="UTF-8">
-		<meta name="viewport" content="width=device-width, initial-scale=1.0">
-		<title>Most Visited Path Tree</title>
-		<script src="https://cdnjs.cloudflare.com/ajax/libs/viz.js/2.1.2/viz.js"></script>
-		<script src="https://cdnjs.cloudflare.com/ajax/libs/viz.js/2.1.2/full.render.js"></script>
-	</head>
-	<body>
-		<div>%s</div>
-		<div id="graph" style="width:100vw; height:100vh;"></div>
-		<script>
-			const dot = %q;
+// 	// Write the HTML file with embedded viz.js for visualization
+// 	htmlContent := fmt.Sprintf(`
+// 	<!DOCTYPE html>
+// 	<html lang="en">
+// 	<head>
+// 		<meta charset="UTF-8">
+// 		<meta name="viewport" content="width=device-width, initial-scale=1.0">
+// 		<title>Most Visited Path Tree</title>
+// 		<script src="https://cdnjs.cloudflare.com/ajax/libs/viz.js/2.1.2/viz.js"></script>
+// 		<script src="https://cdnjs.cloudflare.com/ajax/libs/viz.js/2.1.2/full.render.js"></script>
+// 	</head>
+// 	<body>
+// 		<div>%s</div>
+// 		<div id="graph" style="width:100vw; height:100vh;"></div>
+// 		<script>
+// 			const dot = %q;
 
-			// Render the DOT content using viz.js
-			const viz = new Viz();
-			viz.renderSVGElement(dot)
-				.then(function(element) {
-					document.getElementById('graph').appendChild(element);
-				})
-				.catch(error => {
-					console.error("Error rendering DOT:", error);
-				});
-		</script>
-	</body>
-	</html>`, string(board), dotData)
+// 			// Render the DOT content using viz.js
+// 			const viz = new Viz();
+// 			viz.renderSVGElement(dot)
+// 				.then(function(element) {
+// 					document.getElementById('graph').appendChild(element);
+// 				})
+// 				.catch(error => {
+// 					console.error("Error rendering DOT:", error);
+// 				});
+// 		</script>
+// 	</body>
+// 	</html>`, string(board), dotData)
 
-	// Write the HTML file to disk
-	err = os.WriteFile(filename, []byte(htmlContent), 0644)
-	if err != nil {
-		return fmt.Errorf("failed to write file: %w", err)
-	}
+// 	// Write the HTML file to disk
+// 	err = os.WriteFile(filename, []byte(htmlContent), 0644)
+// 	if err != nil {
+// 		return fmt.Errorf("failed to write file: %w", err)
+// 	}
 
-	fmt.Printf("Generated move tree: %s\nFile: %s\n", uuid, filepath.Join(".", filename))
-	return nil
-}
+// 	fmt.Printf("Generated move tree: %s\nFile: %s\n", uuid, filepath.Join(".", filename))
+// 	return nil
+// }
+
+// // visualizeNode generates the DOT representation of a single node, including its label, visits, score, board state, and controlled positions
+// func visualizeNode(node *Node) string {
+// 	if node == nil {
+// 		return ""
+// 	}
+
+// 	nodeID := fmt.Sprintf("Node_%p", node)
+// 	nodeLabel := fmt.Sprintf("Nodeid: %s\nVisits: %d\nAvg Score: %.3f\nSnake moved: %d",
+// 		nodeID, node.Visits, node.Score/float64(node.Visits), node.SnakeIndex)
+
+// 	// Add the board state visualization
+// 	boardVisualization := visualizeBoard(node.Board, WithNewlineCharacter("<br/>"))
+// 	nodeLabel += "\n" + boardVisualization
+
+// 	// Add controlled positions from the Voronoi diagram
+// 	voronoi := GenerateVoronoi(node.Board)
+// 	nodeVoronoiVisualization := VisualizeVoronoi(voronoi, node.Board.Snakes, WithNewlineCharacter("\n"))
+// 	nodeLabel += "\n" + nodeVoronoiVisualization
+// 	controlledPositions := make([]int, len(node.Board.Snakes))
+// 	for _, row := range voronoi {
+// 		for _, owner := range row {
+// 			if owner >= 0 && owner < len(controlledPositions) {
+// 				controlledPositions[owner]++
+// 			}
+// 		}
+// 	}
+// 	for i, count := range controlledPositions {
+// 		nodeLabel += fmt.Sprintf("\nSnake %c controls: %d positions", 'A'+i, count)
+// 	}
+
+// 	return fmt.Sprintf("  %s [label=\"%s\", fontname=\"Courier\"];\n", nodeID, nodeLabel)
+// }
 
 // visualizeNode generates the DOT representation of a single node, including its label, visits, score, board state, and controlled positions
 func visualizeNode(node *Node) string {
@@ -394,17 +427,18 @@ func visualizeNode(node *Node) string {
 	}
 
 	nodeID := fmt.Sprintf("Node_%p", node)
-	nodeLabel := fmt.Sprintf("Nodeid: %s\\nVisits: %d\\nAvg Score: %.3f\\nSnake moved: %d",
+	// Using <br/> instead of \n to create HTML-based line breaks that D3 can interpret
+	nodeLabel := fmt.Sprintf("%s\nVisits: %d\nAvg Score: %.3f\nSnake moved: %d\n\n",
 		nodeID, node.Visits, node.Score/float64(node.Visits), node.SnakeIndex)
 
 	// Add the board state visualization
-	boardVisualization := visualizeBoard(node.Board, WithNewlineCharacter("\\n"))
-	nodeLabel += "\\n" + boardVisualization
+	boardVisualization := visualizeBoard(node.Board, WithNewlineCharacter("\n"))
+	nodeLabel += "\n" + boardVisualization
 
 	// Add controlled positions from the Voronoi diagram
 	voronoi := GenerateVoronoi(node.Board)
-	nodeVoronoiVisualization := VisualizeVoronoi(voronoi, node.Board.Snakes, WithNewlineCharacter("\\n"))
-	nodeLabel += "\\n" + nodeVoronoiVisualization
+	nodeVoronoiVisualization := VisualizeVoronoi(voronoi, node.Board.Snakes, WithNewlineCharacter("\n"))
+	nodeLabel += "\n" + nodeVoronoiVisualization
 	controlledPositions := make([]int, len(node.Board.Snakes))
 	for _, row := range voronoi {
 		for _, owner := range row {
@@ -414,31 +448,32 @@ func visualizeNode(node *Node) string {
 		}
 	}
 	for i, count := range controlledPositions {
-		nodeLabel += fmt.Sprintf("\\nSnake %c controls: %d positions", 'A'+i, count)
+		nodeLabel += fmt.Sprintf("\nSnake %c controls: %d positions", 'A'+i, count)
 	}
 
-	return fmt.Sprintf("  %s [label=\"%s\", fontname=\"Courier\"];\n", nodeID, nodeLabel)
+	// Return the node label with HTML line breaks
+	return nodeLabel
 }
 
-// generatePrunedDotTreeData generates the pruned DOT data for Graphviz, including only the most visited path and direct neighbors
-func generatePrunedDotTreeData(node *Node) string {
-	if node == nil {
-		return ""
-	}
+// // generatePrunedDotTreeData generates the pruned DOT data for Graphviz, including only the most visited path and direct neighbors
+// func generatePrunedDotTreeData(node *Node) string {
+// 	if node == nil {
+// 		return ""
+// 	}
 
-	var sb strings.Builder
-	sb.WriteString("digraph G {\n")
-	sb.WriteString("  rankdir=\"TB\";\n") // Top to Bottom layout
-	sb.WriteString("  node [ shape=\"box\" style=\"rounded,filled\" fontname=\"Lato\" margin=0.2 ]\n")
-	sb.WriteString("  edge [ fontname=\"Lato\" ]\n")
+// 	var sb strings.Builder
+// 	sb.WriteString("digraph G {\n")
+// 	sb.WriteString("  rankdir=\"TB\";\n") // Top to Bottom layout
+// 	sb.WriteString("  node [ shape=\"box\" style=\"rounded,filled\" fontname=\"Lato\" margin=0.2 ]\n")
+// 	sb.WriteString("  edge [ fontname=\"Lato\" ]\n")
 
-	// Generate the pruned tree, focusing on the most visited path and direct neighbors
-	// traversePrunedDotTree(node, &sb)
-	traverseMostVisitedPaths(node, &sb)
+// 	// Generate the pruned tree, focusing on the most visited path and direct neighbors
+// 	// traversePrunedDotTree(node, &sb)
+// 	traverseMostVisitedPaths(node, &sb)
 
-	sb.WriteString("}\n")
-	return sb.String()
-}
+// 	sb.WriteString("}\n")
+// 	return sb.String()
+// }
 
 // traverseMostVisitedPaths traverses the most visited path starting from each of the first-layer children.
 func traverseMostVisitedPaths(root *Node, sb *strings.Builder) {
@@ -466,7 +501,7 @@ func traverseMostVisitedPaths(root *Node, sb *strings.Builder) {
 		sb.WriteString(fmt.Sprintf("  %s -> %s [label=\"UCB: %.5f\"];\n", rootID, childID, ucbValue))
 
 		// Recursively traverse the most visited path starting from this child
-		traverseMostVisitedPath(firstLayerChild, sb)
+		traverseMostVisitedPaths(firstLayerChild, sb)
 	}
 }
 
@@ -501,5 +536,107 @@ func traverseMostVisitedPath(node *Node, sb *strings.Builder) {
 		// Add rank=same to ensure the most visited node is in the center
 		sb.WriteString(fmt.Sprintf("{ rank=same; %s; }\n", fmt.Sprintf("Node_%p", mostVisitedChild)))
 		traverseMostVisitedPath(mostVisitedChild, sb)
+	}
+}
+
+type TreeNode struct {
+	ID            string      `json:"id"`
+	Visits        int         `json:"visits"`
+	AverageScore  float64     `json:"avg_score"`
+	UCB           float64     `json:"ucb"`
+	IsMostVisited bool        `json:"isMostVisited"`
+	Children      []*TreeNode `json:"children"`
+	Body          string      `json:"body"`
+}
+
+func GenerateMostVisitedPathWithAlternativesHtmlTree(node *Node) error {
+
+	treeNode := generateTreeData(node)
+	timestamp := time.Now().Format("20060102_150405.000000")
+	uuid := uuid.New().String()
+	filename := filepath.Join("visualiser", "tree-data", fmt.Sprintf("%s_%s.json", timestamp, uuid))
+
+	// // Parse the HTML template
+	// tmpl, err := template.ParseFiles("template.html")
+	// if err != nil {
+	// 	return err
+	// }
+
+	// Create the output file
+	file, err := os.Create(filename)
+	if err != nil {
+		return fmt.Errorf("failed to create file: %w", err)
+	}
+	defer file.Close()
+
+	// // Execute the template with the treeData
+	// data := struct {
+	// 	TreeData string
+	// }{
+	// 	TreeData: string(treeData),
+	// }
+
+	// Generate the tree data in JSON format
+	err = json.NewEncoder(file).Encode(treeNode)
+	if err != nil {
+		return err
+	}
+
+	// err = tmpl.Execute(file, data)
+	// if err != nil {
+	// 	return fmt.Errorf("failed to write template: %w", err)
+	// }
+
+	fmt.Printf("Generated move tree: %s\nFile: %s\n", uuid, filepath.Join(".", filename))
+	return nil
+}
+
+// generateTreeData recursively generates the tree structure in JSON format
+func generateTreeData(node *Node) *TreeNode {
+	if node == nil {
+		return nil
+	}
+
+	rootNode := &TreeNode{
+		ID:            fmt.Sprintf("Node_%p", node),
+		Visits:        node.Visits,
+		UCB:           0.0, // Root has no UCB
+		IsMostVisited: true,
+		Children:      make([]*TreeNode, 0),
+		Body:          visualizeNode(node),
+	}
+
+	// Traverse children
+	traverseAndBuildTree(node, rootNode)
+	return rootNode
+}
+
+// traverseAndBuildTree populates the TreeNode structure with children and marks the most visited path
+func traverseAndBuildTree(node *Node, treeNode *TreeNode) {
+	if node == nil {
+		return
+	}
+
+	// Sort children by visit count, descending
+	sort.Slice(node.Children, func(i, j int) bool {
+		return node.Children[i].Visits > node.Children[j].Visits
+	})
+
+	for i, child := range node.Children {
+		childNode := &TreeNode{
+			ID:            fmt.Sprintf("Node_%p", child),
+			Visits:        child.Visits,
+			UCB:           child.UCT(node, 1.41),
+			IsMostVisited: i == 0, // Only mark the most visited path
+			Children:      make([]*TreeNode, 0),
+			Body:          visualizeNode(child),
+		}
+
+		treeNode.Children = append(treeNode.Children, childNode)
+
+		// Recur only on the most visited child
+		// if i == 0 {
+		traverseAndBuildTree(child, childNode)
+		// }
 	}
 }

@@ -70,7 +70,7 @@ func isSnakeDead(snake Snake) bool {
 
 func (n *Node) UCT(parent *Node, explorationParam float64) float64 {
 	if n.Visits == 0 {
-		return math.Inf(1)
+		return math.MaxFloat64
 	}
 
 	exploitation := n.Score / float64(n.Visits)
@@ -85,7 +85,7 @@ func (n *Node) UCT(parent *Node, explorationParam float64) float64 {
 }
 
 func bestChild(node *Node, explorationParam float64) *Node {
-	bestValue := -math.Inf(1)
+	bestValue := -math.MaxFloat64
 	var bestNode *Node
 
 	for _, child := range node.Children {

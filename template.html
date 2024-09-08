@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>React Flow Tree Visualization</title>
+    <style>
+      body,
+      html,
+      #root {
+        height: 100%;
+        margin: 0;
+        font-family: "Courier New", monospace;
+      }
+      .react-flow__node {
+        font-family: "Courier New", monospace;
+      }
+    </style>
+
+    <!-- React and ReactDOM CDN -->
+    <script src="https://unpkg.com/react/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom/umd/react-dom.production.min.js"></script>
+
+    <!-- React Flow CDN -->
+    <link rel="stylesheet" href="https://unpkg.com/reactflow/dist/style.css" />
+    <script src="https://unpkg.com/reactflow/dist/react-flow.production.min.js"></script>
+  </head>
+  <body>
+    <div id="root"></div>
+
+    <script type="text/javascript">
+      // TreeData from Go template will be passed here
+      const treeData = {{.TreeData}};  // Inject Go template data here
+
+      const { useState, useCallback } = React;
+      const { ReactFlow, Controls } = window.ReactFlow;
+
+      function TreeFlow() {
+        const [nodes, setNodes] = useState([]);
+        const [edges, setEdges] = useState([]);
+
+        const generateTree = useCallback(function(tree, parentId = null, depth = 0, position = { x: 250, y: 5 }) {
+          const currentNode = {
+            id: tree.id,
+            data: { label: tree.body },
+            position: { x: position.x, y: position.y + depth * 100 },
+          };
+
+          const currentNodes = [currentNode];
+          let currentEdges = [];
+
+          if (parentId) {
+            currentEdges.push({
+              id: `e${parentId}-${tree.id}`,
+              source: parentId,
+              target: tree.id
+            });
+          }
+
+          if (tree.children) {
+            tree.children.forEach((child, index) => {
+              const childPosition = { x: position.x + index * 200, y: position.y + 100 };
+              const { nodes: childNodes, edges: childEdges } = generateTree(child, tree.id, depth + 1, childPosition);
+              currentNodes.push(...childNodes);
+              currentEdges.push(...childEdges);
+            });
+          }
+
+          return { nodes: currentNodes, edges: currentEdges };
+        }, []);
+
+        // Generate nodes and edges from the treeData
+        React.useEffect(() => {
+          const { nodes, edges } = generateTree(treeData);
+          setNodes(nodes);
+          setEdges(edges);
+        }, [generateTree]);
+
+        return (
+          React.createElement('div', { style: { width: '100%', height: '100%' } },
+            React.createElement(ReactFlow, { nodes: nodes, edges: edges, fitView: true },
+              React.createElement(Controls, null)
+            )
+          )
+        );
+      }
+
+      // Render the ReactFlow Tree into the #root element
+      ReactDOM.render(React.createElement(TreeFlow), document.getElementById('root'));
+    </script>
+  </body>
+</html>
