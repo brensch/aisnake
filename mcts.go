@@ -2,240 +2,112 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"math"
-	"math/rand"
-	"sync"
 )
 
-const maxMovesToIterate = 100
-const explorationParameter = 1.414
+// Methods such as copyBoard, applyMove, generateSafeMoves, and evaluateBoard
+// must be correctly defined elsewhere.
 
-// Node represents a node in the MCTS tree.
 type Node struct {
-	Board              Board       // The current state of the game board
-	Parent             *Node       // The parent node
-	Children           []*Node     // The children nodes
-	Visits             int         // Number of times this node has been visited
-	Score              float64     // The total score accumulated through simulations
-	UntriedMoves       []Direction // Moves that haven't been tried yet for the current snake
-	SnakeIndex         int         // Index of the snake whose move is being evaluated
-	SnakeIndexWhoMoved int
-	Move               Direction // The move that was applied to reach this node
+	Board      Board
+	SnakeIndex int
+	Parent     *Node
+	Children   []*Node
+	Visits     int
+	Score      float64
 }
 
-// NewNode creates a new MCTS node.
-func NewNode(board Board, parent *Node, snakeIndex, snakeIndexWhoMoved int, move Direction) *Node {
+func NewNode(board Board, snakeIndex int) *Node {
 	return &Node{
-		Board:              board,
-		Parent:             parent,
-		Children:           []*Node{},
-		Visits:             0,
-		Score:              0,
-		UntriedMoves:       generateSafeMoves(board, snakeIndex),
-		SnakeIndex:         snakeIndex,
-		SnakeIndexWhoMoved: snakeIndexWhoMoved,
-		Move:               move,
+		Board:      board,
+		SnakeIndex: snakeIndex,
+		Children:   make([]*Node, 0), // Ensuring Children slice is initialized
+		Visits:     0,
+		Score:      0,
 	}
 }
 
-func (n *Node) UCTValue(c *Node) float64 {
+func expand(node *Node) {
+	totalSnakes := len(node.Board.Snakes)
+	currentSnakeIndex := node.SnakeIndex
+	nextSnakeIndex := (currentSnakeIndex + 1) % totalSnakes
+	moves := generateSafeMoves(node.Board, currentSnakeIndex)
+
+	for _, move := range moves {
+		newBoard := copyBoard(node.Board)
+		applyMove(&newBoard, currentSnakeIndex, move)
+		// Create node for next snake's turn but score from current snake's perspective
+		child := NewNode(newBoard, nextSnakeIndex)
+		child.Parent = node
+		node.Children = append(node.Children, child)
+	}
+}
+
+func (n *Node) UCT(parent *Node, explorationParam float64) float64 {
 	exploitation := 0.0
+	if n.Visits > 0 { // Check to prevent division by zero
+		exploitation = n.Score / float64(n.Visits)
+	}
+	parentVisits := float64(parent.Visits)
+	if parentVisits == 0 {
+		parentVisits = 1 // Prevent division by zero in log calculation
+	}
 	exploration := 0.0
-	if c.Visits != 0 {
-		exploitation = c.Score / float64(c.Visits)
-		exploration = explorationParameter * math.Sqrt(math.Log(float64(n.Visits))/float64(c.Visits))
+	if n.Visits > 0 {
+		exploration = math.Sqrt(2 * math.Log(parentVisits) / float64(n.Visits))
+	} else {
+		exploration = math.MaxFloat64 // Encourage exploration of unvisited nodes
 	}
-	return exploitation + exploration
+	return exploitation + explorationParam*exploration
+
 }
 
-func (n *Node) SelectChild() *Node {
-	var selected *Node
-	maxUcbValue := -math.MaxFloat64
-
-	for _, child := range n.Children {
-		if child.Visits == 0 {
-			// Prioritize unvisited children first
-			return child
-		}
-
-		// Calculate UCB value
-		uctValue := n.UCTValue(child)
-
-		// Handle NaN values
-		if math.IsNaN(uctValue) {
-			fmt.Println("got nan")
-			continue // Skip this child if UCB calculation results in NaN
-		}
-
-		// Select the child with the maximum UCB value
-		if uctValue > maxUcbValue {
-			selected = child
-			maxUcbValue = uctValue
-		}
-	}
-
-	return selected
-}
-
-// Expand adds new child nodes by generating all possible moves for the current snake.
-func (n *Node) Expand() []*Node {
-	if len(n.UntriedMoves) == 0 || len(n.Board.Snakes) == 0 {
+func bestChild(node *Node, explorationParam float64) *Node {
+	if len(node.Children) == 0 {
 		return nil
 	}
-
-	children := []*Node{}
-	for _, move := range n.UntriedMoves {
-		newBoard := copyBoard(n.Board)
-		applyMove(&newBoard, n.SnakeIndex, move)
-
-		// Ensure there are still snakes on the board before calculating the next index
-		if len(newBoard.Snakes) == 0 {
-			// If no snakes are left after applying the move, return the children created so far
-			return children
+	best := node.Children[0] // Initialize with the first child
+	bestUCB := -math.MaxFloat64
+	for _, child := range node.Children {
+		ucb := child.UCT(node, explorationParam)
+		if ucb > bestUCB {
+			bestUCB = ucb
+			best = child
 		}
-
-		nextSnakeIndex := (n.SnakeIndex + 1) % len(newBoard.Snakes)
-
-		childNode := NewNode(newBoard, n, nextSnakeIndex, n.SnakeIndex, move)
-		children = append(children, childNode)
 	}
-
-	// Clear untried moves since all have been expanded
-	n.UntriedMoves = []Direction{}
-	n.Children = append(n.Children, children...) // Save the expanded children to the node
-	return children
+	return best
 }
 
-// Update updates the node's visit count and score.
-func (n *Node) Update(score float64) {
-	n.Visits++
-	n.Score += score
-}
-
-func MCTS(ctx context.Context, rootBoard Board, iterations, numGoroutines int) *Node {
-	rootNode := NewNode(rootBoard, nil, 0, -1, Unset) // Start with the first snake, with an Unset move
-	// fmt.Println("root", rootNode.SnakeIndex)
-	// fmt.Println(visualizeBoard(rootNode.Board))
-
-	if iterations < 2 {
-		iterations = 2
-	}
+func MCTS(ctx context.Context, rootBoard Board, iterations int) *Node {
+	rootNode := NewNode(rootBoard, 0) // Starting with the first snake
+	expand(rootNode)
 
 	for i := 0; i < iterations; i++ {
 		select {
 		case <-ctx.Done():
-			return rootNode // Exit early if the context is canceled
+			return rootNode
 		default:
-		}
-
-		node := rootNode
-
-		// Selection and early expansion
-		for len(node.Children) > 0 && len(node.UntriedMoves) == 0 {
-			node = node.SelectChild()
-			// fmt.Println("doing selection")
-		}
-
-		// Expansion
-		if !boardIsTerminal(node.Board) && len(node.UntriedMoves) > 0 {
-			children := node.Expand()
-			if len(children) > 0 {
-				node.Children = children // Save the expanded children to the node
-				node = children[0]       // Proceed with one of the expanded children
+			node := rootNode
+			for node != nil && len(node.Children) > 0 {
+				node = bestChild(node, 1.41)
 			}
-		}
-
-		// Parallel Simulation (Rollout)
-		results := make(chan float64, numGoroutines)
-		var wg sync.WaitGroup
-
-		// Start each rollout from the board state of the selected node
-		for g := 0; g < numGoroutines; g++ {
-			wg.Add(1)
-			go func(node *Node) {
-				defer wg.Done()
-
-				// fmt.Println("base", node.SnakeIndex)
-				// fmt.Println(visualizeBoard(node.Board))
-				boardCopy := copyBoard(node.Board) // Start from the board state at the current node
-				currentSnakeIndex := node.SnakeIndex
-				moves := 0
-
-				for !boardIsTerminal(boardCopy) {
-					select {
-					case <-ctx.Done():
-						return
-					default:
-					}
-
-					move := randomSafeMove(boardCopy, currentSnakeIndex)
-					applyMove(&boardCopy, currentSnakeIndex, move)
-					// everyone died
-					if len(boardCopy.Snakes) == 0 {
-						results <- 0
-						return
-					}
-
-					// Update snake index for the next move
-					currentSnakeIndex = (currentSnakeIndex + 1) % len(boardCopy.Snakes) // Next snake's turn
-					moves++
-					if moves == maxMovesToIterate {
-						// fmt.Println("max iters")
-						break
-					}
-				}
-
-				// Evaluate from the perspective of the snake that led to this node, not the current snake
-				score := evaluateBoard(boardCopy, node.SnakeIndexWhoMoved)
-				results <- score
-
-				// fmt.Println("rolled", score, boardCopy.Height*boardCopy.Width, node.SnakeIndex)
-				// fmt.Println(visualizeBoard(boardCopy))
-				// fmt.Println(VisualizeVoronoi(GenerateVoronoi(boardCopy), boardCopy.Snakes))
-
-			}(node) // Pass the node to start the rollout from
-		}
-
-		// Collect and average the results
-		wg.Wait()
-		close(results)
-
-		totalScore := 0.0
-		count := 0
-
-		for score := range results {
-			select {
-			case <-ctx.Done():
-				return rootNode
-			default:
+			if node == nil {
+				break
 			}
-
-			totalScore += score
-			count++
-		}
-
-		// do an instantaneous evaluation of the current position
-		instantScore := evaluateBoard(node.Board, node.SnakeIndexWhoMoved) / (float64(node.Board.Height) * float64(node.Board.Width))
-
-		// averageScoreMonte := totalScore / float64(count)
-		// finalNodeScore := (instantScore + averageScoreMonte) / 2
-
-		// Backpropagation
-		for node != nil {
-			node.Update(instantScore)
-			node = node.Parent
+			if node.Visits == 0 {
+				expand(node)
+			}
+			score := evaluateBoard(node.Board)
+			if node.SnakeIndex == 0 {
+				score = -1 * score
+			}
+			for node != nil {
+				node.Visits++
+				node.Score += score
+				score = -1 * score
+				node = node.Parent
+			}
 		}
 	}
-
 	return rootNode
-}
-
-func randomSafeMove(board Board, snakeIndex int) Direction {
-	safeMoves := generateSafeMoves(board, snakeIndex)
-	if len(safeMoves) == 0 {
-		return Up // Default move if no safe moves are found (this should generally not happen)
-	}
-
-	return safeMoves[rand.Intn(len(safeMoves))] // Return a random move from the list of safe moves
 }

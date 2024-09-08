@@ -42,19 +42,40 @@ func manhattanDistance(a, b Point) int {
 	return int(math.Abs(float64(a.X-b.X)) + math.Abs(float64(a.Y-b.Y)))
 }
 
-// evaluateBoard evaluates the board from the perspective of the snake at the current index.
-func evaluateBoard(board Board, snakeIndex int) float64 {
+// // evaluateBoard evaluates the board from the perspective of the snake at the current index.
+// func evaluateBoard(board Board, snakeIndex int) float64 {
+// 	voronoi := GenerateVoronoi(board)
+// 	score := 0.0
+
+// 	// Count the number of cells controlled by the snake at the specified index
+// 	for y := 0; y < board.Height; y++ {
+// 		for x := 0; x < board.Width; x++ {
+// 			if voronoi[y][x] == snakeIndex { // Score for the snake at the current index
+// 				score += 1.0
+// 			}
+// 		}
+// 	}
+
+// 	return score
+// }
+
+func evaluateBoard(board Board) float64 {
 	voronoi := GenerateVoronoi(board)
 	score := 0.0
-
-	// Count the number of cells controlled by the snake at the specified index
+	opponent := 0.0
 	for y := 0; y < board.Height; y++ {
 		for x := 0; x < board.Width; x++ {
-			if voronoi[y][x] == snakeIndex { // Score for the snake at the current index
-				score += 1.0
+			if voronoi[y][x] == 0 {
+				score++
+			} else if voronoi[y][x] != -1 {
+				opponent++
 			}
 		}
 	}
 
-	return score
+	if score > opponent {
+		return 1
+	}
+	return -1
+
 }

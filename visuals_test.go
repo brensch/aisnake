@@ -104,40 +104,40 @@ func TestGenerateMermaidTree(t *testing.T) {
 
 	// Create a simple tree for the test
 	root := &Node{
-		Board:        board,
-		Visits:       10,
-		Score:        1.5,
-		UntriedMoves: []Direction{Up},
-		SnakeIndex:   0,
+		Board:  board,
+		Visits: 10,
+		Score:  1.5,
+		// UntriedMoves: []Direction{Up},
+		SnakeIndex: 0,
 		Children: []*Node{
 			{
-				Board:        board,
-				Visits:       5,
-				Score:        2.0,
-				UntriedMoves: []Direction{Right},
-				SnakeIndex:   0,
+				Board:  board,
+				Visits: 5,
+				Score:  2.0,
+				// UntriedMoves: []Direction{Right},
+				SnakeIndex: 0,
 				Children: []*Node{
 					{
-						Board:        board,
-						Visits:       3,
-						Score:        1.0,
-						UntriedMoves: []Direction{},
-						SnakeIndex:   0,
+						Board:  board,
+						Visits: 3,
+						Score:  1.0,
+						// UntriedMoves: []Direction{},
+						SnakeIndex: 0,
 					},
 				},
 			},
 			{
-				Board:        board,
-				Visits:       8,
-				Score:        1.8,
-				UntriedMoves: []Direction{Up},
-				SnakeIndex:   0,
+				Board:  board,
+				Visits: 8,
+				Score:  1.8,
+				// UntriedMoves: []Direction{Up},
+				SnakeIndex: 0,
 			},
 		},
 	}
 
 	// Call the GenerateMermaidTree function
-	output := GenerateMermaidTree(root, 0)
+	output := GenerateMostVisitedPathWithAlternativesMermaidTree(root)
 	expectedOutput := `graph TD;
 Node_0xc00011e210["Visits: 10<br/>Average Score: 0.15<br/>Untried Moves: 1<br/>a↑<br/>x x x x x <br/>x . . H x <br/>x ↑ 🍎 . x <br/>x A . . x <br/>x x x x x <br/><br/>A A A <br/>A A A <br/>A A A <br/>"]
 Node_0xc00011e210 -->|UCB: 1.36| Node_0xc00011e2c0

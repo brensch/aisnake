@@ -2,12 +2,17 @@ package main
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 	"unicode"
+
+	"github.com/google/uuid"
 )
 
-// visualizeBoard renders the board state along with the move of the current snake
+// visualizeBoard renders the board state along with the move of the current snake, with manual spacing for alignment
 func visualizeBoard(game Board, options ...func(*boardOptions)) string {
 	var sb strings.Builder
 
@@ -75,7 +80,7 @@ func visualizeBoard(game Board, options ...func(*boardOptions)) string {
 
 	// Place food on the board
 	for _, food := range game.Food {
-		board[adjustY(food.Y)][food.X+1] = '🍎'
+		board[adjustY(food.Y)][food.X+1] = '♥'
 	}
 
 	// Place hazards on the board
@@ -104,12 +109,12 @@ func visualizeBoard(game Board, options ...func(*boardOptions)) string {
 		}
 	}
 
-	// Build the string representation of the board
+	// Build the string representation of the board using manual spacing for alignment
 	for _, row := range board {
 		sb.WriteString(opts.indent)
 		for _, cell := range row {
 			sb.WriteRune(cell)
-			sb.WriteRune(' ')
+			sb.WriteString("  ") // Add extra spacing to simulate a table
 		}
 		sb.WriteString(opts.newlineCharacter)
 	}
@@ -147,149 +152,120 @@ func WithMove(move Direction, snakeIndex int) func(*boardOptions) {
 
 const maxEdges = 499
 
-func GenerateMermaidTree(node *Node, depth int) string {
+func GenerateMostVisitedPathWithAlternativesMermaidTree(node *Node) string {
 	edges := 0
-	pathsToShow := 5
-	return generateMermaidTree(node, depth, &edges, pathsToShow)
-}
-
-// generateMermaidTree generates a Mermaid diagram for the top N deepest paths and all root children
-func generateMermaidTree(node *Node, depth int, edgeCount *int, topN int) string {
-	if node == nil || *edgeCount >= maxEdges {
-		return ""
-	}
-
-	// Find all paths in the tree
-	var paths []Path
-	findDeepestPaths(node, []*Node{}, &paths)
-
-	// Sort paths by depth in descending order
-	sort.Slice(paths, func(i, j int) bool {
-		return paths[i].Depth > paths[j].Depth
-	})
-
-	// Select the top N deepest paths
-	if len(paths) > topN {
-		paths = paths[:topN]
-	}
-
-	// Create a set of nodes that are part of the top N deepest paths
-	nodeSet := make(map[*Node]bool)
-	for _, path := range paths {
-		for _, n := range path.Nodes {
-			nodeSet[n] = true
-		}
-	}
-
-	// Include all first-level children of the root node in the nodeSet
-	for _, child := range node.Children {
-		nodeSet[child] = true
-	}
-
 	var sb strings.Builder
 
-	// Start with the root node and add Mermaid config
-	if depth == 0 {
-		sb.WriteString("graph TD;\n")
-	}
+	// Add Mermaid config for the graph
+	sb.WriteString("graph TD;\n")
 
-	// Generate the diagram for nodes in the nodeSet and all root children
-	return generateMermaidTreeForNode(node, depth, edgeCount, nodeSet, &sb)
+	// Generate the most visited path with alternatives at each node, starting at depth 0
+	generateMostVisitedPathWithAlternatives(node, 0, &edges, &sb)
+
+	return sb.String()
 }
 
-// generateMermaidTreeForNode recursively generates the Mermaid diagram for the nodes in the nodeSet
-func generateMermaidTreeForNode(node *Node, depth int, edgeCount *int, nodeSet map[*Node]bool, sb *strings.Builder) string {
+// generateMostVisitedPathWithAlternatives generates the Mermaid diagram following the most visited path,
+// but shows all alternative children at each node, and fills in content for every node including Voronoi and controlled positions.
+func generateMostVisitedPathWithAlternatives(node *Node, depth int, edgeCount *int, sb *strings.Builder) string {
 	if node == nil || *edgeCount >= maxEdges {
-		return ""
-	}
-
-	// Skip nodes that aren't part of the top N deepest paths or root children
-	if !nodeSet[node] {
 		return ""
 	}
 
 	// Generate a unique identifier for the node
 	nodeID := fmt.Sprintf("Node_%p", node)
 
-	// Determine the move that led to this node
-	move := node.Move
-
-	// Add which snake is moving at the top
-
-	var arrow rune
-	switch move {
-	case Up:
-		arrow = '↑'
-	case Down:
-		arrow = '↓'
-	case Left:
-		arrow = '←'
-	case Right:
-		arrow = '→'
-	default:
-		arrow = ' ' // Handle unexpected cases
-	}
-
-	snakeFromPrevMove := (node.SnakeIndex - 1 + len(node.Board.Snakes)) % len(node.Board.Snakes)
-	snakeLabel := fmt.Sprintf(" %c %c<br/>", rune('a'+snakeFromPrevMove), arrow)
-
-	// Node details for root (without UCB value)
-	nodeLabel := fmt.Sprintf("%sVisits: %d<br/>Average Score: %.2f<br/>Untried Moves: %d",
-		snakeLabel, node.Visits, node.Score/float64(node.Visits), len(node.UntriedMoves))
+	// Node label with detailed info
+	nodeLabel := fmt.Sprintf("Nodeid: %s<br/>Visits: %d<br/>Average Score: %.3f<br/>Who moved:  %d",
+		nodeID, node.Visits, node.Score/float64(node.Visits), node.SnakeIndex)
 
 	// Add the board state using visualizeBoard with <br/> for newlines
-	boardVisualization := visualizeBoard(node.Board,
-		WithNewlineCharacter("<br/>"))
+	boardVisualization := visualizeBoard(node.Board, WithNewlineCharacter("<br/>"))
 	nodeLabel += "<br/>" + boardVisualization
 
-	// Add the Voronoi visualization with <br/> for newlines
-	voronoiVisualization := VisualizeVoronoi(GenerateVoronoi(node.Board), node.Board.Snakes, WithNewlineCharacter("<br/>"))
-	nodeLabel += "<br/>" + voronoiVisualization
+	// Generate Voronoi diagram and count controlled positions for each snake
+	voronoi := GenerateVoronoi(node.Board)
+	// voronoiVisualization := VisualizeVoronoi(voronoi, node.Board.Snakes, WithNewlineCharacter("<br/>"))
+	// nodeLabel += "<br/>" + voronoiVisualization
 
-	// Add the node definition
+	// Count controlled positions by each snake (A, B, etc.)
+	controlledPositions := make([]int, len(node.Board.Snakes))
+	for _, row := range voronoi {
+		for _, owner := range row {
+			if owner >= 0 && owner < len(controlledPositions) {
+				controlledPositions[owner]++
+			}
+		}
+	}
+	for i, count := range controlledPositions {
+		nodeLabel += fmt.Sprintf("Snake %c controls: %d positions<br/>", 'A'+i, count)
+	}
+
+	// Add the node definition with full details
 	sb.WriteString(fmt.Sprintf("%s[\"%s\"]\n", nodeID, nodeLabel))
 
-	// Recursively process children
+	// Sort children by visit count, descending
+	sort.Slice(node.Children, func(i, j int) bool {
+		return node.Children[i].Visits > node.Children[j].Visits
+	})
+
+	// If there are no children, return
+	if len(node.Children) == 0 {
+		return sb.String()
+	}
+
+	// Show all children as alternative branches with full content
 	for _, child := range node.Children {
 		if *edgeCount >= maxEdges {
 			break
 		}
 
-		// Skip children that aren't part of the top N deepest paths or root children
-		if !nodeSet[child] {
-			continue
-		}
-
 		childID := fmt.Sprintf("Node_%p", child)
 
+		// Child node label with detailed info
+		childLabel := fmt.Sprintf("Nodeid: %s<br/>Visits: %d<br/>Average Score: %.3f<br/>",
+			childID, child.Visits, child.Score/float64(child.Visits))
+
+		// Add the board state using visualizeBoard with <br/> for newlines
+		childBoardVisualization := visualizeBoard(child.Board, WithNewlineCharacter("<br/>"))
+		childLabel += "<br/>" + childBoardVisualization
+
+		// Generate Voronoi diagram and count controlled positions for each snake in the child
+		childVoronoi := GenerateVoronoi(child.Board)
+		// childVoronoiVisualization := VisualizeVoronoi(childVoronoi, child.Board.Snakes, WithNewlineCharacter("<br/>"))
+		// childLabel += "<br/>" + childVoronoiVisualization
+
+		// Count controlled positions for each snake in the child
+		childControlledPositions := make([]int, len(child.Board.Snakes))
+		for _, row := range childVoronoi {
+			for _, owner := range row {
+				if owner >= 0 && owner < len(childControlledPositions) {
+					childControlledPositions[owner]++
+				}
+			}
+		}
+		for i, count := range childControlledPositions {
+			childLabel += fmt.Sprintf("Snake %c controls: %d positions<br/>", 'A'+i, count)
+		}
+
 		// Calculate UCB value for the edge between this node and its child
-		ucbValue := node.UCTValue(child)
+		ucbValue := child.UCT(node, 1.41)
 
 		// Add the edge between the current node and the child node with UCB value
+		// TODO: add back ucb as method
 		sb.WriteString(fmt.Sprintf("%s -->|UCB: %.2f| %s\n", nodeID, ucbValue, childID))
+
+		// Add the child node's content to the diagram
+		sb.WriteString(fmt.Sprintf("%s[\"%s\"]\n", childID, childLabel))
+
 		*edgeCount++ // Increment the edge counter
-
-		// Recursively generate the diagram for the child node
-		generateMermaidTreeForNode(child, depth+1, edgeCount, nodeSet, sb)
 	}
 
-	return sb.String()
-}
+	// Follow the most visited child for the primary path
+	mostVisitedChild := node.Children[0]
 
-// directionToString converts a Direction to a string representation.
-func directionToString(direction Direction) string {
-	switch direction {
-	case Up:
-		return "Up"
-	case Down:
-		return "Down"
-	case Left:
-		return "Left"
-	case Right:
-		return "Right"
-	default:
-		return "Unknown"
-	}
+	// Recursively generate the diagram for the most visited child
+	return generateMostVisitedPathWithAlternatives(mostVisitedChild, depth+1, edgeCount, sb)
 }
 
 // Path represents a path in the tree with its corresponding depth
@@ -347,4 +323,138 @@ func VisualizeVoronoi(voronoi [][]int, snakes []Snake, options ...func(*boardOpt
 	}
 
 	return sb.String()
+}
+
+func GenerateMostVisitedPathWithAlternativesHtmlTree(node *Node) error {
+	timestamp := time.Now().Format("20060102_150405")
+	uuid := uuid.New().String()
+	filename := filepath.Join("movetrees", fmt.Sprintf("%s_%s.html", timestamp, uuid))
+
+	// Generate DOT structure for Graphviz, pruning to most visited path + direct neighbors
+	dotData := generatePrunedDotTreeData(node)
+
+	// Write the HTML file with embedded viz.js for visualization
+	htmlContent := fmt.Sprintf(`
+	<!DOCTYPE html>
+	<html lang="en">
+	<head>
+		<meta charset="UTF-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1.0">
+		<title>Most Visited Path Tree</title>
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/viz.js/2.1.2/viz.js"></script>
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/viz.js/2.1.2/full.render.js"></script>
+	</head>
+	<body>
+		<div id="graph" style="width:100vw; height:100vh;"></div>
+		<script>
+			const dot = %q;
+
+			// Render the DOT content using viz.js
+			const viz = new Viz();
+			viz.renderSVGElement(dot)
+				.then(function(element) {
+					document.getElementById('graph').appendChild(element);
+				})
+				.catch(error => {
+					console.error("Error rendering DOT:", error);
+				});
+		</script>
+	</body>
+	</html>`, dotData)
+
+	// Write the HTML file to disk
+	err := os.WriteFile(filename, []byte(htmlContent), 0644)
+	if err != nil {
+		return fmt.Errorf("failed to write file: %w", err)
+	}
+
+	fmt.Printf("Generated move tree: %s\nFile: %s\n", uuid, filepath.Join(".", filename))
+	return nil
+}
+
+// visualizeNode generates the DOT representation of a single node, including its label, visits, score, board state, and controlled positions
+func visualizeNode(node *Node) string {
+	if node == nil {
+		return ""
+	}
+
+	nodeID := fmt.Sprintf("Node_%p", node)
+	nodeLabel := fmt.Sprintf("Nodeid: %s\\nVisits: %d\\nAvg Score: %.3f\\nSnake moved: %d",
+		nodeID, node.Visits, node.Score/float64(node.Visits), node.SnakeIndex)
+
+	// Add the board state visualization
+	boardVisualization := visualizeBoard(node.Board, WithNewlineCharacter("\\n"))
+	nodeLabel += "\\n" + boardVisualization
+
+	// Add controlled positions from the Voronoi diagram
+	voronoi := GenerateVoronoi(node.Board)
+	controlledPositions := make([]int, len(node.Board.Snakes))
+	for _, row := range voronoi {
+		for _, owner := range row {
+			if owner >= 0 && owner < len(controlledPositions) {
+				controlledPositions[owner]++
+			}
+		}
+	}
+	for i, count := range controlledPositions {
+		nodeLabel += fmt.Sprintf("\\nSnake %c controls: %d positions", 'A'+i, count)
+	}
+
+	return fmt.Sprintf("  %s [label=\"%s\", fontname=\"Courier\"];\n", nodeID, nodeLabel)
+}
+
+// generatePrunedDotTreeData generates the pruned DOT data for Graphviz, including only the most visited path and direct neighbors
+func generatePrunedDotTreeData(node *Node) string {
+	if node == nil {
+		return ""
+	}
+
+	var sb strings.Builder
+	sb.WriteString("digraph G {\n")
+	sb.WriteString("  rankdir=\"TB\";\n") // Top to Bottom layout
+	sb.WriteString("  node [ shape=\"box\" style=\"rounded,filled\" fontname=\"Lato\" margin=0.2 ]\n")
+	sb.WriteString("  edge [ fontname=\"Lato\" ]\n")
+
+	// Generate the pruned tree, focusing on the most visited path and direct neighbors
+	traversePrunedDotTree(node, &sb)
+
+	sb.WriteString("}\n")
+	return sb.String()
+}
+
+// traversePrunedDotTree recursively generates the most visited path and direct neighbors in DOT format
+func traversePrunedDotTree(node *Node, sb *strings.Builder) {
+	if node == nil {
+		return
+	}
+
+	// Use the visualizeNode function to add the current node's representation to the DOT data
+	sb.WriteString(visualizeNode(node))
+
+	// Sort children by visit count, descending
+	sort.Slice(node.Children, func(i, j int) bool {
+		return node.Children[i].Visits > node.Children[j].Visits
+	})
+
+	// Follow only the most visited child path and show its direct neighbors
+	if len(node.Children) > 0 {
+		// Add direct neighbors (children) as nodes using visualizeNode
+		for _, child := range node.Children {
+			// Visualize the child node
+			sb.WriteString(visualizeNode(child))
+
+			// Add the edge between the current node and the child node
+			childID := fmt.Sprintf("Node_%p", child)
+			nodeID := fmt.Sprintf("Node_%p", node)
+			ucbValue := child.UCT(node, 1.41)
+			sb.WriteString(fmt.Sprintf("  %s -> %s [label=\"UCB: %.2f\"];\n", nodeID, childID, ucbValue))
+		}
+
+		// Recursively process only the most visited child
+		mostVisitedChild := node.Children[0]
+
+		// Add rank=same to ensure the most visited node is in the center
+		sb.WriteString(fmt.Sprintf("{ rank=same; %s; }\n", fmt.Sprintf("Node_%p", mostVisitedChild)))
+		traversePrunedDotTree(mostVisitedChild, sb)
+	}
 }

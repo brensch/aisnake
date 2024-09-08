@@ -67,7 +67,7 @@ func handleMove(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(game.Game.Timeout-100)*time.Millisecond)
 	defer cancel()
 
-	mctsResult := MCTS(ctx, reorderedBoard, math.MaxInt, 0)
+	mctsResult := MCTS(ctx, reorderedBoard, math.MaxInt)
 
 	bestMove := determineBestMove(game, mctsResult)
 
@@ -77,11 +77,6 @@ func handleMove(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, response)
 
-	// Generate a timestamp and UUID for the filename
-	timestamp := time.Now().Format("20060102_150405")
-	uuid := uuid.New().String()
-	filename := filepath.Join("movetrees", fmt.Sprintf("%s_%s.html", timestamp, uuid))
-
 	// Ensure the movetrees directory exists
 	err = os.MkdirAll("movetrees", os.ModePerm)
 	if err != nil {
@@ -89,44 +84,89 @@ func handleMove(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Generate Mermaid content
-	mermaidContent := GenerateMermaidTree(mctsResult, 0)
-
-	// Write the Mermaid diagram to the file with a proper HTML template
-	htmlContent := fmt.Sprintf(`
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mermaid Diagram</title>
-    <script type="module">
-        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
-        mermaid.initialize({ 
-            startOnLoad: true,
-            maxTextSize: 100000 // Increase max character count
-        });
-    </script>
-</head>
-<body>
-    <div class="mermaid">
-%s
-    </div>
-</body>
-</html>`, mermaidContent)
-
-	err = os.WriteFile(filename, []byte(htmlContent), 0644)
+	err = writeNodeAsMermaidToHTMLFile(mctsResult)
 	if err != nil {
-		log.Println("Error writing Mermaid file:", err)
+		log.Println("Error saving mermaid tree:", err)
 		return
 	}
 
 	fmt.Println(visualizeBoard(game.Board))
 
 	// Log the filename with a format that makes it clickable in VS Code terminal
-	fmt.Printf("Generated move tree: %s\nFile: %s\n", uuid, filepath.Join(".", filename))
 	log.Println("Made move:", bestMove, "in", time.Since(start).Milliseconds(), "ms with", mctsResult.Visits, "visits")
 
+}
+
+func writeNodeAsMermaidToHTMLFile(node *Node) error {
+	// Generate Mermaid content
+	timestamp := time.Now().Format("20060102_150405")
+	uuid := uuid.New().String()
+	filename := filepath.Join("movetrees", fmt.Sprintf("%s_%s.html", timestamp, uuid))
+	mermaidContent := GenerateMostVisitedPathWithAlternativesMermaidTree(node)
+
+	// Write the Mermaid diagram to the file with a proper HTML template
+	htmlContent := fmt.Sprintf(`
+	<!DOCTYPE html>
+	<html lang="en">
+	<head>
+		<meta charset="UTF-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1.0">
+		<title>Mermaid Diagram</title>
+		<style>
+			body {
+				margin: 0;
+				font-family: Arial, sans-serif;
+				display: flex;
+				justify-content: center;
+				align-items: center;
+				height: 100vh;
+				overflow: hidden;
+			}
+			.mermaid-container {
+				width: 100%%;
+				max-width: 1000px;
+				height: 80vh;
+				overflow: auto;
+				border: 1px solid #ccc;
+				padding: 10px;
+			}
+		</style>
+		<script type="module">
+			import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+			mermaid.initialize({ 
+				startOnLoad: true,
+				maxTextSize: 100000000 // Increase max character count
+			});
+
+			// Add zoom functionality
+			document.addEventListener('keydown', (event) => {
+				const svgElement = document.querySelector('.mermaid svg');
+				let scale = parseFloat(svgElement.getAttribute('data-scale')) || 1;
+
+				if (event.ctrlKey && event.key === '+') { // Zoom in
+					scale += 0.1;
+				} else if (event.ctrlKey && event.key === '-') { // Zoom out
+					scale = Math.max(0.1, scale - 0.1);
+				}
+
+				svgElement.setAttribute('data-scale', scale);
+				svgElement.style.transform = 'scale(' + scale + ')';
+				svgElement.style.transformOrigin = '0 0';
+			});
+		</script>
+	</head>
+	<body>
+		<div class="mermaid-container">
+			<div class="mermaid">
+				%s
+			</div>
+		</div>
+	</body>
+	</html>`, mermaidContent)
+
+	fmt.Printf("Generated move tree: %s\nFile: %s\n", uuid, filepath.Join(".", filename))
+
+	return os.WriteFile(filename, []byte(htmlContent), 0644)
 }
 
 func reorderSnakes(board Board, youID string) Board {
