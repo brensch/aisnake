@@ -15,6 +15,8 @@ import ReactFlow, {
   applyEdgeChanges,
   NodeChange,
   EdgeChange,
+  Handle,
+  Position,
 } from "reactflow"
 import "reactflow/dist/style.css"
 import dagre from "dagre"
@@ -34,14 +36,19 @@ interface TreeFile {
   name: string
 }
 
-const boxWidth = 300
-const boxHeight = 600
+const boxWidthDefault = 300
+const boxHeightDefault = 800
 
 const dagreGraph = new dagre.graphlib.Graph()
 dagreGraph.setDefaultEdgeLabel(() => ({}))
 
-const getLayoutedElements = (nodes: Node[], edges: Edge[]) => {
-  // Set graph to top-to-bottom with extra spacing
+const getLayoutedElements = (
+  nodes: Node[],
+  edges: Edge[],
+  boxHeight: number,
+  boxWidth: number,
+) => {
+  // Set graph to left-to-right with proper spacing
   dagreGraph.setGraph({ rankdir: "TB", ranksep: 100, nodesep: 100 })
 
   // Define the dimensions for each node
@@ -80,29 +87,31 @@ const TreeViewer: React.FC = () => {
   const [selectedTree, setSelectedTree] = useState<TreeNode | null>(null)
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(false)
-  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null) // Track selected node
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
 
+  const [boxHeight, setBoxHeight] = useState(boxHeightDefault)
+  const [boxWidth, setBoxWidth] = useState(boxWidthDefault)
+
+  // Reset nodes and edges when a new tree is selected
   useEffect(() => {
     if (id) {
+      // Clear existing nodes and edges only when switching trees
+      setNodes([])
+      setEdges([])
+      setSelectedTree(null)
+      setExpandedNodes(new Set())
+
+      // Fetch the new tree data
       setLoading(true)
       fetch(`/api/trees/${id}.json`)
         .then((res) => res.json())
-        .then((data) => {
+        .then((data: TreeNode) => {
           setSelectedTree(data)
           setLoading(false)
-          const rootNode: Node = {
-            id: data.id,
-            data: {
-              label: (
-                <pre style={{ fontFamily: "Courier New" }}>{data.body}</pre>
-              ),
-            },
-            position: { x: 0, y: 0 },
-            style: { width: `${boxWidth}px`, height: `${boxHeight}px` },
-          }
-          setNodes([rootNode])
-          setEdges([])
-          setExpandedNodes(new Set())
+
+          // Automatically expand the most visited path
+          const { newNodes, newEdges } = autoExpandMostVisitedPath(data)
+          handleLayout(newNodes, newEdges)
         })
         .catch((err) => {
           console.error("Error loading tree data", err)
@@ -110,6 +119,74 @@ const TreeViewer: React.FC = () => {
         })
     }
   }, [id])
+
+  // Re-layout the graph when box dimensions change
+  useEffect(() => {
+    if (nodes.length > 0 && edges.length > 0) {
+      handleLayout(nodes, edges)
+    }
+  }, [boxHeight, boxWidth])
+
+  const autoExpandMostVisitedPath = (tree: TreeNode) => {
+    const newNodes: Node[] = []
+    const newEdges: Edge[] = []
+    const newExpandedNodes = new Set<string>()
+
+    const traverseAndExpand = (currentNode: TreeNode) => {
+      newExpandedNodes.add(currentNode.id)
+
+      // Create a node for the current tree node
+      newNodes.push({
+        id: currentNode.id,
+        data: {
+          label: (
+            <pre style={{ fontFamily: "Courier New" }}>{currentNode.body}</pre>
+          ),
+        },
+        position: { x: 0, y: 0 }, // Initial position, will be laid out
+        style: { width: `${boxWidth}px`, height: `${boxHeight}px` },
+      })
+
+      if (currentNode.children && currentNode.children.length > 0) {
+        // Expand all children
+        currentNode.children.forEach((child) => {
+          newNodes.push({
+            id: child.id,
+            data: {
+              label: (
+                <pre style={{ fontFamily: "Courier New" }}>{child.body}</pre>
+              ),
+            },
+            position: { x: 0, y: 0 }, // Initial position, will be laid out
+            style: { width: `${boxWidth}px`, height: `${boxHeight}px` },
+          })
+
+          newEdges.push({
+            id: `e${currentNode.id}-${child.id}`,
+            source: currentNode.id,
+            target: child.id,
+          })
+        })
+
+        // Find the most visited child
+        const mostVisitedChild = currentNode.children.reduce(
+          (maxChild, child) =>
+            child.visits > maxChild.visits ? child : maxChild,
+          currentNode.children[0],
+        )
+
+        // Recursively expand the most visited path
+        traverseAndExpand(mostVisitedChild)
+      }
+    }
+
+    traverseAndExpand(tree)
+
+    // Update the expandedNodes state
+    setExpandedNodes(newExpandedNodes)
+
+    return { newNodes, newEdges }
+  }
 
   const handleNodeClick = (nodeId: string, nodeData: TreeNode) => {
     const isExpanded = expandedNodes.has(nodeId)
@@ -121,10 +198,10 @@ const TreeViewer: React.FC = () => {
     } else {
       const { newNodes, newEdges } = expandNode(nodeData)
       newExpandedNodes.add(nodeId)
-      handleLayout(newNodes, newEdges) // Apply layout after expanding nodes
+      handleLayout([...nodes, ...newNodes], [...edges, ...newEdges])
     }
 
-    setSelectedNodeId(nodeId) // Set the clicked node as selected
+    setSelectedNodeId(nodeId)
     setExpandedNodes(newExpandedNodes)
   }
 
@@ -154,21 +231,18 @@ const TreeViewer: React.FC = () => {
       newEdges.push(newEdge)
     })
 
-    setNodes((nds) => [...nds, ...newNodes])
-    setEdges((eds) => [...eds, ...newEdges])
-
-    return { newNodes, newEdges } // Return newly added nodes and edges
+    return { newNodes, newEdges }
   }
 
   const handleLayout = (newNodes: Node[], newEdges: Edge[]) => {
-    // Combine the existing nodes and edges with new ones
-    const updatedNodes = [...nodes, ...newNodes]
-    const updatedEdges = [...edges, ...newEdges]
+    const updatedNodes = [...newNodes]
+    const updatedEdges = [...newEdges]
 
-    // Perform layout using the combined graph
     const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements(
       updatedNodes,
       updatedEdges,
+      boxHeight,
+      boxWidth,
     )
 
     setNodes(layoutedNodes)
@@ -215,7 +289,10 @@ const TreeViewer: React.FC = () => {
   }
 
   return (
-    <div style={{ width: "80%", height: "100%", backgroundColor: "#f0f0f0" }}>
+    <div
+      key={id}
+      style={{ width: "80%", height: "100%", backgroundColor: "#f0f0f0" }}
+    >
       <div
         style={{
           position: "absolute",
@@ -225,13 +302,30 @@ const TreeViewer: React.FC = () => {
         }}
       >
         <button onClick={() => handleLayout(nodes, edges)}>Re-layout</button>
+        <div>
+          <label>Box Width:</label>
+          <input
+            type="number"
+            value={boxWidth}
+            onChange={(e) => setBoxWidth(Number(e.target.value))}
+          />
+        </div>
+        <div>
+          <label>Box Height:</label>
+          <input
+            type="number"
+            value={boxHeight}
+            onChange={(e) => setBoxHeight(Number(e.target.value))}
+          />
+        </div>
       </div>
       <ReactFlow
         nodes={nodes.map((node) => ({
           ...node,
+          type: "customNode", // Use the custom node type
           style: {
             ...node.style,
-            backgroundColor: node.id === selectedNodeId ? "#FFD700" : "#FFF", // Highlight selected node
+            backgroundColor: node.id === selectedNodeId ? "#FFD700" : "#FFF",
           },
         }))}
         edges={edges}
@@ -245,6 +339,7 @@ const TreeViewer: React.FC = () => {
         }}
         fitView
         fitViewOptions={{ padding: 0.2 }}
+        minZoom={0.1}
       >
         <Controls />
       </ReactFlow>
@@ -298,7 +393,9 @@ const Sidebar: React.FC = () => {
         width: "20%",
         overflowY: "scroll",
         padding: "1rem",
-        borderRight: "1px solid #ccc",
+        borderRight: "1px solid #444", // Darker border for dark mode
+        backgroundColor: "#1e1e1e", // Dark background
+        color: "#fff", // Light text color for visibility
       }}
     >
       <div
@@ -306,24 +403,53 @@ const Sidebar: React.FC = () => {
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
+          marginBottom: "1rem",
         }}
       >
-        <h3>Available Trees</h3>
-        <button onClick={fetchTrees} style={{ marginLeft: "1rem" }}>
+        <h3 style={{ margin: 0, color: "#fff" }}>Available Trees</h3>
+        <button
+          onClick={fetchTrees}
+          style={{
+            marginLeft: "1rem",
+            padding: "0.5rem 1rem",
+            backgroundColor: "#007BFF", // Keep button color, but adjust if needed
+            color: "#fff",
+            border: "none",
+            borderRadius: "4px",
+            cursor: "pointer",
+          }}
+        >
           Refresh
         </button>
       </div>
-      <ul>
+      <div>
         {trees.map((tree) => (
-          <li
+          <div
             key={tree.id}
             onClick={() => navigate(`/trees/${tree.id}`)}
-            style={{ cursor: "pointer", margin: "0.5rem 0" }}
+            style={{
+              cursor: "pointer",
+              padding: "1rem",
+              marginBottom: "0.5rem",
+              backgroundColor: "#333", // Dark card background
+              borderRadius: "8px",
+              boxShadow: "0 2px 4px rgba(0, 0, 0, 0.3)", // Adjusted for dark mode
+              color: "#fff", // White text color
+              transition: "transform 0.2s, box-shadow 0.2s",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = "scale(1.02)"
+              e.currentTarget.style.boxShadow = "0 4px 8px rgba(0, 0, 0, 0.6)" // Stronger shadow in dark mode
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = "scale(1)"
+              e.currentTarget.style.boxShadow = "0 2px 4px rgba(0, 0, 0, 0.3)"
+            }}
           >
             {tree.name}
-          </li>
+          </div>
         ))}
-      </ul>
+      </div>
     </div>
   )
 }

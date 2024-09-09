@@ -129,11 +129,8 @@ func visualizeBoard(game Board, options ...func(*boardOptions)) string {
 	}
 
 	// Append the health status of each snake
-	sb.WriteString(opts.indent + "Snake Health:")
-	sb.WriteString(opts.newlineCharacter)
-
 	for i, snake := range game.Snakes {
-		sb.WriteString(fmt.Sprintf("Snake %c: %d", 'a'+i, snake.Health))
+		sb.WriteString(fmt.Sprintf("Snake %c health: %d", 'a'+i, snake.Health))
 		sb.WriteString(opts.newlineCharacter)
 
 	}
@@ -180,124 +177,6 @@ func WithMove(move Direction, snakeIndex int) func(*boardOptions) {
 	}
 }
 
-const maxEdges = 499
-
-func GenerateMostVisitedPathWithAlternativesMermaidTree(node *Node) string {
-	edges := 0
-	var sb strings.Builder
-
-	// Add Mermaid config for the graph
-	sb.WriteString("graph TD;\n")
-
-	// Generate the most visited path with alternatives at each node, starting at depth 0
-	generateMostVisitedPathWithAlternatives(node, 0, &edges, &sb)
-
-	return sb.String()
-}
-
-// generateMostVisitedPathWithAlternatives generates the Mermaid diagram following the most visited path,
-// but shows all alternative children at each node, and fills in content for every node including Voronoi and controlled positions.
-func generateMostVisitedPathWithAlternatives(node *Node, depth int, edgeCount *int, sb *strings.Builder) string {
-	if node == nil || *edgeCount >= maxEdges {
-		return ""
-	}
-
-	// Generate a unique identifier for the node
-	nodeID := fmt.Sprintf("Node_%p", node)
-
-	// Node label with detailed info
-	nodeLabel := fmt.Sprintf("Nodeid: %s<br/>Visits: %d<br/>Average Score: %.3f<br/>Who moved:  %d",
-		nodeID, node.Visits, node.Score/float64(node.Visits), node.SnakeIndex)
-
-	// Add the board state using visualizeBoard with <br/> for newlines
-	boardVisualization := visualizeBoard(node.Board, WithNewlineCharacter("<br/>"))
-	nodeLabel += "<br/>" + boardVisualization
-
-	// Generate Voronoi diagram and count controlled positions for each snake
-	voronoi := GenerateVoronoi(node.Board)
-	voronoiVisualization := VisualizeVoronoi(voronoi, node.Board.Snakes, WithNewlineCharacter("<br/>"))
-	nodeLabel += "<br/>" + voronoiVisualization
-
-	// Count controlled positions by each snake (A, B, etc.)
-	controlledPositions := make([]int, len(node.Board.Snakes))
-	for _, row := range voronoi {
-		for _, owner := range row {
-			if owner >= 0 && owner < len(controlledPositions) {
-				controlledPositions[owner]++
-			}
-		}
-	}
-	for i, count := range controlledPositions {
-		nodeLabel += fmt.Sprintf("Snake %c controls: %d positions<br/>", 'A'+i, count)
-	}
-
-	// Add the node definition with full details
-	sb.WriteString(fmt.Sprintf("%s[\"%s\"]\n", nodeID, nodeLabel))
-
-	// Sort children by visit count, descending
-	sort.Slice(node.Children, func(i, j int) bool {
-		return node.Children[i].Visits > node.Children[j].Visits
-	})
-
-	// If there are no children, return
-	if len(node.Children) == 0 {
-		return sb.String()
-	}
-
-	// Show all children as alternative branches with full content
-	for _, child := range node.Children {
-		if *edgeCount >= maxEdges {
-			break
-		}
-
-		childID := fmt.Sprintf("Node_%p", child)
-
-		// Child node label with detailed info
-		childLabel := fmt.Sprintf("Nodeid: %s<br/>Visits: %d<br/>Average Score: %.3f<br/>",
-			childID, child.Visits, child.Score/float64(child.Visits))
-
-		// Add the board state using visualizeBoard with <br/> for newlines
-		childBoardVisualization := visualizeBoard(child.Board, WithNewlineCharacter("<br/>"))
-		childLabel += "<br/>" + childBoardVisualization
-
-		// Generate Voronoi diagram and count controlled positions for each snake in the child
-		childVoronoi := GenerateVoronoi(child.Board)
-		childVoronoiVisualization := VisualizeVoronoi(childVoronoi, child.Board.Snakes, WithNewlineCharacter("<br/>"))
-		childLabel += "<br/>" + childVoronoiVisualization
-
-		// Count controlled positions for each snake in the child
-		childControlledPositions := make([]int, len(child.Board.Snakes))
-		for _, row := range childVoronoi {
-			for _, owner := range row {
-				if owner >= 0 && owner < len(childControlledPositions) {
-					childControlledPositions[owner]++
-				}
-			}
-		}
-		for i, count := range childControlledPositions {
-			childLabel += fmt.Sprintf("Snake %c controls: %d positions<br/>", 'A'+i, count)
-		}
-
-		// Calculate UCB value for the edge between this node and its child
-		ucbValue := child.UCT(node, 1.41)
-
-		// Add the edge between the current node and the child node with UCB value
-		// TODO: add back ucb as method
-		sb.WriteString(fmt.Sprintf("%s -->|UCB: %.2f| %s\n", nodeID, ucbValue, childID))
-
-		// Add the child node's content to the diagram
-		sb.WriteString(fmt.Sprintf("%s[\"%s\"]\n", childID, childLabel))
-
-		*edgeCount++ // Increment the edge counter
-	}
-
-	// Follow the most visited child for the primary path
-	mostVisitedChild := node.Children[0]
-
-	// Recursively generate the diagram for the most visited child
-	return generateMostVisitedPathWithAlternatives(mostVisitedChild, depth+1, edgeCount, sb)
-}
-
 // Path represents a path in the tree with its corresponding depth
 type Path struct {
 	Nodes []*Node
@@ -324,10 +203,11 @@ func VisualizeVoronoi(voronoi [][]int, snakes []Snake, options ...func(*boardOpt
 		for x := 0; x < len(voronoi[y]); x++ {
 			owner := voronoi[y][x]
 			if owner == -1 {
-				sb.WriteString(". ") // Unassigned cells
+				sb.WriteString(".") // Unassigned cells
 			} else {
-				sb.WriteString(fmt.Sprintf("%c ", 'A'+owner)) // Each snake gets a unique letter
+				sb.WriteString(fmt.Sprintf("%c", 'A'+owner)) // Each snake gets a unique letter
 			}
+			sb.WriteString("  ") // Add extra spacing to simulate a table
 		}
 		sb.WriteString(opts.newlineCharacter)
 	}
@@ -345,15 +225,7 @@ func visualizeNode(node *Node) string {
 	// Using <br/> instead of \n to create HTML-based line breaks that D3 can interpret
 	nodeLabel := fmt.Sprintf("%s\nVisits: %d\nAvg Score: %.3f\nSnake moved: %d\n\n",
 		nodeID, node.Visits, node.Score/float64(node.Visits), node.SnakeIndex)
-
-	// Add the board state visualization
-	boardVisualization := visualizeBoard(node.Board, WithNewlineCharacter("\n"))
-	nodeLabel += "\n" + boardVisualization
-
-	// Add controlled positions from the Voronoi diagram
 	voronoi := GenerateVoronoi(node.Board)
-	nodeVoronoiVisualization := VisualizeVoronoi(voronoi, node.Board.Snakes, WithNewlineCharacter("\n"))
-	nodeLabel += "\n" + nodeVoronoiVisualization
 	controlledPositions := make([]int, len(node.Board.Snakes))
 	for _, row := range voronoi {
 		for _, owner := range row {
@@ -363,8 +235,16 @@ func visualizeNode(node *Node) string {
 		}
 	}
 	for i, count := range controlledPositions {
-		nodeLabel += fmt.Sprintf("\nSnake %c controls: %d positions", 'A'+i, count)
+		nodeLabel += fmt.Sprintf("Snake %c controls: %d cells\n", 'A'+i, count)
 	}
+	// Add the board state visualization
+	boardVisualization := visualizeBoard(node.Board, WithNewlineCharacter("\n"))
+	nodeLabel += boardVisualization
+
+	// Add controlled positions from the Voronoi diagram
+
+	nodeVoronoiVisualization := VisualizeVoronoi(voronoi, node.Board.Snakes, WithNewlineCharacter("\n"))
+	nodeLabel += "\n" + nodeVoronoiVisualization
 
 	// Return the node label with HTML line breaks
 	return nodeLabel
