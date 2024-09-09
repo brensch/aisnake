@@ -285,7 +285,7 @@ func TestMCTSVisualization(t *testing.T) {
 			ctx, _ := context.WithTimeout(context.Background(), 1000*time.Millisecond)
 			// node := MCTS(ctx, rootBoard, tc.Iterations, numCPUs)
 			workers := runtime.NumCPU()
-			node := MCTS(ctx, rootBoard, tc.Iterations, workers, make(map[string]*Node))
+			node := MCTS(ctx, "testid", rootBoard, tc.Iterations, workers, make(map[string]*Node))
 
 			require.NotNil(t, node, "node is nil")
 
@@ -365,7 +365,7 @@ func TestMCTSVisualizationJSON(t *testing.T) {
 			ctx, _ := context.WithTimeout(context.Background(), 500*time.Millisecond)
 
 			workers := runtime.NumCPU()
-			node := MCTS(ctx, rootBoard, tc.Iterations, workers, make(map[string]*Node))
+			node := MCTS(ctx, "testid", rootBoard, tc.Iterations, workers, make(map[string]*Node))
 			require.NotNil(t, node, "node is nil")
 
 			assert.NoError(t, GenerateMostVisitedPathWithAlternativesHtmlTree(node))

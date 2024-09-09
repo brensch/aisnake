@@ -5,50 +5,32 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"log/slog"
 	"math"
 	"math/rand"
 	"net/http"
+	"os"
 	"runtime"
 	"sync"
 	"time"
 )
 
-// TODO: get rid of globals
-// write all of this well also.
 var (
-	gameStates   = make(map[string]*Node) // Global map to store known game states
-	lastMoveTime time.Time                // Tracks the last time a handleMove request was made
-	flushTime    = 5 * time.Second
-	mu           sync.Mutex // Mutex to protect access to gameStates and lastMoveTime
+	gameStates = make(map[string]map[string]*Node) // Global map to store known game states
+	mu         sync.Mutex                          // Mutex to protect access to gameStates and lastMoveTime
 )
 
 func main() {
+	// Set up the custom handler for Google Cloud
+	handler := NewGoogleCloudHandler(os.Stdout, slog.LevelInfo)
 
-	// // Create a new JSON handler that outputs to stdout (Google Cloud reads logs from stdout)
-	// handler := slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{})
+	// Create a new logger using the custom handler
+	logger := slog.New(handler)
 
-	// // Create a new logger using the handler
-	// logger := slog.New(handler)
+	// Set the logger as default
+	slog.SetDefault(logger)
 
-	// // Log an informational message
-	// logger.LogAttrs(slog.LevelInfo, "Info log message",
-	// 	slog.String("message", "This is a log message for Google Cloud"),
-	// 	slog.String("severity", "INFO"), // Severity field for Google Cloud
-	// 	slog.Group("httpRequest",
-	// 		slog.String("requestMethod", "GET"),
-	// 		slog.String("requestUrl", "/some-endpoint"),
-	// 		slog.Int("status", 200),
-	// 	),
-	// )
-
-	// // Log an error message
-	// logger.LogAttrs(slog.LevelError, "Error log message",
-	// 	slog.String("message", "This is an error log for Google Cloud"),
-	// 	slog.String("severity", "ERROR"), // Error severity for Google Cloud
-	// 	slog.String("stack_trace", "stack trace details here..."),
-	// )
-
-	go clearOldGameStates()
+	slog.Info("Starting BattleSnake service", "port", 8080)
 
 	http.HandleFunc("/", handleIndex)
 	http.HandleFunc("/start", handleStart)
@@ -56,22 +38,8 @@ func main() {
 	http.HandleFunc("/end", handleEnd)
 
 	port := "8080"
-	fmt.Printf("Starting BattleSnake on port %s...\n", port)
+	slog.Info("Starting BattleSnake on port", "port", port)
 	log.Fatal(http.ListenAndServe(":"+port, nil))
-}
-
-// Background function to clear the gameStates map if no move request has come in for 30 seconds
-func clearOldGameStates() {
-	for {
-		time.Sleep(3 * time.Second)
-		mu.Lock()
-		if !lastMoveTime.IsZero() && time.Since(lastMoveTime) > flushTime {
-			fmt.Printf("Flushed %d gamestates\n", len(gameStates))
-			gameStates = make(map[string]*Node) // Clear the gameStates map
-			lastMoveTime = time.Time{}
-		}
-		mu.Unlock()
-	}
 }
 
 func handleIndex(w http.ResponseWriter, r *http.Request) {
@@ -93,8 +61,10 @@ func handleStart(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fmt.Printf("Game %s started\n", game.Game.ID)
-	fmt.Println(game.You)
+	// add a map for this game
+	gameStates[game.Game.ID] = make(map[string]*Node)
+
+	slog.Info("Game started", "game_id", game.Game.ID, "you", game.You)
 
 	writeJSON(w, map[string]string{})
 }
@@ -102,70 +72,65 @@ func handleStart(w http.ResponseWriter, r *http.Request) {
 func handleMove(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
 
-	// Decode the incoming JSON to the game structure
 	var game BattleSnakeGame
 	if err := json.NewDecoder(r.Body).Decode(&game); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	// Pre-process the game board and set up the context for MCTS
+	// get the nodemap for this game
+	gameState, ok := gameStates[game.Game.ID]
+	if !ok {
+		slog.Error("failed to find gamestate. seems like bug.")
+		gameState = make(map[string]*Node)
+	}
+
 	reorderedBoard := reorderSnakes(game.Board, game.You.ID)
-	// 50ms is a strong yolo
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(game.Game.Timeout-50)*time.Millisecond)
 	defer cancel()
 
-	// Update the lastMoveTime to track the current request
-	mu.Lock()
-	lastMoveTime = time.Now()
-	mu.Unlock()
-
-	// Perform MCTS to find the best move, reuse known game states if possible
 	workers := runtime.NumCPU()
-	mctsResult := MCTS(ctx, reorderedBoard, math.MaxInt, workers, gameStates)
+	mctsResult := MCTS(ctx, game.Game.ID, reorderedBoard, math.MaxInt, workers, gameState)
 	bestMove := determineBestMove(game, mctsResult)
-	saveNodesAtDepth2(mctsResult, gameStates)
 
-	// Prepare and send the response immediately
 	response := map[string]string{
 		"move":  bestMove,
 		"shout": "This is a nice move.",
 	}
 	writeJSON(w, response)
 
-	// Non-essential logging
-	go func() {
-		fmt.Println("--------------------------")
-		// Logging additional information
-		fmt.Println(visualizeBoard(game.Board))
-		yo, _ := json.Marshal(game.Board)
-		fmt.Println(string(yo))
-		fmt.Println("Received move request for snake", game.You.ID)
-		log.Println("Made move:", bestMove, "in", time.Since(start).Milliseconds(), "ms with depth", mctsResult.Visits, "visits")
-		// // Ensure the movetrees directory exists
-		// if err := os.MkdirAll("movetrees", os.ModePerm); err != nil {
-		// 	log.Println("Error creating movetrees directory:", err)
-		// 	return
-		// }
-		// Generate and log the tree diagram
-		// err := GenerateMostVisitedPathWithAlternativesHtmlTree(mctsResult)
-		// if err != nil {
-		// 	log.Println("Error saving mermaid tree:", err)
-		// 	return
-		// }
-	}()
+	// go func() {
+	// reset this gamestate and load in new nodes
+	gameStates[game.Game.ID] = make(map[string]*Node)
+	saveNodesAtDepth2(mctsResult, gameStates[game.Game.ID])
+	slog.Info("Move processed",
+		"game_id", game.Game.ID,
+		"snake_id", game.You.ID,
+		"move", bestMove,
+		"duration_ms", time.Since(start).Milliseconds(),
+		"depth", mctsResult.Visits,
+		"board", reorderedBoard,
+	)
+	// }()
+
+	// slog.Info("Visualized board", "board", visualizeBoard(game.Board))
+	// // Ensure the movetrees directory exists
+	// if err := os.MkdirAll("movetrees", os.ModePerm); err != nil {
+	// 	log.Println("Error creating movetrees directory:", err)
+	// 	return
+	// }
+	// Generate and log the tree diagram
+	// err := GenerateMostVisitedPathWithAlternativesHtmlTree(mctsResult)
+	// if err != nil {
+	// 	log.Println("Error saving mermaid tree:", err)
+	// 	return
+	// }
 }
 
-// Save all nodes at depth 2 to the map, these will be the potential returned nodes
 func saveNodesAtDepth2(rootNode *Node, gameStates map[string]*Node) {
-	// First level: rootNode's children
 	for _, child := range rootNode.Children {
-		// Second level: child nodes' children (depth 2)
 		for _, grandchild := range child.Children {
-			// Generate a hash of the board state (ignoring food, etc.)
 			boardKey := boardHash(grandchild.Board)
-
-			// Save the grandchild node (at depth 2) to the map
 			gameStates[boardKey] = grandchild
 		}
 	}
@@ -223,7 +188,7 @@ func handleEnd(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fmt.Printf("Game %s ended after %d turns\n", game.Game.ID, game.Turn)
+	slog.Info("Game ended", "game_id", game.Game.ID, "turns", game.Turn)
 
 	writeJSON(w, map[string]string{})
 }
@@ -234,11 +199,10 @@ func writeJSON(w http.ResponseWriter, v interface{}) {
 }
 
 func boardHash(board Board) string {
-	// Create a string that represents the board's state without considering food
 	hash := ""
 	for _, snake := range board.Snakes {
 		for _, part := range snake.Body {
-			hash += fmt.Sprintf("S%v%v", part.X, part.Y) // Snake position
+			hash += fmt.Sprintf("S%v%v", part.X, part.Y)
 		}
 	}
 	return hash

@@ -1,9 +1,5 @@
 package main
 
-import (
-	"fmt"
-)
-
 // Direction represents possible movement directions for a snake.
 type Direction int
 
@@ -21,10 +17,6 @@ var AllDirections = []Direction{Up, Down, Left, Right}
 // applyMove applies the move of a single snake directly to the provided board without returning a new board.
 func applyMove(board *Board, snakeIndex int, direction Direction) {
 	// Track the initial head position of the snake
-	if snakeIndex >= len(board.Snakes) {
-		fmt.Println("snake is ded", snakeIndex)
-		return
-	}
 	initialHead := board.Snakes[snakeIndex].Head
 
 	// Calculate the new head position
