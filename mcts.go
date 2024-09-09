@@ -6,209 +6,198 @@ import (
 	"sync"
 )
 
-const maxMovesToIterate = 100
-
-// Direction represents possible movement directions for a snake.
-type Direction int
-
-const (
-	Up Direction = iota
-	Down
-	Left
-	Right
-)
-
-// AllDirections provides a slice of all possible directions.
-var AllDirections = []Direction{Up, Down, Left, Right}
-
-// Node represents a node in the MCTS tree.
 type Node struct {
-	Board        Board   // The current state of the game board
-	Parent       *Node   // The parent node
-	Children     []*Node // The children nodes
-	Visits       int     // Number of times this node has been visited
-	Score        float64 // The total score accumulated through simulations
-	UntriedMoves []Move  // Moves that haven't been tried yet
+	Board      Board
+	SnakeIndex int
+	Parent     *Node
+	Children   []*Node
+	Visits     int
+	Score      float64
+	MyScore    float64
+
+	mu         sync.Mutex // Mutex to protect the node's state
+	childrenMu sync.Mutex // Separate mutex for protecting children initialization
 }
 
-// Move represents the moves for all players in the game.
-type Move []Direction
-
-// NewNode creates a new MCTS node.
-func NewNode(board Board, parent *Node) *Node {
+func NewNode(board Board, snakeIndex int) *Node {
 	return &Node{
-		Board:        board,
-		Parent:       parent,
-		Children:     []*Node{},
-		Visits:       0,
-		Score:        0,
-		UntriedMoves: generateAllMoves(board),
+		Board:      board,
+		SnakeIndex: snakeIndex,
+		Children:   make([]*Node, 0), // Ensuring Children slice is initialized
+		Visits:     0,
+		Score:      0,
 	}
 }
 
-const explorationParameter = 1.414
+// Expand the node to add children based on the board's state
+func expand(node *Node) {
+	node.childrenMu.Lock() // Protect child initialization
+	defer node.childrenMu.Unlock()
 
-func (n *Node) UCTValue(c *Node) float64 {
-	exploitation := c.Score / float64(c.Visits)
-	exploration := explorationParameter * math.Sqrt(math.Log(float64(n.Visits))/float64(c.Visits))
+	// If already expanded, return immediately
+	if len(node.Children) > 0 {
+		return
+	}
+
+	nextSnakeIndex := (node.SnakeIndex + 1) % len(node.Board.Snakes)
+
+	moves := generateSafeMoves(node.Board, nextSnakeIndex)
+	if len(moves) == 0 {
+		moves = append(moves, Up)
+	}
+
+	for _, move := range moves {
+		newBoard := copyBoard(node.Board)
+		applyMove(&newBoard, nextSnakeIndex, move)
+
+		child := NewNode(newBoard, nextSnakeIndex)
+		child.Parent = node
+		node.Children = append(node.Children, child)
+	}
+}
+
+func isTerminal(board Board) bool {
+	aliveSnakesCount := 0
+	for _, snake := range board.Snakes {
+		if !isSnakeDead(snake) {
+			aliveSnakesCount++
+		}
+	}
+	return aliveSnakesCount <= 1
+}
+
+// isSnakeDead checks if a snake is dead by looking at its health and body length.
+func isSnakeDead(snake Snake) bool {
+	return len(snake.Body) == 0 || snake.Health <= 0
+}
+
+func (n *Node) UCT(parent *Node, explorationParam float64) float64 {
+	if n.Visits == 0 {
+		return math.MaxFloat64
+	}
+
+	exploitation := n.Score / float64(n.Visits)
+	exploration := explorationParam * math.Sqrt(math.Log(float64(parent.Visits))/float64(n.Visits))
+
 	return exploitation + exploration
 }
 
-func (n *Node) SelectChild() *Node {
-	var selected *Node
-	maxUcbValue := -math.MaxFloat64
+// Select the best child node based on the UCT value
+func bestChild(node *Node, explorationParam float64) *Node {
+	node.childrenMu.Lock() // Protect access to children
+	defer node.childrenMu.Unlock()
 
-	for _, child := range n.Children {
-		if child.Visits == 0 {
-			// Prioritize unvisited children first
-			return child
+	if len(node.Children) == 0 {
+		return nil // No children available
+	}
+
+	bestValue := -math.MaxFloat64
+	var bestNode *Node
+
+	for _, child := range node.Children {
+		if child == nil {
+			continue // Skip nil children, in case of race condition or partial initialization
 		}
 
-		// Calculate UCB value
-		uctValue := n.UCTValue(child)
+		// Only lock the child for reading its Visits and Score
+		child.mu.Lock()
+		value := child.UCT(node, explorationParam)
+		child.mu.Unlock()
 
-		// Handle NaN values
-		if math.IsNaN(uctValue) {
-			continue // Skip this child if UCB calculation results in NaN
-		}
-
-		// Select the child with the maximum UCB value
-		if uctValue > maxUcbValue {
-			selected = child
-			maxUcbValue = uctValue
+		if value > bestValue {
+			bestValue = value
+			bestNode = child
 		}
 	}
 
-	return selected
+	return bestNode
 }
 
-// Expand adds new child nodes by generating all possible moves for all players.
-func (n *Node) Expand() []*Node {
-	if len(n.UntriedMoves) == 0 {
-		return nil
-	}
+func MCTS(ctx context.Context, rootBoard Board, iterations int, numWorkers int) *Node {
+	rootNode := NewNode(rootBoard, -1)
+	expand(rootNode)
 
-	children := []*Node{}
-	for _, move := range n.UntriedMoves {
-		newBoard := copyBoard(n.Board)
-		applyMoves(&newBoard, move)
-		childNode := NewNode(newBoard, n)
-		n.Children = append(n.Children, childNode)
-		children = append(children, childNode)
-	}
+	nodeChan := make(chan *Node, numWorkers) // Channel to distribute work
 
-	// Clear untried moves since all have been expanded
-	n.UntriedMoves = []Move{}
-	return children
-}
-
-// Update updates the node's visit count and score.
-func (n *Node) Update(score float64) {
-	n.Visits++
-	n.Score += score
-}
-
-// MCTS runs the Monte Carlo Tree Search algorithm with context for cancellation.
-func MCTS(ctx context.Context, rootBoard Board, iterations, numGoroutines int) *Node {
-	rootNode := NewNode(rootBoard, nil)
-
-	// we need to do at least 2 iterations or we will have no children
-	if iterations < 2 {
-		iterations = 2
-	}
-
-	for i := 0; i < iterations; i++ {
-		// Check if the context has been cancelled
-		select {
-		case <-ctx.Done():
-			return rootNode // Return the current state of the tree if cancelled
-		default:
-		}
-
-		node := rootNode
-		board := rootBoard
-
-		// Selection with early expansion
-		for len(node.Children) > 0 && len(node.UntriedMoves) == 0 {
-			node = node.SelectChild()
-			board = node.Board
-		}
-
-		// Expansion: Expand all untried moves before any simulation
-		if !boardIsTerminal(board) && len(node.UntriedMoves) > 0 {
-			children := node.Expand()
-			if len(children) > 0 {
-				// Continue with a randomly selected child from the expanded nodes
-				node = children[0] // Adjust this selection logic if needed
-				board = node.Board
+	// Central coordinator goroutine
+	go func() {
+		for i := 0; i < iterations; i++ {
+			node := rootNode
+			for len(node.Children) > 0 {
+				nextNode := bestChild(node, 1.41)
+				if nextNode == nil {
+					break // Break the loop if no valid child is found
+				}
+				node = nextNode
+			}
+			select {
+			case nodeChan <- node:
+			case <-ctx.Done():
+				close(nodeChan)
+				return
 			}
 		}
+		close(nodeChan)
+	}()
 
-		// Parallel Simulation (rollout)
-		results := make(chan float64, numGoroutines)
-		var wg sync.WaitGroup
-
-		for g := 0; g < numGoroutines; g++ {
-			wg.Add(1)
-			go func(boardCopy Board) {
-				defer wg.Done()
-
-				moves := 0
-
-				for !boardIsTerminal(boardCopy) {
-					// Check if the context has been cancelled during the simulation
-					select {
-					case <-ctx.Done():
-						return
-					default:
-					}
-
-					move := randomMove(boardCopy)
-					applyMoves(&boardCopy, move)
-					moves++
-					if moves == maxMovesToIterate {
-						break
-					}
+	// Worker goroutines
+	var wg sync.WaitGroup
+	for i := 0; i < numWorkers; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for node := range nodeChan {
+				if node == nil {
+					continue // Skip processing if node is nil
 				}
 
-				// Evaluate the final board state
-				score := evaluateBoard(boardCopy)
-				results <- score
+				// Lock node before processing
+				node.mu.Lock()
+				if !isTerminal(node.Board) && node.Visits > 0 {
+					expand(node)
+					// No need to switch locks between parent and child at this point.
+					// Just expand, unlock, and continue.
+				}
+				node.mu.Unlock()
 
-			}(copyBoard(board)) // Pass a copy of the board to each goroutine
-		}
+				// Simulation
+				score := evaluateBoard(node.Board, node.SnakeIndex)
+				node.MyScore = score
 
-		// Wait for all rollouts to complete
-		go func() {
-			wg.Wait()
-			close(results)
-		}()
-
-		// Aggregate the results
-		totalScore := 0.0
-		count := 0
-
-		for score := range results {
-			// Check if the context has been cancelled during result aggregation
-			select {
-			case <-ctx.Done():
-				return rootNode // Return the current state of the tree if cancelled
-			default:
+				// Backpropagation
+				for n := node; n != nil; n = n.Parent {
+					n.mu.Lock()
+					n.Visits++
+					n.Score += score
+					n.mu.Unlock()
+					score = -score
+				}
 			}
+		}()
+	}
 
-			totalScore += score
-			count++
-		}
+	wg.Wait()
+	return rootNode
+}
 
-		// Calculate the average score
-		averageScore := totalScore / float64(count)
+func evaluateBoard(board Board, snakeIndex int) float64 {
+	// Voronoi evaluation: Calculate the area controlled by each snake
+	voronoi := GenerateVoronoi(board)
+	totalCells := float64(board.Width * board.Height)
+	controlledCells := 0.0
+	opponentsCells := 0.0
 
-		// Backpropagation: Update the node with the average score
-		for node != nil {
-			node.Update(averageScore)
-			node = node.Parent
+	// Count the number of cells each snake controls in the Voronoi diagram
+	for y := 0; y < board.Height; y++ {
+		for x := 0; x < board.Width; x++ {
+			if voronoi[y][x] == snakeIndex {
+				controlledCells++
+			} else if voronoi[y][x] != -1 {
+				opponentsCells++
+			}
 		}
 	}
 
-	return rootNode
+	// Return a score between -1 and 1 based on the difference in controlled areas
+	return (controlledCells - opponentsCells) / totalCells
 }

@@ -1,10 +1,16 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 	"unicode"
+
+	"github.com/google/uuid"
 )
 
 func visualizeBoard(game Board, options ...func(*boardOptions)) string {
@@ -14,7 +20,8 @@ func visualizeBoard(game Board, options ...func(*boardOptions)) string {
 	opts := &boardOptions{
 		indent:           "",
 		newlineCharacter: "\n",
-		move:             nil,
+		snakeIndex:       -1,    // Default: no snake selected
+		move:             Unset, // Default: no move selected
 	}
 
 	// Apply any options provided
@@ -22,34 +29,30 @@ func visualizeBoard(game Board, options ...func(*boardOptions)) string {
 		opt(opts)
 	}
 
-	// Ensure board dimensions are positive
+	// Validate board dimensions
 	if game.Height <= 0 || game.Width <= 0 {
 		return opts.indent + "Invalid board dimensions"
 	}
 
-	// Display moves at the top if provided
-	if opts.move != nil {
+	// Display the move at the top if a move is set
+	var arrow rune
+	if opts.move != Unset && opts.snakeIndex >= 0 && opts.snakeIndex < len(game.Snakes) {
 		sb.WriteString(opts.indent)
-		for i, direction := range opts.move {
-			if i >= len(game.Snakes) {
-				continue
-			}
-			snakeChar := rune('a' + i)
-			var arrow rune
-			switch direction {
-			case Up:
-				arrow = '↑'
-			case Down:
-				arrow = '↓'
-			case Left:
-				arrow = '←'
-			case Right:
-				arrow = '→'
-			}
-			sb.WriteRune(snakeChar)
-			sb.WriteRune(arrow)
-			sb.WriteRune(' ')
+		snakeChar := rune('a' + opts.snakeIndex)
+		switch opts.move {
+		case Up:
+			arrow = '↑'
+		case Down:
+			arrow = '↓'
+		case Left:
+			arrow = '←'
+		case Right:
+			arrow = '→'
+		default:
+			arrow = ' ' // Handle unexpected cases
 		}
+		sb.WriteRune(snakeChar)
+		sb.WriteRune(arrow)
 		sb.WriteString(opts.newlineCharacter)
 	}
 
@@ -70,79 +73,74 @@ func visualizeBoard(game Board, options ...func(*boardOptions)) string {
 		}
 	}
 
-	// Function to adjust the Y coordinate to match the expected orientation
+	// Function to adjust the Y coordinate safely
 	adjustY := func(y int) int {
+		if y < 0 || y >= game.Height {
+			return -1 // Return invalid index if out of bounds
+		}
 		return extendedHeight - 1 - (y + 1)
 	}
 
-	// Place food on the board
+	// Place food on the board safely
 	for _, food := range game.Food {
-		board[adjustY(food.Y)][food.X+1] = '🍎'
+		adjustedY := adjustY(food.Y)
+		if adjustedY != -1 && food.X+1 < extendedWidth {
+			board[adjustedY][food.X+1] = '♥'
+		}
 	}
 
-	// Place hazards on the board
+	// Place hazards on the board safely
 	for _, hazard := range game.Hazards {
-		board[adjustY(hazard.Y)][hazard.X+1] = 'H'
+		adjustedY := adjustY(hazard.Y)
+		if adjustedY != -1 && hazard.X+1 < extendedWidth {
+			board[adjustedY][hazard.X+1] = 'H'
+		}
 	}
 
-	// Place snakes on the board
-	for snakeIndex, snake := range game.Snakes {
-		snakeChar := rune('a' + snakeIndex)
+	// Place snakes on the board safely
+	for i, snake := range game.Snakes {
+		if len(snake.Body) == 0 || snake.Health == 0 {
+			continue
+		}
+		snakeChar := rune('a' + i)
 		if snakeChar > 'z' {
 			snakeChar = '?' // Fallback in case of too many snakes
 		}
 
-		board[adjustY(snake.Head.Y)][snake.Head.X+1] = unicode.ToUpper(snakeChar)
+		headY := adjustY(snake.Head.Y)
+		if headY != -1 && snake.Head.X+1 < extendedWidth {
+			board[headY][snake.Head.X+1] = unicode.ToUpper(snakeChar)
+		}
 		for _, part := range snake.Body[1:] {
-			board[adjustY(part.Y)][part.X+1] = snakeChar
-		}
-	}
-
-	// Overlay arrows for moves if the option is provided
-	if opts.move != nil {
-		for i, direction := range opts.move {
-			if i >= len(game.Snakes) {
-				continue
-			}
-			snake := game.Snakes[i]
-			newHead := moveHead(snake.Head, direction)
-
-			var arrow rune
-			switch direction {
-			case Up:
-				arrow = '↑'
-			case Down:
-				arrow = '↓'
-			case Left:
-				arrow = '←'
-			case Right:
-				arrow = '→'
-			}
-
-			if checkOOB(newHead.X, newHead.Y, game.Width, game.Height) {
-				// Place the arrow on the boundary 'x' if the move is out of bounds
-				switch direction {
-				case Up:
-					board[adjustY(game.Height)][snake.Head.X+1] = arrow
-				case Down:
-					board[adjustY(-1)][snake.Head.X+1] = arrow
-				case Left:
-					board[adjustY(snake.Head.Y)][0] = arrow
-				case Right:
-					board[adjustY(snake.Head.Y)][extendedWidth-1] = arrow
-				}
-			} else {
-				board[adjustY(newHead.Y)][newHead.X+1] = arrow
+			partY := adjustY(part.Y)
+			if partY != -1 && part.X+1 < extendedWidth {
+				board[partY][part.X+1] = snakeChar
 			}
 		}
 	}
 
-	// Build the string representation of the board
+	// Overlay the arrow for the current snake's move safely
+	if opts.move != Unset && opts.snakeIndex != -1 && arrow != ' ' {
+		newHead := moveHead(game.Snakes[opts.snakeIndex].Head, opts.move)
+		adjustedY := adjustY(newHead.Y)
+		if adjustedY != -1 && newHead.X+1 < extendedWidth {
+			board[adjustedY][newHead.X+1] = arrow
+		}
+	}
+
+	// // Append the health status of each snake
+	// for i, snake := range game.Snakes {
+	// 	sb.WriteString(fmt.Sprintf("Snake %c health: %d", 'a'+i, snake.Health))
+	// 	sb.WriteString(opts.newlineCharacter)
+	// }
+	// sb.WriteString(opts.newlineCharacter)
+
+	// Build the string representation of the board using manual spacing for alignment
 	for _, row := range board {
 		sb.WriteString(opts.indent)
 		for _, cell := range row {
 			sb.WriteRune(cell)
-			sb.WriteRune(' ')
+			sb.WriteString("  ") // Add extra spacing to simulate a table
 		}
 		sb.WriteString(opts.newlineCharacter)
 	}
@@ -150,62 +148,12 @@ func visualizeBoard(game Board, options ...func(*boardOptions)) string {
 	return sb.String()
 }
 
-// Helper function to check for out-of-bounds errors
-func checkOOB(x, y, width, height int) bool {
-	return x < 0 || x >= width || y < 0 || y >= height
-}
-
-// Helper function to mark the boundary when an arrow exceeds the board's dimensions
-func markBoundary(overlay [][]rune, x, y int, move Direction, width, height int) {
-	switch move {
-	case Up:
-		if y < height-1 {
-			overlay[0][x] = '↑'
-		} else {
-			overlay[height-1][x] = 'x'
-		}
-	case Down:
-		if y > 0 {
-			overlay[height-1][x] = '↓'
-		} else {
-			overlay[0][x] = 'x'
-		}
-	case Left:
-		if x > 0 {
-			overlay[y][0] = '←'
-		} else {
-			overlay[y][width-1] = 'x'
-		}
-	case Right:
-		if x < width-1 {
-			overlay[y][width-1] = '→'
-		} else {
-			overlay[y][0] = 'x'
-		}
-	}
-}
-
-// Helper function to extend the board with 'x' characters when an arrow exceeds the board's dimensions
-func extendBoardWithArrows(board *[][]rune, x, y, width, height int) {
-	if y >= height {
-		*board = append(*board, make([]rune, width))
-		height++
-	}
-	for i := 0; i < height; i++ {
-		if x >= width {
-			(*board)[i] = append((*board)[i], 'x')
-		}
-		if y >= height {
-			(*board)[y] = append((*board)[y], 'x')
-		}
-	}
-}
-
 // Options struct to hold the customizable parameters
 type boardOptions struct {
 	indent           string
 	newlineCharacter string
-	move             Move
+	move             Direction // Represents the move of a single snake
+	snakeIndex       int       // The index of the snake whose move is being visualized
 }
 
 // Option functions to set optional parameters
@@ -221,144 +169,17 @@ func WithNewlineCharacter(newlineCharacter string) func(*boardOptions) {
 	}
 }
 
-func WithMove(move Move) func(*boardOptions) {
+func WithMove(move Direction, snakeIndex int) func(*boardOptions) {
 	return func(o *boardOptions) {
 		o.move = move
+		o.snakeIndex = snakeIndex
 	}
-}
-
-const maxEdges = 499
-
-func GenerateMermaidTree(node *Node, depth int) string {
-	edges := 0
-	pathsToShow := 5
-	return generateMermaidTree(node, depth, &edges, pathsToShow)
-}
-
-// generateMermaidTree generates a Mermaid diagram for the top N deepest paths and all root children
-func generateMermaidTree(node *Node, depth int, edgeCount *int, topN int) string {
-	if node == nil || *edgeCount >= maxEdges {
-		return ""
-	}
-
-	// Find all paths in the tree
-	var paths []Path
-	findDeepestPaths(node, []*Node{}, &paths)
-
-	// Sort paths by depth in descending order
-	sort.Slice(paths, func(i, j int) bool {
-		return paths[i].Depth > paths[j].Depth
-	})
-
-	// Select the top N deepest paths
-	if len(paths) > topN {
-		paths = paths[:topN]
-	}
-
-	// Create a set of nodes that are part of the top N deepest paths
-	nodeSet := make(map[*Node]bool)
-	for _, path := range paths {
-		for _, n := range path.Nodes {
-			nodeSet[n] = true
-		}
-	}
-
-	// Include all first-level children of the root node in the nodeSet
-	for _, child := range node.Children {
-		nodeSet[child] = true
-	}
-
-	var sb strings.Builder
-
-	// Start with the root node and add Mermaid config
-	if depth == 0 {
-		sb.WriteString("graph TD;\n")
-	}
-
-	// Generate the diagram for nodes in the nodeSet and all root children
-	return generateMermaidTreeForNode(node, depth, edgeCount, nodeSet, &sb)
-}
-
-// generateMermaidTreeForNode recursively generates the Mermaid diagram for the nodes in the nodeSet
-func generateMermaidTreeForNode(node *Node, depth int, edgeCount *int, nodeSet map[*Node]bool, sb *strings.Builder) string {
-	if node == nil || *edgeCount >= maxEdges {
-		return ""
-	}
-
-	// Skip nodes that aren't part of the top N deepest paths or root children
-	if !nodeSet[node] {
-		return ""
-	}
-
-	// Generate a unique identifier for the node
-	nodeID := fmt.Sprintf("Node_%p", node)
-
-	// Node details for root (without UCB value)
-	nodeLabel := fmt.Sprintf("Visits: %d<br/>Average Score: %.2f<br/>Untried Moves: %d",
-		node.Visits, node.Score/float64(node.Visits), len(node.UntriedMoves))
-
-	// Add the board state using visualizeBoard with <br/> for newlines
-	boardVisualization := visualizeBoard(node.Board, WithNewlineCharacter("<br/>"))
-	nodeLabel += "<br/>" + boardVisualization
-
-	// Add the Voronoi visualization with <br/> for newlines
-	voronoiVisualization := VisualizeVoronoi(GenerateVoronoi(node.Board), node.Board.Snakes, WithNewlineCharacter("<br/>"))
-	nodeLabel += "<br/>" + voronoiVisualization
-
-	// Add the node definition
-	sb.WriteString(fmt.Sprintf("%s[\"%s\"]\n", nodeID, nodeLabel))
-
-	// Recursively process children
-	for _, child := range node.Children {
-		if *edgeCount >= maxEdges {
-			break
-		}
-
-		// Skip children that aren't part of the top N deepest paths or root children
-		if !nodeSet[child] {
-			continue
-		}
-
-		childID := fmt.Sprintf("Node_%p", child)
-
-		// Calculate UCB value for the edge between this node and its child
-		ucbValue := node.UCTValue(child)
-
-		// Add the edge between the current node and the child node with UCB value
-		sb.WriteString(fmt.Sprintf("%s -->|UCB: %.2f| %s\n", nodeID, ucbValue, childID))
-		*edgeCount++ // Increment the edge counter
-
-		// Recursively generate the diagram for the child node
-		generateMermaidTreeForNode(child, depth+1, edgeCount, nodeSet, sb)
-	}
-
-	return sb.String()
 }
 
 // Path represents a path in the tree with its corresponding depth
 type Path struct {
 	Nodes []*Node
 	Depth int
-}
-
-// findDeepestPaths recursively finds the deepest paths in the tree
-func findDeepestPaths(node *Node, currentPath []*Node, paths *[]Path) {
-	if node == nil {
-		return
-	}
-
-	// Append the current node to the path
-	currentPath = append(currentPath, node)
-
-	// If the node has no children, this is a leaf node, so record the path
-	if len(node.Children) == 0 {
-		*paths = append(*paths, Path{Nodes: append([]*Node(nil), currentPath...), Depth: len(currentPath)})
-	} else {
-		// Recurse for each child
-		for _, child := range node.Children {
-			findDeepestPaths(child, currentPath, paths)
-		}
-	}
 }
 
 func VisualizeVoronoi(voronoi [][]int, snakes []Snake, options ...func(*boardOptions)) string {
@@ -381,13 +202,138 @@ func VisualizeVoronoi(voronoi [][]int, snakes []Snake, options ...func(*boardOpt
 		for x := 0; x < len(voronoi[y]); x++ {
 			owner := voronoi[y][x]
 			if owner == -1 {
-				sb.WriteString(". ") // Unassigned cells
+				sb.WriteString(".") // Unassigned cells
 			} else {
-				sb.WriteString(fmt.Sprintf("%c ", 'A'+owner)) // Each snake gets a unique letter
+				sb.WriteString(fmt.Sprintf("%c", 'A'+owner)) // Each snake gets a unique letter
 			}
+			sb.WriteString("  ") // Add extra spacing to simulate a table
 		}
 		sb.WriteString(opts.newlineCharacter)
 	}
 
 	return sb.String()
+}
+
+// visualizeNode generates the DOT representation of a single node, including its label, visits, score, board state, and controlled positions
+func visualizeNode(node *Node) string {
+	if node == nil {
+		return ""
+	}
+
+	nodeID := fmt.Sprintf("Node_%p", node)
+	// Using <br/> instead of \n to create HTML-based line breaks that D3 can interpret
+	nodeLabel := fmt.Sprintf("%s\nVisits: %d\nAvg Score: %.3f\nMy Score: %.3f\nSnake moving: %c\n\n",
+		nodeID, node.Visits, node.Score/float64(node.Visits), node.MyScore, 'A'+node.SnakeIndex)
+	voronoi := GenerateVoronoi(node.Board)
+	controlledPositions := make([]int, len(node.Board.Snakes))
+	for _, row := range voronoi {
+		for _, owner := range row {
+			if owner >= 0 && owner < len(controlledPositions) {
+				controlledPositions[owner]++
+			}
+		}
+	}
+	for i, count := range controlledPositions {
+		nodeLabel += fmt.Sprintf("Snake %c controls: %d cells\n", 'A'+i, count)
+	}
+	// Add the board state visualization
+	boardVisualization := visualizeBoard(node.Board, WithNewlineCharacter("\n"))
+	nodeLabel += boardVisualization
+
+	// Add controlled positions from the Voronoi diagram
+
+	nodeVoronoiVisualization := VisualizeVoronoi(voronoi, node.Board.Snakes, WithNewlineCharacter("\n"))
+	nodeLabel += "\n" + nodeVoronoiVisualization
+
+	// Return the node label with HTML line breaks
+	return nodeLabel
+}
+
+type TreeNode struct {
+	ID            string      `json:"id"`
+	Visits        int         `json:"visits"`
+	AverageScore  float64     `json:"avg_score"`
+	UCB           float64     `json:"ucb"`
+	IsMostVisited bool        `json:"isMostVisited"`
+	Children      []*TreeNode `json:"children"`
+	Body          string      `json:"body"`
+	Board         Board       `json:"board"`
+}
+
+func GenerateMostVisitedPathWithAlternativesHtmlTree(node *Node) error {
+
+	treeNode := generateTreeData(node)
+	timestamp := time.Now().Format("20060102_150405.000000")
+	uuid := uuid.New().String()
+	fileName := fmt.Sprintf("%s_%s", timestamp, uuid)
+
+	fileLocation := filepath.Join("visualiser", "tree-data", fmt.Sprintf("%s.json", fileName))
+
+	// Create the output file
+	file, err := os.Create(fileLocation)
+	if err != nil {
+		return fmt.Errorf("failed to create file: %w", err)
+	}
+	defer file.Close()
+
+	// Generate the tree data in JSON format
+	err = json.NewEncoder(file).Encode(treeNode)
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("Generated move tree: %s\nLink: http://localhost:5173/trees/%s\n", uuid, fileName)
+	return nil
+}
+
+// generateTreeData recursively generates the tree structure in JSON format
+func generateTreeData(node *Node) *TreeNode {
+	if node == nil {
+		return nil
+	}
+
+	rootNode := &TreeNode{
+		ID:            fmt.Sprintf("Node_%p", node),
+		Visits:        node.Visits,
+		UCB:           0.0, // Root has no UCB
+		IsMostVisited: true,
+		Children:      make([]*TreeNode, 0),
+		Body:          visualizeNode(node),
+		Board:         node.Board,
+	}
+
+	// Traverse children
+	traverseAndBuildTree(node, rootNode)
+	return rootNode
+}
+
+// traverseAndBuildTree populates the TreeNode structure with children and marks the most visited path
+func traverseAndBuildTree(node *Node, treeNode *TreeNode) {
+	if node == nil {
+		return
+	}
+
+	// Sort children by visit count, descending
+	sort.Slice(node.Children, func(i, j int) bool {
+		return node.Children[i].Visits > node.Children[j].Visits
+	})
+
+	for i, child := range node.Children {
+		childNode := &TreeNode{
+			ID:            fmt.Sprintf("Node_%p", child),
+			Visits:        child.Visits,
+			UCB:           child.UCT(node, 1.41),
+			IsMostVisited: i == 0, // Only mark the most visited path
+			Children:      make([]*TreeNode, 0),
+			Body:          visualizeNode(child),
+			Board:         child.Board,
+		}
+
+		treeNode.Children = append(treeNode.Children, childNode)
+
+		// Recur only on the most visited child
+		// if i == 0 {
+		traverseAndBuildTree(child, childNode)
+		// }
+	}
 }

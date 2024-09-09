@@ -8,6 +8,7 @@ import (
 	"math"
 	"math/rand"
 	"net/http"
+	"runtime"
 	"time"
 )
 
@@ -22,20 +23,18 @@ func main() {
 	log.Fatal(http.ListenAndServe(":"+port, nil))
 }
 
-// handleIndex handles the root endpoint and provides basic info about the snake.
 func handleIndex(w http.ResponseWriter, r *http.Request) {
 	response := map[string]string{
 		"apiversion": "1",
 		"author":     "brensch",
-		"color":      "#888888", // Customize your snake's color
-		"head":       "default", // Customize your snake's head
-		"tail":       "default", // Customize your snake's tail
+		"color":      "#888888",
+		"head":       "default",
+		"tail":       "default",
 		"version":    "0.1.0",
 	}
 	writeJSON(w, response)
 }
 
-// handleStart is called when the game starts.
 func handleStart(w http.ResponseWriter, r *http.Request) {
 	var game BattleSnakeGame
 	if err := json.NewDecoder(r.Body).Decode(&game); err != nil {
@@ -43,46 +42,80 @@ func handleStart(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Log the start of the game
 	fmt.Printf("Game %s started\n", game.Game.ID)
+	fmt.Println(game.You)
 
 	writeJSON(w, map[string]string{})
 }
 
-// handleMove is called on every turn to determine the snake's next move.
 func handleMove(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
+	_ = start
+
+	// Decode the incoming JSON to the game structure
 	var game BattleSnakeGame
 	if err := json.NewDecoder(r.Body).Decode(&game); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	// Create a context with a timeout to ensure MCTS doesn't run indefinitely
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(game.Game.Timeout-50)*time.Millisecond)
+	// Pre-process the game board and set up the context for MCTS
+	reorderedBoard := reorderSnakes(game.Board, game.You.ID)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(game.Game.Timeout-100)*time.Millisecond)
 	defer cancel()
 
-	// Run MCTS to determine the best move
-	mctsResult := MCTS(ctx, game.Board, math.MaxInt, 4)
-
-	// Determine the move based on the best child node returned by MCTS
+	// Perform MCTS to find the best move
+	workers := runtime.NumCPU()
+	mctsResult := MCTS(ctx, reorderedBoard, math.MaxInt, workers)
 	bestMove := determineBestMove(game, mctsResult)
 
-	// Respond with the move
+	// Prepare and send the response immediately
 	response := map[string]string{
 		"move":  bestMove,
 		"shout": "This is a nice move.",
 	}
 	writeJSON(w, response)
-	log.Println("made move", bestMove, time.Since(start).Milliseconds())
+
+	// Perform non-essential operations after sending the response
+	go func() {
+
+		fmt.Println("--------------------------")
+		// Logging additional information
+		fmt.Println(visualizeBoard(game.Board))
+		yo, _ := json.Marshal(game.Board)
+		fmt.Println(string(yo))
+		fmt.Println("Received move request for snake", game.You.ID)
+		log.Println("Made move:", bestMove, "in", time.Since(start).Milliseconds(), "ms with", mctsResult.Visits, "visits")
+		// // Ensure the movetrees directory exists
+		// if err := os.MkdirAll("movetrees", os.ModePerm); err != nil {
+		// 	log.Println("Error creating movetrees directory:", err)
+		// 	return
+		// }
+		// Generate and log the tree diagram
+		// err := GenerateMostVisitedPathWithAlternativesHtmlTree(mctsResult)
+		// if err != nil {
+		// 	log.Println("Error saving mermaid tree:", err)
+		// 	return
+		// }
+	}()
 }
 
-// determineBestMove finds the best move from the MCTS result
+func reorderSnakes(board Board, youID string) Board {
+	var youIndex int
+	for index, snake := range board.Snakes {
+		if snake.ID == youID {
+			youIndex = index
+			break
+		}
+	}
+	board.Snakes[0], board.Snakes[youIndex] = board.Snakes[youIndex], board.Snakes[0]
+	return board
+}
+
 func determineBestMove(game BattleSnakeGame, node *Node) string {
 	var bestChild *Node
 	maxVisits := -1
 
-	// Iterate through the children to find the one with the highest visit count
 	for _, child := range node.Children {
 		if child.Visits > maxVisits {
 			bestChild = child
@@ -90,18 +123,15 @@ func determineBestMove(game BattleSnakeGame, node *Node) string {
 		}
 	}
 
-	// If we found a best child, determine the direction to move
 	if bestChild != nil {
 		bestMove := determineMoveDirection(game.You.Head, bestChild.Board.Snakes[0].Head)
 		return bestMove
 	}
 
-	// Fallback to a random move if no children are found (shouldn't happen if MCTS is working correctly)
 	moves := []string{"up", "down", "left", "right"}
 	return moves[rand.Intn(len(moves))]
 }
 
-// determineMoveDirection determines the direction to move based on the change in position
 func determineMoveDirection(head, nextHead Point) string {
 	if nextHead.X < head.X {
 		return "left"
@@ -115,7 +145,6 @@ func determineMoveDirection(head, nextHead Point) string {
 	return "up"
 }
 
-// handleEnd is called when the game ends.
 func handleEnd(w http.ResponseWriter, r *http.Request) {
 	var game BattleSnakeGame
 	if err := json.NewDecoder(r.Body).Decode(&game); err != nil {
@@ -123,13 +152,11 @@ func handleEnd(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Log the end of the game
 	fmt.Printf("Game %s ended after %d turns\n", game.Game.ID, game.Turn)
 
 	writeJSON(w, map[string]string{})
 }
 
-// writeJSON is a helper function to write a JSON response.
 func writeJSON(w http.ResponseWriter, v interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(v)
