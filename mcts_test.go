@@ -332,9 +332,19 @@ func TestMCTSVisualizationJSON(t *testing.T) {
 		// 	Iterations:   math.MaxInt,
 		// },
 
+		// {
+		// 	Description:  "control isn't right",
+		// 	InitialBoard: `{"height":11,"width":11,"food":[{"x":0,"y":2},{"x":0,"y":4},{"x":7,"y":0},{"x":6,"y":10}],"hazards":[],"snakes":[{"id":"8d1de07d-92cf-4ac9-a23e-45aeb8bc14c1","name":"mcts","health":63,"body":[{"x":8,"y":3},{"x":7,"y":3},{"x":7,"y":4},{"x":6,"y":4},{"x":6,"y":3}],"latency":"406","head":{"x":8,"y":3},"shout":"","customizations":{"color":"#888888","head":"default","tail":"default"}},{"id":"a6afe25e-c5fc-450a-b9f1-40f638fe8be0","name":"soba","health":91,"body":[{"x":9,"y":6},{"x":8,"y":6},{"x":7,"y":6},{"x":6,"y":6},{"x":6,"y":7},{"x":6,"y":8}],"latency":"401","head":{"x":9,"y":6},"shout":"","customizations":{"color":"#118645","head":"replit-mark","tail":"replit-notmark"}}]}`,
+		// 	Iterations:   math.MaxInt,
+		// },
+		// {
+		// 	Description:  "should move towards centre",
+		// 	InitialBoard: `{"height":11,"width":11,"food":[{"x":2,"y":0},{"x":9,"y":8},{"x":0,"y":0},{"x":7,"y":10}],"hazards":[],"snakes":[{"id":"15eec745-def3-4e65-8250-bbf9869d304f","name":"mcts","health":90,"body":[{"x":1,"y":5},{"x":1,"y":6},{"x":1,"y":7},{"x":1,"y":8}],"latency":"401","head":{"x":1,"y":5},"shout":"","customizations":{"color":"#888888","head":"default","tail":"default"}},{"id":"58977559-5285-417b-bde9-824d647160d9","name":"soba","health":96,"body":[{"x":2,"y":10},{"x":2,"y":9},{"x":2,"y":8},{"x":3,"y":8},{"x":4,"y":8},{"x":5,"y":8}],"latency":"401","head":{"x":2,"y":10},"shout":"","customizations":{"color":"#118645","head":"replit-mark","tail":"replit-notmark"}}]}`,
+		// 	Iterations:   math.MaxInt,
+		// },
 		{
-			Description:  "control isn't right",
-			InitialBoard: `{"height":11,"width":11,"food":[{"x":0,"y":2},{"x":0,"y":4},{"x":7,"y":0},{"x":6,"y":10}],"hazards":[],"snakes":[{"id":"8d1de07d-92cf-4ac9-a23e-45aeb8bc14c1","name":"mcts","health":63,"body":[{"x":8,"y":3},{"x":7,"y":3},{"x":7,"y":4},{"x":6,"y":4},{"x":6,"y":3}],"latency":"406","head":{"x":8,"y":3},"shout":"","customizations":{"color":"#888888","head":"default","tail":"default"}},{"id":"a6afe25e-c5fc-450a-b9f1-40f638fe8be0","name":"soba","health":91,"body":[{"x":9,"y":6},{"x":8,"y":6},{"x":7,"y":6},{"x":6,"y":6},{"x":6,"y":7},{"x":6,"y":8}],"latency":"401","head":{"x":9,"y":6},"shout":"","customizations":{"color":"#118645","head":"replit-mark","tail":"replit-notmark"}}]}`,
+			Description:  "don't move into trap",
+			InitialBoard: `{"height":11,"width":11,"food":[{"x":10,"y":2},{"x":5,"y":5},{"x":9,"y":1}],"hazards":[],"snakes":[{"id":"38241f5a-33f2-426c-a754-abf0d779521a","name":"mcts","health":86,"body":[{"x":7,"y":1},{"x":6,"y":1},{"x":5,"y":1}],"latency":"401","head":{"x":7,"y":1},"shout":"","customizations":{"color":"#888888","head":"default","tail":"default"}},{"id":"4898c918-def5-48a1-95cd-b38e58b66f2d","name":"soba","health":92,"body":[{"x":4,"y":2},{"x":4,"y":1},{"x":3,"y":1},{"x":2,"y":1}],"latency":"401","head":{"x":4,"y":2},"shout":"","customizations":{"color":"#118645","head":"replit-mark","tail":"replit-notmark"}}]}`,
 			Iterations:   math.MaxInt,
 		},
 
@@ -350,9 +360,7 @@ func TestMCTSVisualizationJSON(t *testing.T) {
 			var board Board
 			assert.NoError(t, json.Unmarshal([]byte(tc.InitialBoard), &board))
 			rootBoard := copyBoard(board)
-			ctx, _ := context.WithTimeout(context.Background(), 1000*time.Millisecond)
-			// node := MCTS(ctx, rootBoard, tc.Iterations, numCPUs)
-			// for i := 0; i < tc.Iterations; i++ {
+			ctx, _ := context.WithTimeout(context.Background(), 500*time.Millisecond)
 
 			node := MCTS(ctx, rootBoard, tc.Iterations)
 			require.NotNil(t, node, "node is nil")

@@ -1,25 +1,22 @@
-import React, { useState, useEffect, useCallback } from "react"
+import dagre from "dagre"
+import React, { useCallback, useEffect, useState } from "react"
 import {
-  BrowserRouter as Router,
   Route,
+  BrowserRouter as Router,
   Routes,
-  Link,
-  useParams,
   useNavigate,
+  useParams,
 } from "react-router-dom"
 import ReactFlow, {
-  Node,
-  Edge,
-  Controls,
-  applyNodeChanges,
   applyEdgeChanges,
-  NodeChange,
+  applyNodeChanges,
+  Controls,
+  Edge,
   EdgeChange,
-  Handle,
-  Position,
+  Node,
+  NodeChange,
 } from "reactflow"
 import "reactflow/dist/style.css"
-import dagre from "dagre"
 
 interface TreeNode {
   id: string
@@ -159,7 +156,6 @@ const TreeViewer: React.FC = () => {
     const traverseAndExpand = (currentNode: TreeNode) => {
       newExpandedNodes.add(currentNode.id)
 
-      // Add copy button to the node's label, and prevent event propagation
       newNodes.push({
         id: currentNode.id,
         data: {
@@ -210,6 +206,7 @@ const TreeViewer: React.FC = () => {
             id: `e${currentNode.id}-${child.id}`,
             source: currentNode.id,
             target: child.id,
+            label: `UCB: ${child.ucb.toFixed(5)}`, // Add UCB as label on the edge
           })
         })
 
@@ -277,6 +274,7 @@ const TreeViewer: React.FC = () => {
         id: `e${parentId}-${child.id}`,
         source: parentId,
         target: child.id,
+        label: `UCB: ${child.ucb.toFixed(5)}`, // Add UCB as label on the edge
       }
 
       newNodes.push(newNode)
@@ -372,6 +370,7 @@ const TreeViewer: React.FC = () => {
         </div>
       </div>
       <ReactFlow
+        key={id}
         nodes={nodes.map((node) => ({
           ...node,
           style: {

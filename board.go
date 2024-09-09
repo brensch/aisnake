@@ -75,10 +75,19 @@ func resolveCollisions(board *Board, snakeIndex int, newHead Point) {
 		if i != snakeIndex && board.Snakes[i].Health > 0 { // Skip dead snakes
 			// Check for head-to-head collision
 			if newHead == board.Snakes[i].Head {
-				// Kill both snakes if head-to-head collision
-				deadSnakes[snakeIndex] = true
+				// Kill shortest snake
+				// equal length, both die
+				if len(board.Snakes[i].Body) == len(board.Snakes[snakeIndex].Body) {
+					deadSnakes[snakeIndex] = true
+					deadSnakes[i] = true
+					break
+				}
+				if len(board.Snakes[i].Body) > len(board.Snakes[snakeIndex].Body) {
+					deadSnakes[snakeIndex] = true
+					break
+				}
 				deadSnakes[i] = true
-				break
+
 			}
 		}
 	}
@@ -209,7 +218,7 @@ func isPointInsideBoard(board *Board, point Point) bool {
 // Check if a point is occupied by a snake's body
 func isOccupied(board *Board, point Point) bool {
 	for _, snake := range board.Snakes {
-		for _, bodyPart := range snake.Body {
+		for _, bodyPart := range snake.Body[1:] {
 			if bodyPart.X == point.X && bodyPart.Y == point.Y {
 				return true
 			}

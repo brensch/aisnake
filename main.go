@@ -8,7 +8,6 @@ import (
 	"math"
 	"math/rand"
 	"net/http"
-	"os"
 	"time"
 )
 
@@ -50,6 +49,7 @@ func handleStart(w http.ResponseWriter, r *http.Request) {
 
 func handleMove(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
+	_ = start
 
 	// Decode the incoming JSON to the game structure
 	var game BattleSnakeGame
@@ -75,23 +75,26 @@ func handleMove(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, response)
 
 	// Perform non-essential operations after sending the response
-	defer func() {
-		// Ensure the movetrees directory exists
-		if err := os.MkdirAll("movetrees", os.ModePerm); err != nil {
-			log.Println("Error creating movetrees directory:", err)
-			return
-		}
+	go func() {
 
 		fmt.Println("--------------------------")
 		// Logging additional information
 		fmt.Println(visualizeBoard(game.Board))
+		yo, _ := json.Marshal(game.Board)
+		fmt.Println(string(yo))
 		fmt.Println("Received move request for snake", game.You.ID)
 		log.Println("Made move:", bestMove, "in", time.Since(start).Milliseconds(), "ms with", mctsResult.Visits, "visits")
+		// // Ensure the movetrees directory exists
+		// if err := os.MkdirAll("movetrees", os.ModePerm); err != nil {
+		// 	log.Println("Error creating movetrees directory:", err)
+		// 	return
+		// }
 		// Generate and log the tree diagram
-		if err := GenerateMostVisitedPathWithAlternativesHtmlTree(mctsResult); err != nil {
-			log.Println("Error saving mermaid tree:", err)
-			return
-		}
+		// err := GenerateMostVisitedPathWithAlternativesHtmlTree(mctsResult)
+		// if err != nil {
+		// 	log.Println("Error saving mermaid tree:", err)
+		// 	return
+		// }
 	}()
 }
 

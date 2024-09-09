@@ -150,9 +150,11 @@ func isLegalMove(board Board, snakeIndex int, newHead Point) bool {
 			continue
 		}
 
-		// Check for collisions with other snakes' bodies
-		snakeWithoutTail := otherSnake.Body[0 : len(otherSnake.Body)-1]
-		for _, segment := range snakeWithoutTail {
+		// remove the snake's tail if it went before us (because of turn based approximation of simultaneous moves)
+		if snakeIndex < i {
+			otherSnake.Body = otherSnake.Body[0 : len(otherSnake.Body)-1]
+		}
+		for _, segment := range otherSnake.Body {
 			if newHead == segment {
 				return false
 			}

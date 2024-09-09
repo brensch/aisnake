@@ -128,13 +128,12 @@ func visualizeBoard(game Board, options ...func(*boardOptions)) string {
 		}
 	}
 
-	// Append the health status of each snake
-	for i, snake := range game.Snakes {
-		sb.WriteString(fmt.Sprintf("Snake %c health: %d", 'a'+i, snake.Health))
-		sb.WriteString(opts.newlineCharacter)
-
-	}
-	sb.WriteString(opts.newlineCharacter)
+	// // Append the health status of each snake
+	// for i, snake := range game.Snakes {
+	// 	sb.WriteString(fmt.Sprintf("Snake %c health: %d", 'a'+i, snake.Health))
+	// 	sb.WriteString(opts.newlineCharacter)
+	// }
+	// sb.WriteString(opts.newlineCharacter)
 
 	// Build the string representation of the board using manual spacing for alignment
 	for _, row := range board {
@@ -223,8 +222,8 @@ func visualizeNode(node *Node) string {
 
 	nodeID := fmt.Sprintf("Node_%p", node)
 	// Using <br/> instead of \n to create HTML-based line breaks that D3 can interpret
-	nodeLabel := fmt.Sprintf("%s\nVisits: %d\nAvg Score: %.3f\nSnake moved: %d\n\n",
-		nodeID, node.Visits, node.Score/float64(node.Visits), node.SnakeIndex)
+	nodeLabel := fmt.Sprintf("%s\nVisits: %d\nAvg Score: %.3f\nMy Score: %.3f\nSnake moving: %c\n\n",
+		nodeID, node.Visits, node.Score/float64(node.Visits), node.MyScore, 'A'+node.SnakeIndex)
 	voronoi := GenerateVoronoi(node.Board)
 	controlledPositions := make([]int, len(node.Board.Snakes))
 	for _, row := range voronoi {
@@ -266,10 +265,12 @@ func GenerateMostVisitedPathWithAlternativesHtmlTree(node *Node) error {
 	treeNode := generateTreeData(node)
 	timestamp := time.Now().Format("20060102_150405.000000")
 	uuid := uuid.New().String()
-	filename := filepath.Join("visualiser", "tree-data", fmt.Sprintf("%s_%s.json", timestamp, uuid))
+	fileName := fmt.Sprintf("%s_%s", timestamp, uuid)
+
+	fileLocation := filepath.Join("visualiser", "tree-data", fmt.Sprintf("%s.json", fileName))
 
 	// Create the output file
-	file, err := os.Create(filename)
+	file, err := os.Create(fileLocation)
 	if err != nil {
 		return fmt.Errorf("failed to create file: %w", err)
 	}
@@ -281,7 +282,7 @@ func GenerateMostVisitedPathWithAlternativesHtmlTree(node *Node) error {
 		return err
 	}
 
-	fmt.Printf("Generated move tree: %s\nFile: %s\n", uuid, filepath.Join(".", filename))
+	fmt.Printf("Generated move tree: %s\nLink: http://localhost:5173/trees/%s\n", uuid, fileName)
 	return nil
 }
 
