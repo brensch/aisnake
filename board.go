@@ -171,7 +171,7 @@ func markDangerZones(board *Board, snakeIndex int) [][]int {
 		}
 		possibleMoves := getPossibleMoves(snake)
 		for _, move := range possibleMoves {
-			if isPointInsideBoard(board, move) && !isOccupied(board, move) {
+			if isPointInsideBoard(board, move) && !isOccupied(board, move, snakeIndex) {
 				// Mark the danger zone with the length of the threatening snake
 				dangerZones[move.Y][move.X] = len(snake.Body)
 			}
@@ -197,10 +197,10 @@ func generateSafeMoves(board Board, snakeIndex int) []Direction {
 		nextMove := moveInDirection(head, direction)
 
 		// Check if the move is within the board, not occupied, and check danger zones
-		if isPointInsideBoard(&board, nextMove) && !isOccupied(&board, nextMove) {
+		if isPointInsideBoard(&board, nextMove) && !isOccupied(&board, nextMove, snakeIndex) {
 			// Check if the move leads into a danger zone
 			dangerLength := dangerZones[nextMove.Y][nextMove.X]
-			if dangerLength == 0 || len(snake.Body) > dangerLength {
+			if dangerLength == 0 || len(snake.Body) >= dangerLength {
 				// Safe if there's no danger or the current snake is longer
 				safeMoves = append(safeMoves, direction)
 			}
@@ -215,10 +215,17 @@ func isPointInsideBoard(board *Board, point Point) bool {
 	return point.X >= 0 && point.X < board.Width && point.Y >= 0 && point.Y < board.Height
 }
 
-// Check if a point is occupied by a snake's body
-func isOccupied(board *Board, point Point) bool {
-	for _, snake := range board.Snakes {
-		for _, bodyPart := range snake.Body[1:] {
+// Check if a point is safe for a given snake to move its head to
+func isOccupied(board *Board, point Point, snakeIndex int) bool {
+	for i, snake := range board.Snakes {
+		snakeLength := len(snake.Body)
+		// don't count our own tail since it will disappear if we are the ones moving
+		if i == snakeIndex {
+			snakeLength--
+		}
+		// want to not include heads so we can do hazard check potentially.
+		// this is used in generate safe moves.
+		for _, bodyPart := range snake.Body[1:snakeLength] {
 			if bodyPart.X == point.X && bodyPart.Y == point.Y {
 				return true
 			}

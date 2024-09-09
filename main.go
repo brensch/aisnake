@@ -24,6 +24,30 @@ var (
 
 func main() {
 
+	// // Create a new JSON handler that outputs to stdout (Google Cloud reads logs from stdout)
+	// handler := slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{})
+
+	// // Create a new logger using the handler
+	// logger := slog.New(handler)
+
+	// // Log an informational message
+	// logger.LogAttrs(slog.LevelInfo, "Info log message",
+	// 	slog.String("message", "This is a log message for Google Cloud"),
+	// 	slog.String("severity", "INFO"), // Severity field for Google Cloud
+	// 	slog.Group("httpRequest",
+	// 		slog.String("requestMethod", "GET"),
+	// 		slog.String("requestUrl", "/some-endpoint"),
+	// 		slog.Int("status", 200),
+	// 	),
+	// )
+
+	// // Log an error message
+	// logger.LogAttrs(slog.LevelError, "Error log message",
+	// 	slog.String("message", "This is an error log for Google Cloud"),
+	// 	slog.String("severity", "ERROR"), // Error severity for Google Cloud
+	// 	slog.String("stack_trace", "stack trace details here..."),
+	// )
+
 	go clearOldGameStates()
 
 	http.HandleFunc("/", handleIndex)

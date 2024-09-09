@@ -323,7 +323,7 @@ func TestMCTSVisualizationJSON(t *testing.T) {
 		// 	Iterations:   math.MaxInt,
 		// },
 		// {
-		// 	Description:  "should go towards center",
+		// 	Description:  "should down, counter intuitive (seems like left but will get boxed out of top. may need further investigation)",
 		// 	InitialBoard: `{"height":11,"width":11,"food":[{"x":0,"y":0},{"x":1,"y":3},{"x":2,"y":3},{"x":1,"y":4},{"x":4,"y":9}],"hazards":[],"snakes":[{"id":"a5053727-e14f-43aa-ba60-8bb43c54610c","name":"mcts","health":77,"body":[{"x":8,"y":5},{"x":8,"y":6},{"x":9,"y":6},{"x":9,"y":7},{"x":9,"y":8},{"x":9,"y":9},{"x":9,"y":10},{"x":10,"y":10},{"x":10,"y":9},{"x":10,"y":8},{"x":10,"y":7}],"latency":"904","head":{"x":8,"y":5},"shout":"","customizations":{"color":"#888888","head":"default","tail":"default"}},{"id":"6653a691-0d7e-4f0f-a9ed-e430e87b003d","name":"soba","health":76,"body":[{"x":5,"y":6},{"x":6,"y":6},{"x":6,"y":7},{"x":5,"y":7},{"x":4,"y":7},{"x":3,"y":7},{"x":3,"y":6},{"x":2,"y":6},{"x":1,"y":6},{"x":1,"y":5},{"x":2,"y":5}],"latency":"400","head":{"x":5,"y":6},"shout":"","customizations":{"color":"#118645","head":"replit-mark","tail":"replit-notmark"}}]}`,
 		// 	Iterations:   math.MaxInt,
 		// },
@@ -332,7 +332,6 @@ func TestMCTSVisualizationJSON(t *testing.T) {
 		// 	InitialBoard: `{"height":11,"width":11,"food":[{"x":8,"y":0},{"x":5,"y":5},{"x":5,"y":10},{"x":10,"y":4}],"hazards":[],"snakes":[{"id":"6fb7c491-2ad6-4718-83c6-613840dfe0ea","name":"mcts","health":96,"body":[{"x":6,"y":0},{"x":5,"y":0},{"x":4,"y":0},{"x":3,"y":0}],"latency":"902","head":{"x":6,"y":0},"shout":"","customizations":{"color":"#888888","head":"default","tail":"default"}},{"id":"eaf1ae04-8bcb-4e74-8ab7-6328d207f797","name":"soba","health":94,"body":[{"x":4,"y":2},{"x":5,"y":2},{"x":5,"y":1}],"latency":"401","head":{"x":4,"y":2},"shout":"","customizations":{"color":"#118645","head":"replit-mark","tail":"replit-notmark"}}]}`,
 		// 	Iterations:   math.MaxInt,
 		// },
-
 		// {
 		// 	Description:  "control isn't right",
 		// 	InitialBoard: `{"height":11,"width":11,"food":[{"x":0,"y":2},{"x":0,"y":4},{"x":7,"y":0},{"x":6,"y":10}],"hazards":[],"snakes":[{"id":"8d1de07d-92cf-4ac9-a23e-45aeb8bc14c1","name":"mcts","health":63,"body":[{"x":8,"y":3},{"x":7,"y":3},{"x":7,"y":4},{"x":6,"y":4},{"x":6,"y":3}],"latency":"406","head":{"x":8,"y":3},"shout":"","customizations":{"color":"#888888","head":"default","tail":"default"}},{"id":"a6afe25e-c5fc-450a-b9f1-40f638fe8be0","name":"soba","health":91,"body":[{"x":9,"y":6},{"x":8,"y":6},{"x":7,"y":6},{"x":6,"y":6},{"x":6,"y":7},{"x":6,"y":8}],"latency":"401","head":{"x":9,"y":6},"shout":"","customizations":{"color":"#118645","head":"replit-mark","tail":"replit-notmark"}}]}`,
@@ -348,9 +347,11 @@ func TestMCTSVisualizationJSON(t *testing.T) {
 			InitialBoard: `{"height":11,"width":11,"food":[{"x":10,"y":2},{"x":5,"y":5},{"x":9,"y":1}],"hazards":[],"snakes":[{"id":"38241f5a-33f2-426c-a754-abf0d779521a","name":"mcts","health":86,"body":[{"x":7,"y":1},{"x":6,"y":1},{"x":5,"y":1}],"latency":"401","head":{"x":7,"y":1},"shout":"","customizations":{"color":"#888888","head":"default","tail":"default"}},{"id":"4898c918-def5-48a1-95cd-b38e58b66f2d","name":"soba","health":92,"body":[{"x":4,"y":2},{"x":4,"y":1},{"x":3,"y":1},{"x":2,"y":1}],"latency":"401","head":{"x":4,"y":2},"shout":"","customizations":{"color":"#118645","head":"replit-mark","tail":"replit-notmark"}}]}`,
 			Iterations:   math.MaxInt,
 		},
-
-		//
-
+		{
+			Description:  "other snake's tail shouldn't trick us into trap",
+			InitialBoard: `{"height":11,"width":11,"food":[{"x":1,"y":8},{"x":0,"y":8},{"x":10,"y":7},{"x":7,"y":10},{"x":8,"y":1}],"hazards":[],"snakes":[{"id":"gs_xY7RRtB98qft6dGwHtRmxtHc","name":"Gregory","health":51,"body":[{"x":2,"y":4},{"x":2,"y":5},{"x":3,"y":5},{"x":4,"y":5},{"x":5,"y":5}],"latency":"459","head":{"x":2,"y":4},"shout":"This is a nice move.","customizations":{"color":"#888888","head":"default","tail":"default"}},{"id":"gs_TMvV6VVr6TcKYDkq4f8PtKH9","name":"snakos","health":81,"body":[{"x":4,"y":2},{"x":4,"y":3},{"x":4,"y":4},{"x":5,"y":4},{"x":6,"y":4},{"x":7,"y":4},{"x":8,"y":4},{"x":9,"y":4},{"x":10,"y":4},{"x":10,"y":3},{"x":10,"y":2},{"x":10,"y":1},{"x":10,"y":0},{"x":9,"y":0},{"x":8,"y":0},{"x":7,"y":0},{"x":6,"y":0},{"x":5,"y":0},{"x":4,"y":0},{"x":3,"y":0},{"x":3,"y":1},{"x":3,"y":2}],"latency":"78","head":{"x":4,"y":2},"shout":"chasing tail","customizations":{"color":"#ff8645","head":"replit-mark","tail":"replit-notmark"}}]}`,
+			Iterations:   math.MaxInt,
+		},
 	}
 
 	for _, tc := range testCases {
@@ -368,7 +369,6 @@ func TestMCTSVisualizationJSON(t *testing.T) {
 			require.NotNil(t, node, "node is nil")
 
 			assert.NoError(t, GenerateMostVisitedPathWithAlternativesHtmlTree(node))
-			// }
 
 		})
 	}
