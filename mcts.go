@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"math"
 	"sync"
 )
@@ -115,9 +116,22 @@ func bestChild(node *Node, explorationParam float64) *Node {
 	return bestNode
 }
 
-func MCTS(ctx context.Context, rootBoard Board, iterations int, numWorkers int) *Node {
-	rootNode := NewNode(rootBoard, -1)
-	expand(rootNode)
+func MCTS(ctx context.Context, rootBoard Board, iterations int, numWorkers int, gameStates map[string]*Node) *Node {
+	// Generate the hash for the current board state
+	boardKey := boardHash(rootBoard)
+	var rootNode *Node
+	// If the board state is already known, use the existing node
+	if existingNode, ok := gameStates[boardKey]; ok {
+		fmt.Printf("found board from previous game with %d visits\n", existingNode.Visits)
+		rootNode = existingNode
+		// we still want to update to the new board since it may have food or danger updates
+		rootNode.Board = rootBoard
+	} else {
+		// Otherwise, create a new node and add it to the game state map
+		fmt.Println("couldn't find yo")
+		rootNode = NewNode(rootBoard, -1)
+		expand(rootNode)
+	}
 
 	nodeChan := make(chan *Node, numWorkers) // Channel to distribute work
 
