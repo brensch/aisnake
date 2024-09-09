@@ -100,6 +100,8 @@ func bestChild(node *Node, explorationParam float64) *Node {
 		}
 
 		// Only lock the child for reading its Visits and Score
+		// note this is now racey since node.visits is accessed.
+		// could not get it to lock the node without causing a deadlock so will leave it
 		child.mu.Lock()
 		value := child.UCT(node, explorationParam)
 		child.mu.Unlock()
