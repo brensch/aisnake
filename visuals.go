@@ -258,6 +258,7 @@ type TreeNode struct {
 	IsMostVisited bool        `json:"isMostVisited"`
 	Children      []*TreeNode `json:"children"`
 	Body          string      `json:"body"`
+	Board         Board       `json:"board"`
 }
 
 func GenerateMostVisitedPathWithAlternativesHtmlTree(node *Node) error {
@@ -297,6 +298,7 @@ func generateTreeData(node *Node) *TreeNode {
 		IsMostVisited: true,
 		Children:      make([]*TreeNode, 0),
 		Body:          visualizeNode(node),
+		Board:         node.Board,
 	}
 
 	// Traverse children
@@ -323,6 +325,7 @@ func traverseAndBuildTree(node *Node, treeNode *TreeNode) {
 			IsMostVisited: i == 0, // Only mark the most visited path
 			Children:      make([]*TreeNode, 0),
 			Body:          visualizeNode(child),
+			Board:         child.Board,
 		}
 
 		treeNode.Children = append(treeNode.Children, childNode)

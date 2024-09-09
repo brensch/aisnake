@@ -29,11 +29,35 @@ interface TreeNode {
   ucb: number
   isMostVisited: boolean
   children?: TreeNode[]
+  board: Board
 }
 
 interface TreeFile {
   id: string
   name: string
+}
+
+interface Board {
+  height: number
+  width: number
+  food: Point[]
+  hazards: Point[]
+  snakes: Snake[]
+}
+
+interface Point {
+  x: number
+  y: number
+}
+
+interface Snake {
+  id: string
+  name: string
+  health: number
+  body: Point[]
+  latency: string
+  head: Point
+  shout: string
 }
 
 const boxWidthDefault = 300
@@ -135,12 +159,24 @@ const TreeViewer: React.FC = () => {
     const traverseAndExpand = (currentNode: TreeNode) => {
       newExpandedNodes.add(currentNode.id)
 
-      // Create a node for the current tree node
+      // Add copy button to the node's label, and prevent event propagation
       newNodes.push({
         id: currentNode.id,
         data: {
           label: (
-            <pre style={{ fontFamily: "Courier New" }}>{currentNode.body}</pre>
+            <div>
+              <pre style={{ fontFamily: "Courier New" }}>
+                {currentNode.body}
+              </pre>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  copyBoardState(currentNode.board)
+                }}
+              >
+                Copy Board State
+              </button>
+            </div>
           ),
         },
         position: { x: 0, y: 0 }, // Initial position, will be laid out
@@ -148,13 +184,22 @@ const TreeViewer: React.FC = () => {
       })
 
       if (currentNode.children && currentNode.children.length > 0) {
-        // Expand all children
         currentNode.children.forEach((child) => {
           newNodes.push({
             id: child.id,
             data: {
               label: (
-                <pre style={{ fontFamily: "Courier New" }}>{child.body}</pre>
+                <div>
+                  <pre style={{ fontFamily: "Courier New" }}>{child.body}</pre>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      copyBoardState(child.board)
+                    }}
+                  >
+                    Copy Board State
+                  </button>
+                </div>
               ),
             },
             position: { x: 0, y: 0 }, // Initial position, will be laid out
@@ -168,23 +213,18 @@ const TreeViewer: React.FC = () => {
           })
         })
 
-        // Find the most visited child
         const mostVisitedChild = currentNode.children.reduce(
           (maxChild, child) =>
             child.visits > maxChild.visits ? child : maxChild,
           currentNode.children[0],
         )
 
-        // Recursively expand the most visited path
         traverseAndExpand(mostVisitedChild)
       }
     }
 
     traverseAndExpand(tree)
-
-    // Update the expandedNodes state
     setExpandedNodes(newExpandedNodes)
-
     return { newNodes, newEdges }
   }
 
@@ -216,7 +256,19 @@ const TreeViewer: React.FC = () => {
       const newNode: Node = {
         id: child.id,
         data: {
-          label: <pre style={{ fontFamily: "Courier New" }}>{child.body}</pre>,
+          label: (
+            <div>
+              <pre style={{ fontFamily: "Courier New" }}>{child.body}</pre>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  copyBoardState(child.board)
+                }}
+              >
+                Copy Board State
+              </button>
+            </div>
+          ),
         },
         position: { x: 0, y: 0 }, // Default position, will be re-laid out
         style: { width: `${boxWidth}px`, height: `${boxHeight}px` },
@@ -322,7 +374,6 @@ const TreeViewer: React.FC = () => {
       <ReactFlow
         nodes={nodes.map((node) => ({
           ...node,
-          type: "customNode", // Use the custom node type
           style: {
             ...node.style,
             backgroundColor: node.id === selectedNodeId ? "#FFD700" : "#FFF",
@@ -465,3 +516,11 @@ const findTreeNode = (tree: TreeNode, id: string): TreeNode | null => {
 }
 
 export default App
+
+const copyBoardState = (board: Board) => {
+  const boardStateString = JSON.stringify(board)
+  navigator.clipboard.writeText(boardStateString).then(
+    () => alert("Board state copied to clipboard"),
+    (err) => console.error("Failed to copy board state", err),
+  )
+}

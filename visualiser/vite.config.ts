@@ -16,6 +16,29 @@ interface TreeNode {
   ucb: number
   isMostVisited: boolean
   children?: TreeNode[]
+  board: Board
+}
+interface Board {
+  height: number
+  width: number
+  food: Point[]
+  hazards: Point[]
+  snakes: Snake[]
+}
+
+interface Point {
+  x: number
+  y: number
+}
+
+interface Snake {
+  id: string
+  name: string
+  health: number
+  body: Point[]
+  latency: string
+  head: Point
+  shout: string
 }
 
 const treeDataPlugin: Plugin = {
