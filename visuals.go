@@ -139,12 +139,13 @@ func visualizeBoard(game Board, options ...func(*boardOptions)) string {
 	}
 
 	// Append the health status of each snake at the bottom
-	sb.WriteString(opts.indent + "Snake Health: ")
+	sb.WriteString(opts.indent + "Snake Health:")
+	sb.WriteString(opts.newlineCharacter)
+
 	for i, snake := range game.Snakes {
-		if i > 0 {
-			sb.WriteString(", ")
-		}
 		sb.WriteString(fmt.Sprintf("Snake %c: %d", 'a'+i, snake.Health))
+		sb.WriteString(opts.newlineCharacter)
+
 	}
 	sb.WriteString(opts.newlineCharacter)
 
