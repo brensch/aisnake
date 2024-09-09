@@ -8,6 +8,7 @@ import (
 	"math"
 	"math/rand"
 	"net/http"
+	"runtime"
 	"time"
 )
 
@@ -64,7 +65,8 @@ func handleMove(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 
 	// Perform MCTS to find the best move
-	mctsResult := MCTS(ctx, reorderedBoard, math.MaxInt)
+	workers := runtime.NumCPU()
+	mctsResult := MCTS(ctx, reorderedBoard, math.MaxInt, workers)
 	bestMove := determineBestMove(game, mctsResult)
 
 	// Prepare and send the response immediately

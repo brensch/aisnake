@@ -15,7 +15,8 @@ type Node struct {
 	Score      float64
 	MyScore    float64
 
-	mu sync.Mutex
+	mu         sync.Mutex // Mutex to protect the node's state
+	childrenMu sync.Mutex // Separate mutex for protecting children initialization
 }
 
 func NewNode(board Board, snakeIndex int) *Node {
@@ -28,12 +29,19 @@ func NewNode(board Board, snakeIndex int) *Node {
 	}
 }
 
+// Expand the node to add children based on the board's state
 func expand(node *Node) {
+	node.childrenMu.Lock() // Protect child initialization
+	defer node.childrenMu.Unlock()
+
+	// If already expanded, return immediately
+	if len(node.Children) > 0 {
+		return
+	}
 
 	nextSnakeIndex := (node.SnakeIndex + 1) % len(node.Board.Snakes)
 
 	moves := generateSafeMoves(node.Board, nextSnakeIndex)
-	// cannot have 0 or it will seem like nothing bad happens at the end. need to see the death.
 	if len(moves) == 0 {
 		moves = append(moves, Up)
 	}
@@ -42,7 +50,6 @@ func expand(node *Node) {
 		newBoard := copyBoard(node.Board)
 		applyMove(&newBoard, nextSnakeIndex, move)
 
-		// Fix the SnakeIndex to reflect the snake who is deciding the next move
 		child := NewNode(newBoard, nextSnakeIndex)
 		child.Parent = node
 		node.Children = append(node.Children, child)
@@ -75,12 +82,28 @@ func (n *Node) UCT(parent *Node, explorationParam float64) float64 {
 	return exploitation + exploration
 }
 
+// Select the best child node based on the UCT value
 func bestChild(node *Node, explorationParam float64) *Node {
+	node.childrenMu.Lock() // Protect access to children
+	defer node.childrenMu.Unlock()
+
+	if len(node.Children) == 0 {
+		return nil // No children available
+	}
+
 	bestValue := -math.MaxFloat64
 	var bestNode *Node
 
 	for _, child := range node.Children {
+		if child == nil {
+			continue // Skip nil children, in case of race condition or partial initialization
+		}
+
+		// Only lock the child for reading its Visits and Score
+		child.mu.Lock()
 		value := child.UCT(node, explorationParam)
+		child.mu.Unlock()
+
 		if value > bestValue {
 			bestValue = value
 			bestNode = child
@@ -90,57 +113,74 @@ func bestChild(node *Node, explorationParam float64) *Node {
 	return bestNode
 }
 
-func MCTS(ctx context.Context, rootBoard Board, iterationsPerThread, numThreads int) *Node {
+func MCTS(ctx context.Context, rootBoard Board, iterations int, numWorkers int) *Node {
 	rootNode := NewNode(rootBoard, -1)
 	expand(rootNode)
 
+	nodeChan := make(chan *Node, numWorkers) // Channel to distribute work
+
+	// Central coordinator goroutine
+	go func() {
+		for i := 0; i < iterations; i++ {
+			node := rootNode
+			for len(node.Children) > 0 {
+				nextNode := bestChild(node, 1.41)
+				if nextNode == nil {
+					break // Break the loop if no valid child is found
+				}
+				node = nextNode
+			}
+			select {
+			case nodeChan <- node:
+			case <-ctx.Done():
+				close(nodeChan)
+				return
+			}
+		}
+		close(nodeChan)
+	}()
+
+	// Worker goroutines
 	var wg sync.WaitGroup
-	wg.Add(numThreads)
-	for i := 0; i < numThreads; i++ {
+	for i := 0; i < numWorkers; i++ {
+		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			for i := 0; i < iterationsPerThread; i++ {
-				select {
-				case <-ctx.Done():
-					return
-				default:
-					node := rootNode
+			for node := range nodeChan {
+				if node == nil {
+					continue // Skip processing if node is nil
+				}
 
-					// Selection
-					for len(node.Children) > 0 {
-						node = bestChild(node, 1.41)
-					}
+				// Lock node before processing
+				node.mu.Lock()
+				if !isTerminal(node.Board) && node.Visits > 0 {
+					expand(node)
+					// No need to switch locks between parent and child at this point.
+					// Just expand, unlock, and continue.
+				}
+				node.mu.Unlock()
 
-					// Expansion
-					if !isTerminal(node.Board) && node.Visits > 0 {
-						expand(node)
-						if len(node.Children) > 0 {
-							node = node.Children[0] // Select the first child for simulation
-						}
-					}
+				// Simulation
+				score := evaluateBoard(node.Board, node.SnakeIndex)
+				node.MyScore = score
 
-					// Simulation
-					score := evaluateBoard(node.Board, node.SnakeIndex)
-					node.MyScore = score
-					// score := simulate(node.Board, node.SnakeIndex)
-
-					// Backpropagation using parent pointers, ensuring we don't hit nil
-					for n := node; n != nil; n = n.Parent {
-						n.Visits++
-						n.Score += score
-						score = -score
-					}
+				// Backpropagation
+				for n := node; n != nil; n = n.Parent {
+					n.mu.Lock()
+					n.Visits++
+					n.Score += score
+					n.mu.Unlock()
+					score = -score
 				}
 			}
 		}()
-
 	}
+
 	wg.Wait()
 	return rootNode
 }
 
 func evaluateBoard(board Board, snakeIndex int) float64 {
-
 	// Voronoi evaluation: Calculate the area controlled by each snake
 	voronoi := GenerateVoronoi(board)
 	totalCells := float64(board.Width * board.Height)
