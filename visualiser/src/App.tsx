@@ -34,7 +34,7 @@ interface TreeFile {
   name: string
 }
 
-const boxWidth = 400
+const boxWidth = 300
 const boxHeight = 600
 
 const dagreGraph = new dagre.graphlib.Graph()
@@ -80,6 +80,7 @@ const TreeViewer: React.FC = () => {
   const [selectedTree, setSelectedTree] = useState<TreeNode | null>(null)
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(false)
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null) // Track selected node
 
   useEffect(() => {
     if (id) {
@@ -118,15 +119,17 @@ const TreeViewer: React.FC = () => {
       collapseNodeAndDescendants(nodeId)
       newExpandedNodes.delete(nodeId)
     } else {
-      expandNode(nodeData)
+      const { newNodes, newEdges } = expandNode(nodeData)
       newExpandedNodes.add(nodeId)
+      handleLayout(newNodes, newEdges) // Apply layout after expanding nodes
     }
 
+    setSelectedNodeId(nodeId) // Set the clicked node as selected
     setExpandedNodes(newExpandedNodes)
   }
 
   const expandNode = (parentNode: TreeNode) => {
-    if (!parentNode.children) return
+    if (!parentNode.children) return { newNodes: [], newEdges: [] }
 
     const parentId = parentNode.id
     const newNodes: Node[] = []
@@ -151,13 +154,25 @@ const TreeViewer: React.FC = () => {
       newEdges.push(newEdge)
     })
 
-    // Set new nodes and edges and trigger re-layout
-    setNodes((nds) => {
-      const updatedNodes = [...nds, ...newNodes]
-      const { nodes: layoutedNodes } = getLayoutedElements(updatedNodes, edges)
-      return layoutedNodes
-    })
+    setNodes((nds) => [...nds, ...newNodes])
     setEdges((eds) => [...eds, ...newEdges])
+
+    return { newNodes, newEdges } // Return newly added nodes and edges
+  }
+
+  const handleLayout = (newNodes: Node[], newEdges: Edge[]) => {
+    // Combine the existing nodes and edges with new ones
+    const updatedNodes = [...nodes, ...newNodes]
+    const updatedEdges = [...edges, ...newEdges]
+
+    // Perform layout using the combined graph
+    const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements(
+      updatedNodes,
+      updatedEdges,
+    )
+
+    setNodes(layoutedNodes)
+    setEdges(layoutedEdges)
   }
 
   const collapseNodeAndDescendants = (parentId: string) => {
@@ -191,15 +206,6 @@ const TreeViewer: React.FC = () => {
     [],
   )
 
-  const handleLayout = () => {
-    const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements(
-      nodes,
-      edges,
-    )
-    setNodes(layoutedNodes)
-    setEdges(layoutedEdges)
-  }
-
   if (loading) {
     return <p>Loading...</p>
   }
@@ -210,8 +216,24 @@ const TreeViewer: React.FC = () => {
 
   return (
     <div style={{ width: "80%", height: "100%", backgroundColor: "#f0f0f0" }}>
+      <div
+        style={{
+          position: "absolute",
+          top: 10,
+          right: 10,
+          zIndex: 1000, // Ensure button appears above the canvas
+        }}
+      >
+        <button onClick={() => handleLayout(nodes, edges)}>Re-layout</button>
+      </div>
       <ReactFlow
-        nodes={nodes}
+        nodes={nodes.map((node) => ({
+          ...node,
+          style: {
+            ...node.style,
+            backgroundColor: node.id === selectedNodeId ? "#FFD700" : "#FFF", // Highlight selected node
+          },
+        }))}
         edges={edges}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
@@ -225,10 +247,6 @@ const TreeViewer: React.FC = () => {
         fitViewOptions={{ padding: 0.2 }}
       >
         <Controls />
-        {/* Layout button */}
-        <div style={{ position: "absolute", top: 10, right: 10 }}>
-          <button onClick={handleLayout}>Re-layout</button>
-        </div>
       </ReactFlow>
     </div>
   )
