@@ -118,6 +118,17 @@ func handleMove(w http.ResponseWriter, r *http.Request) {
 		fmt.Println(string(yo))
 		fmt.Println("Received move request for snake", game.You.ID)
 		log.Println("Made move:", bestMove, "in", time.Since(start).Milliseconds(), "ms with depth", mctsResult.Visits, "visits")
+		// // Ensure the movetrees directory exists
+		// if err := os.MkdirAll("movetrees", os.ModePerm); err != nil {
+		// 	log.Println("Error creating movetrees directory:", err)
+		// 	return
+		// }
+		// Generate and log the tree diagram
+		// err := GenerateMostVisitedPathWithAlternativesHtmlTree(mctsResult)
+		// if err != nil {
+		// 	log.Println("Error saving mermaid tree:", err)
+		// 	return
+		// }
 	}()
 }
 
