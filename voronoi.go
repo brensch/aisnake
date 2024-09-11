@@ -2,16 +2,10 @@ package main
 
 import (
 	"container/heap"
-	"math"
 )
 
-// manhattanDistance calculates the Manhattan distance between two points.
-func manhattanDistance(a, b Point) int {
-	return int(math.Abs(float64(a.X-b.X)) + math.Abs(float64(a.Y-b.Y)))
-}
-
 // isLegalMove checks if a move to a new point is legal for the snake.
-func isLegalMove(board Board, snakeIndex int, newHead Point) bool {
+func isLegalMove(board Board, snakeIndex int, newHead Point, steps int) bool {
 	snake := board.Snakes[snakeIndex]
 
 	// Check if the new head is within the board boundaries
@@ -28,10 +22,21 @@ func isLegalMove(board Board, snakeIndex int, newHead Point) bool {
 			continue
 		}
 
-		// remove the snake's tail if it went before us (because of turn based approximation of simultaneous moves)
+		// Determine how much of the tail is to be removed based on steps
+		stepsToRemove := steps
 		if snakeIndex < i {
-			otherSnake.Body = otherSnake.Body[0 : len(otherSnake.Body)-1]
+			stepsToRemove++ // Since the other snake moves after this one, remove one extra
 		}
+
+		// Ensure we do not remove more segments than the snake has
+		if stepsToRemove < len(otherSnake.Body) {
+			otherSnake.Body = otherSnake.Body[0 : len(otherSnake.Body)-stepsToRemove]
+		} else {
+			// If the steps exceed the length of the snake, treat it as having no body
+			otherSnake.Body = []Point{}
+		}
+
+		// Check for collisions with the snake's body
 		for _, segment := range otherSnake.Body {
 			if newHead == segment {
 				return false
@@ -121,7 +126,7 @@ func GenerateVoronoi(board Board) [][]int {
 			// Ensure new point is within bounds
 			if newPoint.X >= 0 && newPoint.X < board.Width && newPoint.Y >= 0 && newPoint.Y < board.Height {
 				// Check if the move is legal for the snake at snakeIndex
-				if isLegalMove(board, node.snakeIndex, newPoint) {
+				if isLegalMove(board, node.snakeIndex, newPoint, node.distance) {
 					// Compute the new distance to reach this point
 					newDistance := node.distance + 1
 

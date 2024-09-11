@@ -342,14 +342,25 @@ func TestMCTSVisualizationJSON(t *testing.T) {
 		// 	InitialBoard: `{"height":11,"width":11,"food":[{"x":2,"y":0},{"x":9,"y":8},{"x":0,"y":0},{"x":7,"y":10}],"hazards":[],"snakes":[{"id":"15eec745-def3-4e65-8250-bbf9869d304f","name":"mcts","health":90,"body":[{"x":1,"y":5},{"x":1,"y":6},{"x":1,"y":7},{"x":1,"y":8}],"latency":"401","head":{"x":1,"y":5},"shout":"","customizations":{"color":"#888888","head":"default","tail":"default"}},{"id":"58977559-5285-417b-bde9-824d647160d9","name":"soba","health":96,"body":[{"x":2,"y":10},{"x":2,"y":9},{"x":2,"y":8},{"x":3,"y":8},{"x":4,"y":8},{"x":5,"y":8}],"latency":"401","head":{"x":2,"y":10},"shout":"","customizations":{"color":"#118645","head":"replit-mark","tail":"replit-notmark"}}]}`,
 		// 	Iterations:   math.MaxInt,
 		// },
+		// {
+		// 	Description:  "don't move into trap",
+		// 	InitialBoard: `{"height":11,"width":11,"food":[{"x":10,"y":2},{"x":5,"y":5},{"x":9,"y":1}],"hazards":[],"snakes":[{"id":"38241f5a-33f2-426c-a754-abf0d779521a","name":"mcts","health":86,"body":[{"x":7,"y":1},{"x":6,"y":1},{"x":5,"y":1}],"latency":"401","head":{"x":7,"y":1},"shout":"","customizations":{"color":"#888888","head":"default","tail":"default"}},{"id":"4898c918-def5-48a1-95cd-b38e58b66f2d","name":"soba","health":92,"body":[{"x":4,"y":2},{"x":4,"y":1},{"x":3,"y":1},{"x":2,"y":1}],"latency":"401","head":{"x":4,"y":2},"shout":"","customizations":{"color":"#118645","head":"replit-mark","tail":"replit-notmark"}}]}`,
+		// 	Iterations:   math.MaxInt,
+		// },
+		// {
+		// 	Description:  "other snake's tail shouldn't trick us into trap",
+		// 	InitialBoard: `{"height":11,"width":11,"food":[{"x":1,"y":8},{"x":0,"y":8},{"x":10,"y":7},{"x":7,"y":10},{"x":8,"y":1}],"hazards":[],"snakes":[{"id":"gs_xY7RRtB98qft6dGwHtRmxtHc","name":"Gregory","health":51,"body":[{"x":2,"y":4},{"x":2,"y":5},{"x":3,"y":5},{"x":4,"y":5},{"x":5,"y":5}],"latency":"459","head":{"x":2,"y":4},"shout":"This is a nice move.","customizations":{"color":"#888888","head":"default","tail":"default"}},{"id":"gs_TMvV6VVr6TcKYDkq4f8PtKH9","name":"snakos","health":81,"body":[{"x":4,"y":2},{"x":4,"y":3},{"x":4,"y":4},{"x":5,"y":4},{"x":6,"y":4},{"x":7,"y":4},{"x":8,"y":4},{"x":9,"y":4},{"x":10,"y":4},{"x":10,"y":3},{"x":10,"y":2},{"x":10,"y":1},{"x":10,"y":0},{"x":9,"y":0},{"x":8,"y":0},{"x":7,"y":0},{"x":6,"y":0},{"x":5,"y":0},{"x":4,"y":0},{"x":3,"y":0},{"x":3,"y":1},{"x":3,"y":2}],"latency":"78","head":{"x":4,"y":2},"shout":"chasing tail","customizations":{"color":"#ff8645","head":"replit-mark","tail":"replit-notmark"}}]}`,
+		// 	Iterations:   math.MaxInt,
+		// },
+		// {
+		// 	Description:  "other snake's tail shouldn't trick us into trap",
+		// 	InitialBoard: `{"height":11,"width":11,"food":[{"x":1,"y":8},{"x":0,"y":8},{"x":10,"y":7},{"x":7,"y":10},{"x":8,"y":1}],"hazards":[],"snakes":[{"id":"gs_xY7RRtB98qft6dGwHtRmxtHc","name":"Gregory","health":51,"body":[{"x":2,"y":4},{"x":2,"y":5},{"x":3,"y":5},{"x":4,"y":5},{"x":5,"y":5}],"latency":"459","head":{"x":2,"y":4},"shout":"This is a nice move.","customizations":{"color":"#888888","head":"default","tail":"default"}},{"id":"gs_TMvV6VVr6TcKYDkq4f8PtKH9","name":"snakos","health":81,"body":[{"x":4,"y":2},{"x":4,"y":3},{"x":4,"y":4},{"x":5,"y":4},{"x":6,"y":4},{"x":7,"y":4},{"x":8,"y":4},{"x":9,"y":4},{"x":10,"y":4},{"x":10,"y":3},{"x":10,"y":2},{"x":10,"y":1},{"x":10,"y":0},{"x":9,"y":0},{"x":8,"y":0},{"x":7,"y":0},{"x":6,"y":0},{"x":5,"y":0},{"x":4,"y":0},{"x":3,"y":0},{"x":3,"y":1},{"x":3,"y":2}],"latency":"78","head":{"x":4,"y":2},"shout":"chasing tail","customizations":{"color":"#ff8645","head":"replit-mark","tail":"replit-notmark"}}]}`,
+		// 	Iterations:   math.MaxInt,
+		// },
+
 		{
-			Description:  "don't move into trap",
-			InitialBoard: `{"height":11,"width":11,"food":[{"x":10,"y":2},{"x":5,"y":5},{"x":9,"y":1}],"hazards":[],"snakes":[{"id":"38241f5a-33f2-426c-a754-abf0d779521a","name":"mcts","health":86,"body":[{"x":7,"y":1},{"x":6,"y":1},{"x":5,"y":1}],"latency":"401","head":{"x":7,"y":1},"shout":"","customizations":{"color":"#888888","head":"default","tail":"default"}},{"id":"4898c918-def5-48a1-95cd-b38e58b66f2d","name":"soba","health":92,"body":[{"x":4,"y":2},{"x":4,"y":1},{"x":3,"y":1},{"x":2,"y":1}],"latency":"401","head":{"x":4,"y":2},"shout":"","customizations":{"color":"#118645","head":"replit-mark","tail":"replit-notmark"}}]}`,
-			Iterations:   math.MaxInt,
-		},
-		{
-			Description:  "other snake's tail shouldn't trick us into trap",
-			InitialBoard: `{"height":11,"width":11,"food":[{"x":1,"y":8},{"x":0,"y":8},{"x":10,"y":7},{"x":7,"y":10},{"x":8,"y":1}],"hazards":[],"snakes":[{"id":"gs_xY7RRtB98qft6dGwHtRmxtHc","name":"Gregory","health":51,"body":[{"x":2,"y":4},{"x":2,"y":5},{"x":3,"y":5},{"x":4,"y":5},{"x":5,"y":5}],"latency":"459","head":{"x":2,"y":4},"shout":"This is a nice move.","customizations":{"color":"#888888","head":"default","tail":"default"}},{"id":"gs_TMvV6VVr6TcKYDkq4f8PtKH9","name":"snakos","health":81,"body":[{"x":4,"y":2},{"x":4,"y":3},{"x":4,"y":4},{"x":5,"y":4},{"x":6,"y":4},{"x":7,"y":4},{"x":8,"y":4},{"x":9,"y":4},{"x":10,"y":4},{"x":10,"y":3},{"x":10,"y":2},{"x":10,"y":1},{"x":10,"y":0},{"x":9,"y":0},{"x":8,"y":0},{"x":7,"y":0},{"x":6,"y":0},{"x":5,"y":0},{"x":4,"y":0},{"x":3,"y":0},{"x":3,"y":1},{"x":3,"y":2}],"latency":"78","head":{"x":4,"y":2},"shout":"chasing tail","customizations":{"color":"#ff8645","head":"replit-mark","tail":"replit-notmark"}}]}`,
+			Description:  "can chase tail to freedom",
+			InitialBoard: `{"height":11,"width":11,"food":[{"X":10,"Y":9},{"X":9,"Y":10},{"X":0,"Y":0},{"X":10,"Y":4},{"X":0,"Y":10},{"X":0,"Y":5},{"X":0,"Y":7},{"X":1,"Y":0},{"X":6,"Y":6},{"X":3,"Y":3}],"hazards":[],"snakes":[{"id":"gs_vRg7TtfdrGy79wG4GjfwPhx6","name":"Gregory","health":96,"body":[{"X":1,"Y":4},{"X":1,"Y":3},{"X":1,"Y":2},{"X":2,"Y":2},{"X":3,"Y":2},{"X":3,"Y":1},{"X":2,"Y":1},{"X":2,"Y":0},{"X":3,"Y":0},{"X":4,"Y":0},{"X":5,"Y":0},{"X":6,"Y":0},{"X":6,"Y":1},{"X":7,"Y":1},{"X":8,"Y":1},{"X":8,"Y":2},{"X":7,"Y":2},{"X":6,"Y":2},{"X":5,"Y":2},{"X":4,"Y":2},{"X":4,"Y":3},{"X":4,"Y":4},{"X":3,"Y":4}],"latency":"457","head":{"X":1,"Y":4},"shout":"This is a nice move."},{"id":"gs_HRKWrTyp847KtHDVtTDbmy8Q","name":"soba","health":88,"body":[{"X":1,"Y":6},{"X":2,"Y":6},{"X":3,"Y":6},{"X":3,"Y":5},{"X":4,"Y":5},{"X":5,"Y":5},{"X":5,"Y":4},{"X":5,"Y":3},{"X":6,"Y":3},{"X":7,"Y":3},{"X":7,"Y":4},{"X":6,"Y":4},{"X":6,"Y":5},{"X":7,"Y":5},{"X":8,"Y":5},{"X":9,"Y":5},{"X":10,"Y":5},{"X":10,"Y":6},{"X":9,"Y":6},{"X":8,"Y":6},{"X":7,"Y":6},{"X":7,"Y":7},{"X":8,"Y":7},{"X":8,"Y":8},{"X":7,"Y":8},{"X":6,"Y":8}],"latency":"411","head":{"X":1,"Y":6},"shout":"swag"}]}`,
 			Iterations:   math.MaxInt,
 		},
 	}
@@ -365,6 +376,7 @@ func TestMCTSVisualizationJSON(t *testing.T) {
 			ctx, _ := context.WithTimeout(context.Background(), 500*time.Millisecond)
 
 			workers := runtime.NumCPU()
+			_ = workers
 			node := MCTS(ctx, "testid", rootBoard, tc.Iterations, workers, make(map[string]*Node))
 			require.NotNil(t, node, "node is nil")
 

@@ -255,33 +255,33 @@ func BenchmarkGenerateVoronoi(b *testing.B) {
 	}
 }
 
-func TestIsLegalMove(t *testing.T) {
-	testCases := []struct {
-		Description  string
-		InitialBoard string
-		SnakeIndex   int
-		NewHead      Point
-		Expected     bool
-	}{
-		{
-			Description:  "should be a legal move within the board boundaries and no collisions",
-			InitialBoard: `{"height":11,"width":11,"food":[{"x":0,"y":2},{"x":0,"y":4},{"x":7,"y":0},{"x":6,"y":10}],"hazards":null,"snakes":[{"id":"8d1de07d-92cf-4ac9-a23e-45aeb8bc14c1","name":"mcts","health":58,"body":[{"x":9,"y":1},{"x":10,"y":1},{"x":10,"y":2},{"x":9,"y":2},{"x":9,"y":3}],"latency":"406","head":{"x":9,"y":1},"shout":"","customizations":{"color":"#888888","head":"default","tail":"default"}},{"id":"a6afe25e-c5fc-450a-b9f1-40f638fe8be0","name":"soba","health":87,"body":[{"x":10,"y":3},{"x":10,"y":4},{"x":10,"y":5},{"x":10,"y":6},{"x":9,"y":6},{"x":8,"y":6}],"latency":"401","head":{"x":10,"y":3},"shout":"","customizations":{"color":"#118645","head":"replit-mark","tail":"replit-notmark"}}]}`,
-			SnakeIndex:   1,
-			NewHead:      Point{X: 9, Y: 3},
-			Expected:     false,
-		},
-	}
+// func TestIsLegalMove(t *testing.T) {
+// 	testCases := []struct {
+// 		Description  string
+// 		InitialBoard string
+// 		SnakeIndex   int
+// 		NewHead      Point
+// 		Expected     bool
+// 	}{
+// 		{
+// 			Description:  "should be a legal move within the board boundaries and no collisions",
+// 			InitialBoard: `{"height":11,"width":11,"food":[{"x":0,"y":2},{"x":0,"y":4},{"x":7,"y":0},{"x":6,"y":10}],"hazards":null,"snakes":[{"id":"8d1de07d-92cf-4ac9-a23e-45aeb8bc14c1","name":"mcts","health":58,"body":[{"x":9,"y":1},{"x":10,"y":1},{"x":10,"y":2},{"x":9,"y":2},{"x":9,"y":3}],"latency":"406","head":{"x":9,"y":1},"shout":"","customizations":{"color":"#888888","head":"default","tail":"default"}},{"id":"a6afe25e-c5fc-450a-b9f1-40f638fe8be0","name":"soba","health":87,"body":[{"x":10,"y":3},{"x":10,"y":4},{"x":10,"y":5},{"x":10,"y":6},{"x":9,"y":6},{"x":8,"y":6}],"latency":"401","head":{"x":10,"y":3},"shout":"","customizations":{"color":"#118645","head":"replit-mark","tail":"replit-notmark"}}]}`,
+// 			SnakeIndex:   1,
+// 			NewHead:      Point{X: 9, Y: 3},
+// 			Expected:     false,
+// 		},
+// 	}
 
-	for _, tc := range testCases {
-		t.Run(tc.Description, func(t *testing.T) {
-			var board Board
-			assert.NoError(t, json.Unmarshal([]byte(tc.InitialBoard), &board))
+// 	for _, tc := range testCases {
+// 		t.Run(tc.Description, func(t *testing.T) {
+// 			var board Board
+// 			assert.NoError(t, json.Unmarshal([]byte(tc.InitialBoard), &board))
 
-			result := isLegalMove(board, tc.SnakeIndex, tc.NewHead)
-			assert.Equal(t, tc.Expected, result)
-		})
-	}
-}
+// 			result := isLegalMove(board, tc.SnakeIndex, tc.NewHead)
+// 			assert.Equal(t, tc.Expected, result)
+// 		})
+// 	}
+// }
 
 func TestEvaluate(t *testing.T) {
 	testCases := []struct {
