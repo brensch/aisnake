@@ -106,7 +106,8 @@ func main() {
 	var err error
 	webhookURL, err = getSecret(secretName)
 	if err != nil {
-		slog.Error("Failed to retrieve Discord webhook secret", "error", err)
+		slog.Error("Failed to retrieve Discord webhook secret", "error", &err)
+		fmt.Println(err)
 		webhookURL = "" // Ensure webhookURL is empty if retrieval fails
 	}
 
@@ -188,7 +189,7 @@ func handleMove(w http.ResponseWriter, r *http.Request) {
 	bestMove := determineBestMove(game, mctsResult)
 
 	response := map[string]string{
-		"move":  "bestMove",
+		"move":  bestMove,
 		"shout": "This is a nice move.",
 	}
 	writeJSON(w, response)
