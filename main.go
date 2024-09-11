@@ -101,14 +101,14 @@ func main() {
 	}
 	slog.Info("Starting BattleSnake on port", "port", port)
 
-	// // Retrieve Discord webhook URL from Google Secret Manager
-	// secretName := "projects/680796481131/secrets/discord_webhook/versions/latest"
-	// var err error
-	// webhookURL, err = getSecret(secretName)
-	// if err != nil {
-	// 	slog.Error("Failed to retrieve Discord webhook secret", "error", err)
-	// 	webhookURL = "" // Ensure webhookURL is empty if retrieval fails
-	// }
+	// Retrieve Discord webhook URL from Google Secret Manager
+	secretName := "projects/680796481131/secrets/discord_webhook/versions/latest"
+	var err error
+	webhookURL, err = getSecret(secretName)
+	if err != nil {
+		slog.Error("Failed to retrieve Discord webhook secret", "error", err)
+		webhookURL = "" // Ensure webhookURL is empty if retrieval fails
+	}
 
 	// Try to send a test message via webhook
 	sendDiscordWebhook(webhookURL, "Starting up")
