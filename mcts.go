@@ -224,6 +224,7 @@ func evaluateBoard(board Board, snakeIndex int) float64 {
 	}
 
 	// Calculate capped length bonus/penalty
+	// TODO: this is probably not going to work for multiplayer
 	mySnake := board.Snakes[snakeIndex]
 	for i, opponent := range board.Snakes {
 		if i != snakeIndex && !isSnakeDead(opponent) {
@@ -234,7 +235,8 @@ func evaluateBoard(board Board, snakeIndex int) float64 {
 				lengthBonus += 0.5 // Higher reward, but capped
 			} else {
 				// want to penalise more and more for shorter shit (smooth gradient to coax back to longer)
-				lengthBonus -= 0.1 * float64(lengthDifference)
+				// FYI lengthdifference will be negative here
+				lengthBonus += 0.1 * float64(lengthDifference)
 			}
 		}
 	}

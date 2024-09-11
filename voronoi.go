@@ -91,6 +91,7 @@ func (pq *PriorityQueue) Pop() interface{} {
 }
 
 // GenerateVoronoi generates a board ownership diagram based on a shortest path algorithm
+// note, voronoi will
 func GenerateVoronoi(board Board) [][]int {
 	// Track the best path (shortest distance and longest snake) to each position
 	bestPaths := make([][]dijkstraNode, board.Height)

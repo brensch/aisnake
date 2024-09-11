@@ -289,10 +289,15 @@ func TestEvaluate(t *testing.T) {
 		InitialBoard string
 		SnakeIndex   int
 	}{
+		// {
+		// 	Description:  "should score win as 1",
+		// 	InitialBoard: `{"height":11,"width":11,"food":[{"x":0,"y":2},{"x":0,"y":4},{"x":7,"y":0},{"x":6,"y":10}],"hazards":null,"snakes":[{"id":"8d1de07d-92cf-4ac9-a23e-45aeb8bc14c1","name":"mcts","health":0,"body":[],"latency":"406","head":{"x":10,"y":5},"shout":"","customizations":{"color":"#888888","head":"default","tail":"default"}},{"id":"a6afe25e-c5fc-450a-b9f1-40f638fe8be0","name":"soba","health":86,"body":[{"x":7,"y":5},{"x":8,"y":5},{"x":9,"y":5},{"x":10,"y":5},{"x":10,"y":6},{"x":9,"y":6}],"latency":"401","head":{"x":7,"y":5},"shout":"","customizations":{"color":"#118645","head":"replit-mark","tail":"replit-notmark"}}]}`,
+		// 	SnakeIndex:   1,
+		// },
 		{
-			Description:  "should score win as 1",
-			InitialBoard: `{"height":11,"width":11,"food":[{"x":0,"y":2},{"x":0,"y":4},{"x":7,"y":0},{"x":6,"y":10}],"hazards":null,"snakes":[{"id":"8d1de07d-92cf-4ac9-a23e-45aeb8bc14c1","name":"mcts","health":0,"body":[],"latency":"406","head":{"x":10,"y":5},"shout":"","customizations":{"color":"#888888","head":"default","tail":"default"}},{"id":"a6afe25e-c5fc-450a-b9f1-40f638fe8be0","name":"soba","health":86,"body":[{"x":7,"y":5},{"x":8,"y":5},{"x":9,"y":5},{"x":10,"y":5},{"x":10,"y":6},{"x":9,"y":6}],"latency":"401","head":{"x":7,"y":5},"shout":"","customizations":{"color":"#118645","head":"replit-mark","tail":"replit-notmark"}}]}`,
-			SnakeIndex:   1,
+			Description:  "should score loss as negative",
+			InitialBoard: `{"height":11,"width":11,"food":[{"x":10,"y":0},{"x":10,"y":3},{"x":8,"y":1},{"x":9,"y":0},{"x":3,"y":1},{"x":4,"y":2},{"x":8,"y":4},{"x":3,"y":0},{"x":9,"y":5}],"hazards":null,"snakes":[{"id":"bbc27600-9763-4cce-954a-b3d6fa0d58de","name":"mcts","health":0,"body":[],"latency":"451","head":{"x":3,"y":9},"shout":"","customizations":{"color":"#888888","head":"default","tail":"default"}},{"id":"a34717ee-ee2f-472e-ba78-a99e446a310a","name":"soba","health":91,"body":[{"x":4,"y":7},{"x":5,"y":7},{"x":6,"y":7},{"x":7,"y":7},{"x":8,"y":7},{"x":9,"y":7},{"x":10,"y":7},{"x":10,"y":8},{"x":10,"y":9},{"x":10,"y":10},{"x":9,"y":10},{"x":9,"y":9},{"x":9,"y":8},{"x":8,"y":8},{"x":7,"y":8},{"x":6,"y":8},{"x":6,"y":9},{"x":5,"y":9},{"x":5,"y":8},{"x":4,"y":8},{"x":4,"y":9},{"x":3,"y":9}],"latency":"401","head":{"x":4,"y":7},"shout":"","customizations":{"color":"#118645","head":"replit-mark","tail":"replit-notmark"}}]}`,
+			SnakeIndex:   0,
 		},
 	}
 
