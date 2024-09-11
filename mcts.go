@@ -124,8 +124,6 @@ func MCTS(ctx context.Context, gameID string, rootBoard Board, iterations int, n
 	if existingNode, ok := gameStates[boardKey]; ok {
 		slog.Info("board cache lookup", "hit", true, "cache_size", len(gameStates), "visits", existingNode.Visits)
 		rootNode = existingNode
-		// we still want to update to the new board since it may have food or danger updates
-		rootNode.Board = rootBoard
 	} else {
 		// Otherwise, create a new node and add it to the game state map
 		slog.Info("board cache lookup", "hit", false, "cache_size", len(gameStates))

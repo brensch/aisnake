@@ -114,6 +114,7 @@ func handleMove(w http.ResponseWriter, r *http.Request) {
 	// }()
 
 	// slog.Info("Visualized board", "board", visualizeBoard(game.Board))
+	fmt.Println(visualizeBoard(game.Board))
 	// // Ensure the movetrees directory exists
 	// if err := os.MkdirAll("movetrees", os.ModePerm); err != nil {
 	// 	log.Println("Error creating movetrees directory:", err)
@@ -188,6 +189,9 @@ func handleEnd(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// tidy the cache
+	delete(gameStates, game.Game.ID)
+
 	slog.Info("Game ended", "game_id", game.Game.ID, "turns", game.Turn)
 
 	writeJSON(w, map[string]string{})
@@ -200,10 +204,18 @@ func writeJSON(w http.ResponseWriter, v interface{}) {
 
 func boardHash(board Board) string {
 	hash := ""
-	for _, snake := range board.Snakes {
+	for i, snake := range board.Snakes {
 		for _, part := range snake.Body {
-			hash += fmt.Sprintf("S%v%v", part.X, part.Y)
+			hash += fmt.Sprintf("S%d%v%v", i, part.X, part.Y)
 		}
 	}
+	for _, food := range board.Food {
+		hash += fmt.Sprintf("f%v%v", food.X, food.Y)
+	}
+
+	for _, hazard := range board.Hazards {
+		hash += fmt.Sprintf("h%v%v", hazard.X, hazard.Y)
+	}
+
 	return hash
 }
