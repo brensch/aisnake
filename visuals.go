@@ -234,7 +234,7 @@ func visualizeNode(node *Node) string {
 		}
 	}
 	for i, count := range controlledPositions {
-		nodeLabel += fmt.Sprintf("Snake %c controls: %d cells\n", 'A'+i, count)
+		nodeLabel += fmt.Sprintf("Snake %c: %d cells, %d len\n", 'A'+i, count, len(node.Board.Snakes[i].Body))
 	}
 	// Add the board state visualization
 	boardVisualization := visualizeBoard(node.Board, WithNewlineCharacter("\n"))

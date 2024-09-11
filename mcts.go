@@ -195,11 +195,22 @@ func MCTS(ctx context.Context, gameID string, rootBoard Board, iterations int, n
 }
 
 func evaluateBoard(board Board, snakeIndex int) float64 {
+	if isSnakeDead(board.Snakes[snakeIndex]) {
+		return -2
+	}
+
+	// TODO: won't work for multiplayer
+	if isSnakeDead(board.Snakes[(snakeIndex+1)%len(board.Snakes)]) {
+		return 2
+	}
+
 	// Voronoi evaluation: Calculate the area controlled by each snake
+	// note, not actually voronoi. brendonoi let's say.
 	voronoi := GenerateVoronoi(board)
 	totalCells := float64(board.Width * board.Height)
 	controlledCells := 0.0
 	opponentsCells := 0.0
+	lengthBonus := 0.0
 
 	// Count the number of cells each snake controls in the Voronoi diagram
 	for y := 0; y < board.Height; y++ {
@@ -212,6 +223,23 @@ func evaluateBoard(board Board, snakeIndex int) float64 {
 		}
 	}
 
-	// Return a score between -1 and 1 based on the difference in controlled areas
-	return (controlledCells - opponentsCells) / totalCells
+	// Calculate capped length bonus/penalty
+	mySnake := board.Snakes[snakeIndex]
+	for i, opponent := range board.Snakes {
+		if i != snakeIndex && !isSnakeDead(opponent) {
+			lengthDifference := len(mySnake.Body) - len(opponent.Body)
+
+			if lengthDifference >= 1 {
+				// Cap the bonus for being at least 1 longer than the opponent
+				lengthBonus += 0.5 // Higher reward, but capped
+			} else {
+				// want to penalise more and more for shorter shit (smooth gradient to coax back to longer)
+				lengthBonus -= 0.1 * float64(lengthDifference)
+			}
+		}
+	}
+
+	// Return a score between -1 and 1 based on the difference in controlled areas,
+	// with a capped length bonus/penalty.
+	return ((controlledCells - opponentsCells) / totalCells) + lengthBonus
 }
