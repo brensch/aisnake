@@ -175,8 +175,19 @@ func MCTS(ctx context.Context, gameID string, rootBoard Board, iterations int, n
 				node.mu.Unlock()
 
 				// Simulation
-				score := evaluateBoard(node.Board, node.SnakeIndex)
-				node.MyScore = score
+				// TODO: note we are not actually simulating in this implementation.
+				// Seems to be working well just using the current score of the board position at this state.
+				// Battlesnake games go for a long time so was not having much luck doing a randomish
+				// (or at least cheap heuristic based move) run out of a game.
+
+				// To save evaluation cost we store this nodes score and call on it every time.
+				var score float64
+				if node.Visits == 0 {
+					score = evaluateBoard(node.Board, node.SnakeIndex)
+					node.MyScore = score
+				} else {
+					score = node.MyScore
+				}
 
 				// Backpropagation
 				for n := node; n != nil; n = n.Parent {
