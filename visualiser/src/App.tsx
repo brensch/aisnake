@@ -407,6 +407,7 @@ const App: React.FC = () => {
             path="/"
             element={<p style={{ padding: "1rem" }}>Select a tree to view</p>}
           />
+
           <Route path="/trees/:id" element={<TreeViewer />} />
         </Routes>
       </div>
@@ -414,9 +415,45 @@ const App: React.FC = () => {
   )
 }
 
+const BoardDisplay: React.FC<{ board: Board | null }> = ({ board }) => {
+  if (!board) {
+    return null
+  }
+
+  const copyToClipboard = () => {
+    const json = JSON.stringify(board)
+    const testCase = `
+    {
+      Description: "placeholder",
+      InitialBoard: \`${json}\`,
+      Iterations:   math.MaxInt,
+    },`
+
+    navigator.clipboard.writeText(testCase).then(
+      () => {
+        alert("Test case copied to clipboard")
+      },
+      (err) => {
+        console.error("Failed to copy test case", err)
+      },
+    )
+  }
+
+  return (
+    <div style={{ padding: "1rem" }}>
+      <button onClick={copyToClipboard}>Copy test case to Clipboard</button>
+    </div>
+  )
+}
+
 // Sidebar to display the list of trees and handle navigation
 const Sidebar: React.FC = () => {
   const [trees, setTrees] = useState<TreeFile[]>([])
+  const [gameId, setGameId] = useState("")
+  const [turnNumber, setTurnNumber] = useState(0)
+  const [gameHeight, setGameHeight] = useState(11)
+  const [gameWidth, setGameWidth] = useState(11)
+  const [board, setBoard] = useState<Board | null>(null)
   const navigate = useNavigate()
 
   const fetchTrees = () => {
@@ -433,6 +470,57 @@ const Sidebar: React.FC = () => {
       .catch((err) => console.error("Error loading trees", err))
   }
 
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!gameId || turnNumber < 0) {
+      alert("Please enter a valid game ID and turn number")
+      return
+    }
+    connectToWebSocket(gameId, turnNumber)
+  }
+
+  const connectToWebSocket = (gameId: string, turn: number) => {
+    const gameIdStripped = gameId.replace(
+      "https://play.battlesnake.com/game/",
+      "",
+    )
+    const socket = new WebSocket(
+      `wss://engine.battlesnake.com/games/${gameIdStripped}/events`,
+    )
+
+    socket.onmessage = (event) => {
+      const data = JSON.parse(event.data)
+      if (data.Type === "frame" && data.Data.Turn === turn) {
+        console.log(data.Data)
+        const boardData: Board = {
+          height: 11,
+          width: 11,
+          food: data.Data.Food,
+          hazards: data.Data.Hazards,
+          snakes: data.Data.Snakes.map((snake: any) => ({
+            id: snake.ID,
+            name: snake.Name,
+            health: snake.Health,
+            body: snake.Body,
+            latency: snake.Latency,
+            head: snake.Body[0],
+            shout: snake.Shout,
+          })),
+        }
+        setBoard(boardData)
+        socket.close()
+      }
+    }
+
+    socket.onerror = (error) => {
+      console.error("WebSocket error:", error)
+    }
+
+    socket.onclose = () => {
+      console.log("WebSocket connection closed")
+    }
+  }
+
   useEffect(() => {
     fetchTrees()
   }, [])
@@ -443,35 +531,78 @@ const Sidebar: React.FC = () => {
         width: "20%",
         overflowY: "scroll",
         padding: "1rem",
-        borderRight: "1px solid #444", // Darker border for dark mode
-        backgroundColor: "#1e1e1e", // Dark background
-        color: "#fff", // Light text color for visibility
+        borderRight: "1px solid #444",
+        backgroundColor: "#1e1e1e",
+        color: "#fff",
       }}
     >
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: "1rem",
-        }}
-      >
-        <h3 style={{ margin: 0, color: "#fff" }}>Available Trees</h3>
+      <form onSubmit={handleSubmit} style={{ marginBottom: "1rem" }}>
+        <div>
+          <label>Game ID:</label>
+          <input
+            type="text"
+            value={gameId}
+            onChange={(e) => setGameId(e.target.value)}
+            style={{ width: "100%", marginBottom: "1rem" }}
+          />
+        </div>
+        <div>
+          <label>height:</label>
+          <input
+            type="number"
+            value={gameHeight}
+            onChange={(e) => setGameHeight(Number(e.target.value))}
+            style={{ width: "100%", marginBottom: "1rem" }}
+          />
+        </div>
+        <div>
+          <label>width:</label>
+          <input
+            type="number"
+            value={gameWidth}
+            onChange={(e) => setGameWidth(Number(e.target.value))}
+            style={{ width: "100%", marginBottom: "1rem" }}
+          />
+        </div>
+        <div>
+          <label>Turn Number:</label>
+          <input
+            type="number"
+            value={turnNumber}
+            onChange={(e) => setTurnNumber(Number(e.target.value))}
+            style={{ width: "100%", marginBottom: "1rem" }}
+          />
+        </div>
         <button
-          onClick={fetchTrees}
+          type="submit"
           style={{
-            marginLeft: "1rem",
-            padding: "0.5rem 1rem",
-            backgroundColor: "#007BFF", // Keep button color, but adjust if needed
+            width: "100%",
+            padding: "0.5rem",
+            backgroundColor: "#007BFF",
             color: "#fff",
             border: "none",
             borderRadius: "4px",
-            cursor: "pointer",
           }}
         >
-          Refresh
+          Load Turn Data
         </button>
-      </div>
+      </form>
+      <BoardDisplay board={board} />
+      <h3 style={{ margin: 0, color: "#fff" }}>Available Trees</h3>
+      <button
+        onClick={fetchTrees}
+        style={{
+          marginLeft: "1rem",
+          padding: "0.5rem 1rem",
+          backgroundColor: "#007BFF",
+          color: "#fff",
+          border: "none",
+          borderRadius: "4px",
+          cursor: "pointer",
+        }}
+      >
+        Refresh
+      </button>
       <div>
         {trees.map((tree) => (
           <div
@@ -481,19 +612,11 @@ const Sidebar: React.FC = () => {
               cursor: "pointer",
               padding: "1rem",
               marginBottom: "0.5rem",
-              backgroundColor: "#333", // Dark card background
+              backgroundColor: "#333",
               borderRadius: "8px",
-              boxShadow: "0 2px 4px rgba(0, 0, 0, 0.3)", // Adjusted for dark mode
-              color: "#fff", // White text color
+              boxShadow: "0 2px 4px rgba(0, 0, 0, 0.3)",
+              color: "#fff",
               transition: "transform 0.2s, box-shadow 0.2s",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.transform = "scale(1.02)"
-              e.currentTarget.style.boxShadow = "0 4px 8px rgba(0, 0, 0, 0.6)" // Stronger shadow in dark mode
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.transform = "scale(1)"
-              e.currentTarget.style.boxShadow = "0 2px 4px rgba(0, 0, 0, 0.3)"
             }}
           >
             {tree.name}
