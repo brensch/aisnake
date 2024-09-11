@@ -286,7 +286,7 @@ func handleEnd(w http.ResponseWriter, r *http.Request) {
 	// tidy the cache
 	delete(gameStates, game.Game.ID)
 
-	slog.Info("Game ended", "game", game.Game)
+	slog.Info("Game ended", "game", game)
 
 	outcome := describeGameOutcome(game)
 	// put you back onto the board if you died
@@ -343,6 +343,17 @@ func describeGameOutcome(game BattleSnakeGame) string {
 		return "You lost by starving to death."
 	}
 
+	// Check if all snakes died (a draw)
+	livingSnakes := 0
+	for _, snake := range game.Board.Snakes {
+		if snake.Health > 0 {
+			livingSnakes++
+		}
+	}
+	if livingSnakes == 0 {
+		return "It's a draw! All snakes died."
+	}
+
 	// Check if you won because all other snakes starved or collided
 	if len(game.Board.Snakes) == 1 && game.Board.Snakes[0].ID == game.You.ID {
 		// If only your snake remains, it means you won
@@ -364,5 +375,5 @@ func describeGameOutcome(game BattleSnakeGame) string {
 	}
 
 	// Default outcome
-	return "The game is still ongoing."
+	return "Seems like a draw."
 }
