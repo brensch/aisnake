@@ -241,9 +241,9 @@ func evaluateBoard(board Board, snakeIndex int) float64 {
 		if i != snakeIndex && !isSnakeDead(opponent) {
 			lengthDifference := len(mySnake.Body) - len(opponent.Body)
 
-			if lengthDifference >= 1 {
+			if lengthDifference >= 2 {
 				// Cap the bonus for being at least 1 longer than the opponent
-				lengthBonus += 0.5 // Higher reward, but capped
+				lengthBonus += 0.3 * float64(lengthDifference) // Higher reward, but capped
 			} else {
 				// want to penalise more and more for shorter shit (smooth gradient to coax back to longer)
 				// FYI lengthdifference will be negative here
