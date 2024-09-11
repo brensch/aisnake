@@ -101,14 +101,14 @@ func main() {
 	}
 	slog.Info("Starting BattleSnake on port", "port", port)
 
-	// Retrieve Discord webhook URL from Google Secret Manager
-	secretName := "projects/680796481131/secrets/discord_webhook/versions/latest"
-	var err error
-	webhookURL, err = getSecret(secretName)
-	if err != nil {
-		slog.Error("Failed to retrieve Discord webhook secret", "error", err)
-		webhookURL = "" // Ensure webhookURL is empty if retrieval fails
-	}
+	// // Retrieve Discord webhook URL from Google Secret Manager
+	// secretName := "projects/680796481131/secrets/discord_webhook/versions/latest"
+	// var err error
+	// webhookURL, err = getSecret(secretName)
+	// if err != nil {
+	// 	slog.Error("Failed to retrieve Discord webhook secret", "error", err)
+	// 	webhookURL = "" // Ensure webhookURL is empty if retrieval fails
+	// }
 
 	// Try to send a test message via webhook
 	sendDiscordWebhook(webhookURL, "Starting up")
@@ -188,7 +188,7 @@ func handleMove(w http.ResponseWriter, r *http.Request) {
 	bestMove := determineBestMove(game, mctsResult)
 
 	response := map[string]string{
-		"move":  bestMove,
+		"move":  "bestMove",
 		"shout": "This is a nice move.",
 	}
 	writeJSON(w, response)
@@ -286,24 +286,17 @@ func handleEnd(w http.ResponseWriter, r *http.Request) {
 	// tidy the cache
 	delete(gameStates, game.Game.ID)
 
-	slog.Info("Game ended", "game_id", game.Game.ID, "turns", game.Turn)
+	slog.Info("Game ended", "game", game.Game)
 
-	result := "won"
-	if game.You.Health == 0 {
-		result = "drew"
-		// if another snake had health we lost
-		for _, snake := range game.Board.Snakes {
-			if snake.ID == game.You.ID {
-				continue
-			}
-			if snake.Health != 0 {
-				result = "lost"
-				break
-			}
-		}
-	}
+	yo, _ := json.Marshal(game)
+	fmt.Println(string(yo))
 
-	sendDiscordWebhook(webhookURL, fmt.Sprintf("Game %s finished. We %s", game.Game.ID, result))
+	outcome := describeGameOutcome(game)
+	// put you back onto the board if you died
+	game.Board.Snakes = append(game.Board.Snakes, game.You)
+	board := visualizeBoard(reorderSnakes(game.Board, game.You.ID), WithNewlineCharacter("\n"))
+
+	sendDiscordWebhook(webhookURL, fmt.Sprintf("Game %s finished on turn %d. %s.\nhttps://play.battlesnake.com/game/%s\n```\n%s\n```", game.Game.ID, game.Turn, outcome, game.Game.ID, board))
 
 	writeJSON(w, map[string]string{})
 }
@@ -329,4 +322,82 @@ func boardHash(board Board) string {
 	}
 
 	return hash
+}
+
+func describeGameOutcome(game BattleSnakeGame) string {
+	// Check if you lost by colliding with a wall
+	if game.You.Head.X < 0 || game.You.Head.X >= game.Board.Width || game.You.Head.Y < 0 || game.You.Head.Y >= game.Board.Height {
+		return "You lost by crashing into a wall."
+	}
+
+	// Check if you lost by colliding with another snake
+	for _, snake := range game.Board.Snakes {
+		if snake.ID != game.You.ID {
+			for _, segment := range snake.Body {
+				if game.You.Head == segment {
+					return fmt.Sprintf("You lost by colliding with %s.", snake.Name)
+				}
+			}
+		}
+	}
+
+	// Check if you lost by starving
+	if game.You.Health <= 0 {
+		return "You lost by starving to death."
+	}
+
+	// Check if you won because all other snakes died
+	if len(game.Board.Snakes) == 1 && game.Board.Snakes[0].ID == game.You.ID {
+		// Loop over the previous snakes to describe how the opponent died
+		for _, snake := range game.Board.Snakes {
+			if snake.ID != game.You.ID {
+				// Check if the opponent collided with a wall
+				if snake.Head.X < 0 || snake.Head.X >= game.Board.Width || snake.Head.Y < 0 || snake.Head.Y >= game.Board.Height {
+					return fmt.Sprintf("You won because %s crashed into a wall.", snake.Name)
+				}
+				// Check if the opponent collided with your body or another snake
+				for _, segment := range game.You.Body {
+					if snake.Head == segment {
+						return fmt.Sprintf("You won because %s collided with your body.", snake.Name)
+					}
+				}
+				for _, otherSnake := range game.Board.Snakes {
+					if otherSnake.ID != snake.ID {
+						for _, segment := range otherSnake.Body {
+							if snake.Head == segment {
+								return fmt.Sprintf("You won because %s collided with %s.", snake.Name, otherSnake.Name)
+							}
+						}
+					}
+				}
+				// Check if the opponent starved
+				if snake.Health <= 0 {
+					return fmt.Sprintf("You won because %s starved to death.", snake.Name)
+				}
+				// Check if the opponent entered a hazard
+				for _, hazard := range game.Board.Hazards {
+					if snake.Head == hazard {
+						return fmt.Sprintf("You won because %s entered a hazard.", snake.Name)
+					}
+				}
+			}
+		}
+	}
+
+	// Check if an opponent starved
+	for _, snake := range game.Board.Snakes {
+		if snake.ID != game.You.ID && snake.Health <= 0 {
+			return fmt.Sprintf("You won because %s starved.", snake.Name)
+		}
+	}
+
+	// Check if you lost by entering a hazard
+	for _, hazard := range game.Board.Hazards {
+		if game.You.Head == hazard {
+			return "You lost by entering a hazard."
+		}
+	}
+
+	// Default outcome
+	return "The game is still ongoing."
 }

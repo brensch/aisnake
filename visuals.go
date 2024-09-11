@@ -99,7 +99,7 @@ func visualizeBoard(game Board, options ...func(*boardOptions)) string {
 
 	// Place snakes on the board safely
 	for i, snake := range game.Snakes {
-		if len(snake.Body) == 0 || snake.Health == 0 {
+		if len(snake.Body) == 0 {
 			continue
 		}
 		snakeChar := rune('a' + i)
