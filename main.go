@@ -106,8 +106,7 @@ func main() {
 	var err error
 	webhookURL, err = getSecret(secretName)
 	if err != nil {
-		slog.Error("Failed to retrieve Discord webhook secret", "error", &err)
-		fmt.Println(err)
+		slog.Error("Failed to retrieve Discord webhook secret", "error", err.Error())
 		webhookURL = "" // Ensure webhookURL is empty if retrieval fails
 	}
 
@@ -209,7 +208,7 @@ func handleMove(w http.ResponseWriter, r *http.Request) {
 	// }()
 
 	// slog.Info("Visualized board", "board", visualizeBoard(game.Board))
-	fmt.Println(visualizeBoard(game.Board))
+	// fmt.Println(visualizeBoard(game.Board))
 	// // Ensure the movetrees directory exists
 	// if err := os.MkdirAll("movetrees", os.ModePerm); err != nil {
 	// 	log.Println("Error creating movetrees directory:", err)
@@ -289,9 +288,6 @@ func handleEnd(w http.ResponseWriter, r *http.Request) {
 
 	slog.Info("Game ended", "game", game.Game)
 
-	yo, _ := json.Marshal(game)
-	fmt.Println(string(yo))
-
 	outcome := describeGameOutcome(game)
 	// put you back onto the board if you died
 	game.Board.Snakes = append(game.Board.Snakes, game.You)
@@ -347,42 +343,10 @@ func describeGameOutcome(game BattleSnakeGame) string {
 		return "You lost by starving to death."
 	}
 
-	// Check if you won because all other snakes died
+	// Check if you won because all other snakes starved or collided
 	if len(game.Board.Snakes) == 1 && game.Board.Snakes[0].ID == game.You.ID {
-		// Loop over the previous snakes to describe how the opponent died
-		for _, snake := range game.Board.Snakes {
-			if snake.ID != game.You.ID {
-				// Check if the opponent collided with a wall
-				if snake.Head.X < 0 || snake.Head.X >= game.Board.Width || snake.Head.Y < 0 || snake.Head.Y >= game.Board.Height {
-					return fmt.Sprintf("You won because %s crashed into a wall.", snake.Name)
-				}
-				// Check if the opponent collided with your body or another snake
-				for _, segment := range game.You.Body {
-					if snake.Head == segment {
-						return fmt.Sprintf("You won because %s collided with your body.", snake.Name)
-					}
-				}
-				for _, otherSnake := range game.Board.Snakes {
-					if otherSnake.ID != snake.ID {
-						for _, segment := range otherSnake.Body {
-							if snake.Head == segment {
-								return fmt.Sprintf("You won because %s collided with %s.", snake.Name, otherSnake.Name)
-							}
-						}
-					}
-				}
-				// Check if the opponent starved
-				if snake.Health <= 0 {
-					return fmt.Sprintf("You won because %s starved to death.", snake.Name)
-				}
-				// Check if the opponent entered a hazard
-				for _, hazard := range game.Board.Hazards {
-					if snake.Head == hazard {
-						return fmt.Sprintf("You won because %s entered a hazard.", snake.Name)
-					}
-				}
-			}
-		}
+		// If only your snake remains, it means you won
+		return "You won."
 	}
 
 	// Check if an opponent starved
