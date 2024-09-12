@@ -26,3 +26,5 @@ go.work.sum
 
 /movetrees
 /visualiser/tree-data
+
+*.json

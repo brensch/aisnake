@@ -22,7 +22,8 @@ import (
 var (
 	gameStates = make(map[string]map[string]*Node) // Global map to store known game states
 	// TODO: make this non global
-	webhookURL string = ""
+	webhookURL   string = ""
+	tidbytSecret string = ""
 )
 
 // Struct for Discord Webhook payload
@@ -86,6 +87,7 @@ func getSecret(secretName string) (string, error) {
 }
 
 func main() {
+
 	// Set up the custom handler for Google Cloud
 	handler := NewGoogleCloudHandler(os.Stdout, slog.LevelInfo)
 
@@ -105,6 +107,13 @@ func main() {
 	secretName := "projects/680796481131/secrets/discord_webhook/versions/latest"
 	var err error
 	webhookURL, err = getSecret(secretName)
+	if err != nil {
+		slog.Error("Failed to retrieve Discord webhook secret", "error", err.Error())
+		webhookURL = "" // Ensure webhookURL is empty if retrieval fails
+	}
+
+	tidBytSecretName := "projects/680796481131/secrets/tidbyt/versions/latest"
+	tidbytSecret, err = getSecret(tidBytSecretName)
 	if err != nil {
 		slog.Error("Failed to retrieve Discord webhook secret", "error", err.Error())
 		webhookURL = "" // Ensure webhookURL is empty if retrieval fails
@@ -294,6 +303,21 @@ func handleEnd(w http.ResponseWriter, r *http.Request) {
 	board := visualizeBoard(reorderSnakes(game.Board, game.You.ID), WithNewlineCharacter("\n"))
 
 	sendDiscordWebhook(webhookURL, fmt.Sprintf("Game %s finished on turn %d. %s.\nhttps://play.battlesnake.com/game/%s\n```\n%s\n```", game.Game.ID, game.Turn, outcome, game.Game.ID, board))
+
+	// WebSocket URL for the game
+	wsURL := fmt.Sprintf("wss://engine.battlesnake.com/games/%s/events", game.Game.ID)
+
+	// Collect game frames
+	frames, won, err := collectGameFrames(wsURL)
+	if err != nil {
+		log.Fatalf("Failed to collect game frames: %v", err)
+	}
+
+	// Render frames to WebP and push to Tidbyt
+	err = renderGameToGIF("game_animation.gif", frames, deviceID, won)
+	if err != nil {
+		log.Fatalf("Failed to render game to WebP: %v", err)
+	}
 
 	writeJSON(w, map[string]string{})
 }
