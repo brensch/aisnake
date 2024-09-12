@@ -11,6 +11,7 @@ import (
 	"image/draw"
 	"image/gif"
 	"log"
+	"log/slog"
 	"os"
 	"strconv"
 	"strings"
@@ -337,8 +338,9 @@ func addScaledLabel(img *image.RGBA, x, y int, label string, face font.Face, col
 }
 
 // Stitch together frames and encode as GIF animation in 15-second chunks
-func renderGameToGIF(outputFile string, frames []*Board, deviceID string, gregoryWon bool) error {
+func renderGameToGIF(frames []*Board, deviceID string, gregoryWon bool) error {
 
+	slog.Info("rendering game")
 	// Define how many frames to include per 15-second chunk
 	framesPerChunk := 150 // assuming 100ms per frame (10 frames per second, 15 seconds = 150 frames)
 

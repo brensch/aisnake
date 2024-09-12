@@ -11,6 +11,6 @@ gcloud run deploy battlesnake-server \
 --allow-unauthenticated \
 --cpu 8 \
 --memory 4Gi \
---timeout 30s \
+--timeout 60s \
 --max-instances 1
 ```

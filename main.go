@@ -310,13 +310,14 @@ func handleEnd(w http.ResponseWriter, r *http.Request) {
 	// Collect game frames
 	frames, won, err := collectGameFrames(wsURL)
 	if err != nil {
-		log.Fatalf("Failed to collect game frames: %v", err)
+		slog.Error("Failed to collect game frames", "error", err.Error())
 	}
+	slog.Info("got frames from websocket", "turns", len(frames))
 
 	// Render frames to WebP and push to Tidbyt
-	err = renderGameToGIF("game_animation.gif", frames, deviceID, won)
+	err = renderGameToGIF(frames, deviceID, won)
 	if err != nil {
-		log.Fatalf("Failed to render game to WebP: %v", err)
+		slog.Error("Failed to render game to gif", "error", err.Error())
 	}
 
 	writeJSON(w, map[string]string{})
