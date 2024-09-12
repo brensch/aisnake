@@ -112,12 +112,12 @@ func main() {
 		webhookURL = "" // Ensure webhookURL is empty if retrieval fails
 	}
 
-	tidBytSecretName := "projects/680796481131/secrets/tidbyt/versions/latest"
-	tidbytSecret, err = getSecret(tidBytSecretName)
-	if err != nil {
-		slog.Error("Failed to retrieve Discord webhook secret", "error", err.Error())
-		webhookURL = "" // Ensure webhookURL is empty if retrieval fails
-	}
+	// tidBytSecretName := "projects/680796481131/secrets/tidbyt/versions/latest"
+	// tidbytSecret, err = getSecret(tidBytSecretName)
+	// if err != nil {
+	// 	slog.Error("Failed to retrieve Discord webhook secret", "error", err.Error())
+	// 	webhookURL = "" // Ensure webhookURL is empty if retrieval fails
+	// }
 
 	// Try to send a test message via webhook
 	sendDiscordWebhook(webhookURL, "Starting up")
@@ -304,21 +304,21 @@ func handleEnd(w http.ResponseWriter, r *http.Request) {
 
 	sendDiscordWebhook(webhookURL, fmt.Sprintf("Game %s finished on turn %d. %s.\nhttps://play.battlesnake.com/game/%s\n```\n%s\n```", game.Game.ID, game.Turn, outcome, game.Game.ID, board))
 
-	// WebSocket URL for the game
-	wsURL := fmt.Sprintf("wss://engine.battlesnake.com/games/%s/events", game.Game.ID)
+	// // WebSocket URL for the game
+	// wsURL := fmt.Sprintf("wss://engine.battlesnake.com/games/%s/events", game.Game.ID)
 
-	// Collect game frames
-	frames, won, err := collectGameFrames(wsURL)
-	if err != nil {
-		slog.Error("Failed to collect game frames", "error", err.Error())
-	}
-	slog.Info("got frames from websocket", "turns", len(frames))
+	// // Collect game frames
+	// frames, won, err := collectGameFrames(wsURL)
+	// if err != nil {
+	// 	slog.Error("Failed to collect game frames", "error", err.Error())
+	// }
+	// slog.Info("got frames from websocket", "turns", len(frames))
 
-	// Render frames to WebP and push to Tidbyt
-	err = renderGameToGIF(frames, deviceID, won)
-	if err != nil {
-		slog.Error("Failed to render game to gif", "error", err.Error())
-	}
+	// // Render frames to WebP and push to Tidbyt
+	// err = renderGameToGIF(frames, deviceID, won)
+	// if err != nil {
+	// 	slog.Error("Failed to render game to gif", "error", err.Error())
+	// }
 
 	writeJSON(w, map[string]string{})
 }
