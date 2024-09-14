@@ -280,7 +280,9 @@ func handleEnd(w http.ResponseWriter, r *http.Request) {
 		score = -1
 	}
 
-	slog.Info("Game ended", "game", game, "rank", rank, "score", score, "duration_ms", end.Sub(gameMeta.start).Milliseconds())
+	gameDuration := end.Sub(gameMeta.start)
+
+	slog.Info("Game ended", "game", game, "rank", rank, "score", score, "duration_ms", gameDuration.Milliseconds())
 
 	err = downloadAndUploadFile(context.Background(), game.Game.ID)
 	if err != nil {
@@ -317,6 +319,11 @@ func handleEnd(w http.ResponseWriter, r *http.Request) {
 						{
 							Name:   "score",
 							Value:  fmt.Sprint(score),
+							Inline: true,
+						},
+						{
+							Name:   "game duration",
+							Value:  fmt.Sprint(gameDuration.String()),
 							Inline: true,
 						},
 					},
