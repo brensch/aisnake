@@ -87,6 +87,8 @@ func main() {
 		slog.Error("Failed to retrieve tidbyt webhook secret", "error", err.Error())
 	}
 
+	RetrieveGameRenderAndSendToTidbyt("e1aa81f3-8d4a-4b0b-99f1-e14367f72958")
+
 	http.HandleFunc("/", handleIndex)
 	http.HandleFunc("/start", handleStart)
 	http.HandleFunc("/move", handleMove)

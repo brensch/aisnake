@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"log/slog"
 	"net/http"
 )
@@ -85,8 +84,6 @@ func sendDiscordWebhook(webhookURL, message string, embeds []Embed) error {
 	if err != nil {
 		return err
 	}
-
-	fmt.Println(string(jsonData))
 
 	// Send the HTTP POST request to the webhook URL
 	resp, err := http.Post(webhookURL, "application/json", bytes.NewBuffer(jsonData))

@@ -72,14 +72,14 @@ func RetrieveGameRenderAndSendToTidbyt(gameID string) {
 	wsURL := fmt.Sprintf("wss://engine.battlesnake.com/games/%s/events", gameID)
 
 	// Collect game frames
-	frames, won, err := collectGameFrames(wsURL)
+	frames, outcome, err := collectGameFrames(wsURL)
 	if err != nil {
 		slog.Error("Failed to collect game frames", "error", err.Error())
 	}
-	slog.Info("got frames from websocket", "turns", len(frames))
+	slog.Info("got frames from websocket", "turns", len(frames), "outcome", outcome)
 
 	// Render frames to WebP and push to Tidbyt
-	err = renderGameToGIF(frames, deviceID, won)
+	err = renderGameToGIF(frames, deviceID, outcome)
 	if err != nil {
 		slog.Error("Failed to render game to gif", "error", err.Error())
 	}
@@ -112,17 +112,16 @@ func min(a, b int) int {
 }
 
 // Collect game frames from WebSocket and save board dimensions from the `game_end` event
-func collectGameFrames(wsURL string) ([]*Board, bool, error) {
+func collectGameFrames(wsURL string) ([]*Board, GameOutcome, error) {
 	var boards []*Board
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
 	conn, _, err := websocket.DefaultDialer.DialContext(ctx, wsURL, nil)
 	if err != nil {
-		return nil, false, fmt.Errorf("failed to connect to WebSocket: %v", err)
+		return nil, 0, fmt.Errorf("failed to connect to WebSocket: %v", err)
 	}
 	defer conn.Close()
 	var boardWidth, boardHeight int
-	var gregoryWon bool
 
 	var lastFrameEvent FrameEvent
 	for {
@@ -130,7 +129,7 @@ func collectGameFrames(wsURL string) ([]*Board, bool, error) {
 		if websocket.IsCloseError(err, websocket.CloseNormalClosure) {
 			break
 		} else if err != nil {
-			return nil, false, fmt.Errorf("error reading message: %v", err)
+			return nil, 0, fmt.Errorf("error reading message: %v", err)
 		}
 
 		var event FrameEvent
@@ -157,11 +156,9 @@ func collectGameFrames(wsURL string) ([]*Board, bool, error) {
 
 	}
 
-	for _, snake := range lastFrameEvent.Data.Snakes {
-		if snake.Name == "Gregory" && snake.Death == nil {
-			gregoryWon = true
-			break
-		}
+	outcome, err := GetOutcomeForGregory(lastFrameEvent)
+	if err != nil {
+		return nil, 0, err
 	}
 
 	// update the game dimensions in every frame
@@ -170,7 +167,45 @@ func collectGameFrames(wsURL string) ([]*Board, bool, error) {
 		board.Width = boardWidth
 	}
 
-	return boards, gregoryWon, nil
+	return boards, outcome, nil
+}
+
+// GetOutcomeForGregory determines if Gregory won, lost, or the game was a draw.
+// Note this is for the retrieved object types
+func GetOutcomeForGregory(data FrameEvent) (GameOutcome, error) {
+
+	var gregory, opponent *FrameSnake
+
+	// Find Gregory and the other snake
+	for i := range data.Data.Snakes {
+		if data.Data.Snakes[i].Name == "Gregory" {
+			gregory = &data.Data.Snakes[i]
+		} else {
+			opponent = &data.Data.Snakes[i]
+		}
+	}
+
+	if gregory == nil || opponent == nil {
+		return Draw, fmt.Errorf("could not find Gregory or opponent")
+	}
+
+	// Check if both died on the same turn (ensure Death is not nil)
+	if gregory.Death != nil && opponent.Death != nil {
+		return Draw, nil
+	}
+
+	// If Gregory is alive (Death is nil or Turn is 0) and the opponent is dead
+	if gregory.Death == nil && opponent.Death != nil {
+		return Win, nil
+	}
+
+	// If Gregory is dead and the opponent is alive (Death is nil or Turn is 0)
+	if gregory.Death != nil && (opponent.Death == nil) {
+		return Loss, nil
+	}
+
+	// If only one snake is alive, Gregory wins if it's him
+	return Draw, nil
 }
 
 // Conversion function: FrameSnake -> GameSnake
@@ -214,6 +249,7 @@ func renderBoardToImage(board *Board) (*image.RGBA, []color.Color) {
 		color.RGBA{0, 0, 0, 255},       // Black
 		color.RGBA{255, 255, 255, 255}, // White
 		color.RGBA{255, 0, 0, 255},     // Red
+		color.RGBA{255, 255, 0, 255},   // yellow
 		color.RGBA{0, 255, 0, 255},     // Green
 		color.RGBA{0, 0, 255, 255},     // Blue
 		color.RGBA{100, 100, 100, 255}, // Grey
@@ -327,7 +363,7 @@ func drawCell(img *image.RGBA, x, y int, c color.RGBA) {
 }
 
 // Stitch together frames and encode as GIF animation with dynamic delay to fit within 15 seconds
-func renderGameToGIF(frames []*Board, deviceID string, gregoryWon bool) error {
+func renderGameToGIF(frames []*Board, deviceID string, outcome GameOutcome) error {
 
 	if len(frames) == 0 {
 		slog.Warn("no frames to be rendered")
@@ -367,12 +403,13 @@ func renderGameToGIF(frames []*Board, deviceID string, gregoryWon bool) error {
 	}
 
 	// If Gregory won, append a green screen at the end, otherwise append a red screen
-	var winScreenPalette color.Palette
-	if gregoryWon {
-		winScreenPalette = color.Palette{color.RGBA{0, 255, 0, 255}}
-	} else {
-		winScreenPalette = color.Palette{color.RGBA{255, 0, 0, 255}}
+	colourHex := fmt.Sprintf("#%06x", getColorForOutcome(outcome))
+	colour, err := hexToRGBA(colourHex)
+	if err != nil {
+		colour = color.RGBA{255, 255, 255, 255}
 	}
+	winScreenPalette := color.Palette{colour}
+
 	// Create the win/lose screen as a paletted image
 	finalScreen := image.NewPaletted(image.Rect(0, 0, canvasWidth, canvasHeight), winScreenPalette)
 
@@ -384,7 +421,7 @@ func renderGameToGIF(frames []*Board, deviceID string, gregoryWon bool) error {
 	var buf bytes.Buffer
 
 	// Encode the images (including the final screen) into a single GIF
-	err := gif.EncodeAll(&buf, &gif.GIF{
+	err = gif.EncodeAll(&buf, &gif.GIF{
 		Image: images,
 		Delay: delays,
 	})
