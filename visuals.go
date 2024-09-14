@@ -282,7 +282,7 @@ func GenerateMostVisitedPathWithAlternativesHtmlTree(node *Node) error {
 		return err
 	}
 
-	fmt.Printf("Generated move tree: %s\nLink: http://localhost:5173/trees/%s\n", uuid, fileName)
+	fmt.Printf("Generated move tree: http://localhost:5173/trees/%s\n", fileName)
 	return nil
 }
 

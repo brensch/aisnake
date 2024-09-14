@@ -172,7 +172,7 @@ func handleMove(w http.ResponseWriter, r *http.Request) {
 
 	workers := runtime.NumCPU()
 	mctsResult := MCTS(ctx, game.Game.ID, reorderedBoard, math.MaxInt, workers, gameState)
-	bestMove := determineBestMove(game, mctsResult)
+	bestMove := determineBestMove(mctsResult)
 
 	response := map[string]string{
 		"move":  bestMove,
@@ -230,7 +230,7 @@ func reorderSnakes(board Board, youID string) Board {
 	return board
 }
 
-func determineBestMove(game BattleSnakeGame, node *Node) string {
+func determineBestMove(node *Node) string {
 	var bestChild *Node
 	maxVisits := -1
 
@@ -242,7 +242,7 @@ func determineBestMove(game BattleSnakeGame, node *Node) string {
 	}
 
 	if bestChild != nil {
-		bestMove := determineMoveDirection(game.You.Head, bestChild.Board.Snakes[0].Head)
+		bestMove := determineMoveDirection(node.Board.Snakes[0].Head, bestChild.Board.Snakes[0].Head)
 		return bestMove
 	}
 
