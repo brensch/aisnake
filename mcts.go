@@ -16,8 +16,8 @@ type Node struct {
 	Score      float64
 	MyScore    float64
 
-	mu         sync.Mutex // Mutex to protect the node's state
-	childrenMu sync.Mutex // Separate mutex for protecting children initialization
+	mu         sync.RWMutex // Read-Write Mutex to protect the node's state
+	childrenMu sync.RWMutex // Read-Write Mutex for protecting children initialization
 }
 
 func NewNode(board Board, snakeIndex int) *Node {
@@ -73,6 +73,23 @@ func isSnakeDead(snake Snake) bool {
 }
 
 func (n *Node) UCT(parent *Node, explorationParam float64) float64 {
+	// Acquire locks in a consistent order to prevent deadlocks
+	if n == parent {
+		// Avoid double-locking if n and parent are the same node
+		n.mu.RLock()
+		defer n.mu.RUnlock()
+	} else if n.SnakeIndex < parent.SnakeIndex {
+		n.mu.RLock()
+		parent.mu.RLock()
+		defer n.mu.RUnlock()
+		defer parent.mu.RUnlock()
+	} else {
+		parent.mu.RLock()
+		n.mu.RLock()
+		defer n.mu.RUnlock()
+		defer parent.mu.RUnlock()
+	}
+
 	if n.Visits == 0 {
 		return math.MaxFloat64
 	}
@@ -85,8 +102,8 @@ func (n *Node) UCT(parent *Node, explorationParam float64) float64 {
 
 // Select the best child node based on the UCT value
 func bestChild(node *Node, explorationParam float64) *Node {
-	node.childrenMu.Lock() // Protect access to children
-	defer node.childrenMu.Unlock()
+	node.childrenMu.RLock() // Protect access to children
+	defer node.childrenMu.RUnlock()
 
 	if len(node.Children) == 0 {
 		return nil // No children available
@@ -100,12 +117,8 @@ func bestChild(node *Node, explorationParam float64) *Node {
 			continue // Skip nil children, in case of race condition or partial initialization
 		}
 
-		// Only lock the child for reading its Visits and Score
-		// note this is now racey since node.visits is accessed.
-		// could not get it to lock the node without causing a deadlock so will leave it
-		child.mu.Lock()
+		// Lock the child and parent for reading Visits and Score
 		value := child.UCT(node, explorationParam)
-		child.mu.Unlock()
 
 		if value > bestValue {
 			bestValue = value
@@ -137,7 +150,13 @@ func MCTS(ctx context.Context, gameID string, rootBoard Board, iterations int, n
 	go func() {
 		for i := 0; i < iterations; i++ {
 			node := rootNode
-			for len(node.Children) > 0 {
+			for {
+				node.childrenMu.RLock()
+				hasChildren := len(node.Children) > 0
+				node.childrenMu.RUnlock()
+				if !hasChildren {
+					break
+				}
 				nextNode := bestChild(node, 1.41)
 				if nextNode == nil {
 					break // Break the loop if no valid child is found
@@ -166,28 +185,25 @@ func MCTS(ctx context.Context, gameID string, rootBoard Board, iterations int, n
 				}
 
 				// Lock node before processing
-				node.mu.Lock()
-				if !isTerminal(node.Board) && node.Visits > 0 {
+				node.mu.RLock()
+				isTerminalNode := isTerminal(node.Board)
+				visits := node.Visits
+				node.mu.RUnlock()
+
+				if !isTerminalNode && visits > 0 {
 					expand(node)
-					// No need to switch locks between parent and child at this point.
-					// Just expand, unlock, and continue.
 				}
-				node.mu.Unlock()
 
 				// Simulation
-				// TODO: note we are not actually simulating in this implementation.
-				// Seems to be working well just using the current score of the board position at this state.
-				// Battlesnake games go for a long time so was not having much luck doing a randomish
-				// (or at least cheap heuristic based move) run out of a game.
-
-				// To save evaluation cost we store this nodes score and call on it every time.
 				var score float64
+				node.mu.Lock()
 				if node.Visits == 0 {
 					score = evaluateBoard(node.Board, node.SnakeIndex)
 					node.MyScore = score
 				} else {
 					score = node.MyScore
 				}
+				node.mu.Unlock()
 
 				// Backpropagation
 				for n := node; n != nil; n = n.Parent {
@@ -245,8 +261,7 @@ func evaluateBoard(board Board, snakeIndex int) float64 {
 				// Cap the bonus for being at least 1 longer than the opponent
 				lengthBonus += 0.3 * float64(lengthDifference) // Higher reward, but capped
 			} else {
-				// want to penalise more and more for shorter shit (smooth gradient to coax back to longer)
-				// FYI lengthdifference will be negative here
+				// Penalize for being shorter
 				lengthBonus += 0.1 * float64(lengthDifference)
 			}
 		}
