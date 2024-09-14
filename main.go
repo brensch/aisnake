@@ -152,7 +152,7 @@ func handleMove(w http.ResponseWriter, r *http.Request) {
 	// get the nodemap for this game
 	gameState, ok := gameStates[game.Game.ID]
 	if !ok {
-		slog.Error("failed to find gamestate. seems like bug.")
+		slog.Error("failed to find gamestate. probably reset during a game.")
 		gameState = make(map[string]*Node)
 	}
 
