@@ -18,8 +18,15 @@ import (
 	"cloud.google.com/go/secretmanager/apiv1/secretmanagerpb"
 )
 
+// things i want to track from the start to the end that don't get provided by the server
+type GameMeta struct {
+	otherSnakes []string
+	start       time.Time
+}
+
 var (
-	gameStates = make(map[string]map[string]*Node) // Global map to store known game states
+	gameMetaRegistry = make(map[string]GameMeta)         // this is needed since final game states don't necessarily have all snakes
+	gameStates       = make(map[string]map[string]*Node) // Global map to store known game states
 	// TODO: make this non global
 	webhookURL   string = ""
 	tidbytSecret string = ""
@@ -52,7 +59,7 @@ func getSecret(secretName string) (string, error) {
 func main() {
 
 	// Set up the custom handler for Google Cloud
-	handler := NewGoogleCloudHandler(os.Stdout, slog.LevelInfo)
+	handler := NewGoogleCloudHandler(os.Stdout, slog.LevelDebug)
 
 	// Create a new logger using the custom handler
 	logger := slog.New(handler)
@@ -64,22 +71,20 @@ func main() {
 	if port == "" {
 		port = "8080"
 	}
-	slog.Info("Starting BattleSnake on port", "port", port)
+
+	var err error
 
 	// Retrieve Discord webhook URL from Google Secret Manager
 	secretName := "projects/680796481131/secrets/discord_webhook/versions/latest"
-	var err error
 	webhookURL, err = getSecret(secretName)
 	if err != nil {
 		slog.Error("Failed to retrieve Discord webhook secret", "error", err.Error())
-		webhookURL = "" // Ensure webhookURL is empty if retrieval fails
 	}
 
 	tidBytSecretName := "projects/680796481131/secrets/tidbyt/versions/latest"
 	tidbytSecret, err = getSecret(tidBytSecretName)
 	if err != nil {
-		slog.Error("Failed to retrieve Discord webhook secret", "error", err.Error())
-		webhookURL = "" // Ensure webhookURL is empty if retrieval fails
+		slog.Error("Failed to retrieve tidbyt webhook secret", "error", err.Error())
 	}
 
 	http.HandleFunc("/", handleIndex)
@@ -87,7 +92,7 @@ func main() {
 	http.HandleFunc("/move", handleMove)
 	http.HandleFunc("/end", handleEnd)
 
-	slog.Info("Starting BattleSnake on port", "port", port)
+	slog.Debug("Starting BattleSnake on port", "port", port)
 	log.Fatal(http.ListenAndServe(":"+port, nil))
 }
 
@@ -112,8 +117,25 @@ func handleStart(w http.ResponseWriter, r *http.Request) {
 
 	// add a map for this game
 	gameStates[game.Game.ID] = make(map[string]*Node)
-
-	slog.Info("Game started", "game_id", game.Game.ID, "you", game.You)
+	var otherSnakes []string
+	foundPaul := false
+	for _, snake := range game.Board.Snakes {
+		if snake.Name == game.You.Name {
+			continue
+		}
+		if snake.Name == "Cucumber Cat" {
+			foundPaul = true
+		}
+		otherSnakes = append(otherSnakes, snake.Name)
+	}
+	if foundPaul {
+		sendDiscordWebhook(webhookURL, fmt.Sprintf("Paul Alert: https://play.battlesnake.com/game/%s", game.Game.ID), []Embed{})
+	}
+	gameMetaRegistry[game.Game.ID] = GameMeta{
+		otherSnakes: otherSnakes,
+		start:       time.Now(),
+	}
+	slog.Info("Game started", "game_id", game.Game.ID, "you", game.You, "other_snakes", otherSnakes)
 
 	writeJSON(w, map[string]string{})
 }
@@ -233,6 +255,7 @@ func determineMoveDirection(head, nextHead Point) string {
 }
 
 func handleEnd(w http.ResponseWriter, r *http.Request) {
+	end := time.Now()
 	var game BattleSnakeGame
 	if err := json.NewDecoder(r.Body).Decode(&game); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -242,25 +265,33 @@ func handleEnd(w http.ResponseWriter, r *http.Request) {
 	// tidy the cache
 	delete(gameStates, game.Game.ID)
 
-	slog.Info("Game ended", "game", game)
+	gameMeta, ok := gameMetaRegistry[game.Game.ID]
+	if !ok {
+		gameMeta = GameMeta{}
+	}
+	delete(gameMetaRegistry, game.Game.ID)
 
 	outcome, description := describeGameOutcome(game)
 
-	var otherSnakes []string
-	for _, snake := range game.Board.Snakes {
-		otherSnakes = append(otherSnakes, snake.Name)
+	// TODO: only works for duels
+	rank, score, err := GetDuelsRankAndScore()
+	if err != nil {
+		rank = -1
+		score = -1
 	}
 
-	err := downloadAndUploadFile(context.Background(), game.Game.ID)
+	slog.Info("Game ended", "game", game, "rank", rank, "score", score, "duration_ms", end.Sub(gameMeta.start).Milliseconds())
+
+	err = downloadAndUploadFile(context.Background(), game.Game.ID)
 	if err != nil {
-		sendDiscordWebhook(webhookURL, fmt.Sprintf("%s | %s", description, strings.Join(otherSnakes, ", ")), []Embed{})
+		sendDiscordWebhook(webhookURL, fmt.Sprintf("%s | %s", description, strings.Join(gameMeta.otherSnakes, ", ")), []Embed{})
 	} else {
 		sendDiscordWebhook(
 			webhookURL,
 			"",
 			[]Embed{
 				{
-					Title:       strings.Join(otherSnakes, ", "),
+					Title:       strings.Join(gameMeta.otherSnakes, ", "),
 					Description: description,
 					Image: &Image{
 						URL: fmt.Sprintf("https://storage.googleapis.com/gregorywebp/%s.gif", game.Game.ID),
@@ -274,8 +305,18 @@ func handleEnd(w http.ResponseWriter, r *http.Request) {
 							Inline: true,
 						},
 						{
-							Name:   "final latency",
+							Name:   "latency",
 							Value:  game.You.Latency,
+							Inline: true,
+						},
+						{
+							Name:   "rank",
+							Value:  fmt.Sprint(rank),
+							Inline: true,
+						},
+						{
+							Name:   "score",
+							Value:  fmt.Sprint(score),
 							Inline: true,
 						},
 					},

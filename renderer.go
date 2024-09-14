@@ -11,7 +11,6 @@ import (
 	"image/color"
 	"image/draw"
 	"image/gif"
-	"log"
 	"log/slog"
 	"strconv"
 	"strings"
@@ -129,7 +128,6 @@ func collectGameFrames(wsURL string) ([]*Board, bool, error) {
 	for {
 		_, message, err := conn.ReadMessage()
 		if websocket.IsCloseError(err, websocket.CloseNormalClosure) {
-			log.Println("WebSocket closed normally.")
 			break
 		} else if err != nil {
 			return nil, false, fmt.Errorf("error reading message: %v", err)
@@ -138,7 +136,7 @@ func collectGameFrames(wsURL string) ([]*Board, bool, error) {
 		var event FrameEvent
 
 		if err := json.Unmarshal(message, &event); err != nil {
-			log.Printf("Failed to unmarshal frame: %v", err)
+			slog.Error("Failed to unmarshal frame", "error", err.Error())
 			continue
 		}
 
@@ -146,7 +144,6 @@ func collectGameFrames(wsURL string) ([]*Board, bool, error) {
 		if event.Type == "game_end" {
 			boardWidth = event.Data.Width
 			boardHeight = event.Data.Height
-			log.Printf("Game end received. Width: %d, Height: %d", boardWidth, boardHeight)
 			// Check if Gregory won (i.e., no Death value)
 			break
 		}
@@ -331,6 +328,11 @@ func drawCell(img *image.RGBA, x, y int, c color.RGBA) {
 
 // Stitch together frames and encode as GIF animation with dynamic delay to fit within 15 seconds
 func renderGameToGIF(frames []*Board, deviceID string, gregoryWon bool) error {
+
+	if len(frames) == 0 {
+		slog.Warn("no frames to be rendered")
+		return nil
+	}
 
 	slog.Info("rendering game")
 	totalDuration := 13000                               // 15 seconds in milliseconds

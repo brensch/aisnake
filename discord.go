@@ -99,6 +99,6 @@ func sendDiscordWebhook(webhookURL, message string, embeds []Embed) error {
 		return err
 	}
 
-	slog.Info("Webhook sent successfully.")
+	slog.Debug("discord message sent")
 	return nil
 }
