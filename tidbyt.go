@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
 )
 
@@ -50,9 +51,9 @@ func PushToTidbyt(deviceID, webpBase64 string) error {
 
 	// Check response status
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("Tidbyt API returned status: %v", resp.Status)
+		return fmt.Errorf("tidbyt API returned status: %v", resp.Status)
 	}
 
-	fmt.Println("Image successfully pushed to Tidbyt")
+	slog.Info("Image successfully pushed to Tidbyt")
 	return nil
 }

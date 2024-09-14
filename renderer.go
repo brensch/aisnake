@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha1"
 	"encoding/base64"
 	"encoding/json"
@@ -12,13 +13,12 @@ import (
 	"image/gif"
 	"log"
 	"log/slog"
-	"os"
 	"strconv"
 	"strings"
 	"time"
 
 	"golang.org/x/image/font"
-	"golang.org/x/image/font/opentype"
+	"golang.org/x/image/font/basicfont"
 	"golang.org/x/image/math/fixed"
 
 	"github.com/gorilla/websocket"
@@ -67,6 +67,26 @@ type FrameEvent struct {
 	} `json:"Data"`
 }
 
+func RetrieveGameRenderAndSendToTidbyt(gameID string) {
+
+	// WebSocket URL for the game
+	wsURL := fmt.Sprintf("wss://engine.battlesnake.com/games/%s/events", gameID)
+
+	// Collect game frames
+	frames, won, err := collectGameFrames(wsURL)
+	if err != nil {
+		slog.Error("Failed to collect game frames", "error", err.Error())
+	}
+	slog.Info("got frames from websocket", "turns", len(frames))
+
+	// Render frames to WebP and push to Tidbyt
+	err = renderGameToGIF(frames, deviceID, won)
+	if err != nil {
+		slog.Error("Failed to render game to gif", "error", err.Error())
+	}
+
+}
+
 // Generate color from a hash of the snake name
 func generateColor(name string) color.RGBA {
 	h := sha1.New()
@@ -95,7 +115,9 @@ func min(a, b int) int {
 // Collect game frames from WebSocket and save board dimensions from the `game_end` event
 func collectGameFrames(wsURL string) ([]*Board, bool, error) {
 	var boards []*Board
-	conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	defer cancel()
+	conn, _, err := websocket.DefaultDialer.DialContext(ctx, wsURL, nil)
 	if err != nil {
 		return nil, false, fmt.Errorf("failed to connect to WebSocket: %v", err)
 	}
@@ -215,8 +237,7 @@ func renderBoardToImage(board *Board) (*image.RGBA, []color.Color) {
 
 	// Draw the snakes
 	// Render snake names on the left side
-	yOffset := 10                       // Initial vertical offset for the first name
-	scaledFontFace := loadScaledFont(8) // Example: 8-point font
+	yOffset := 10
 	for _, snake := range board.Snakes {
 		bodyColor, err := hexToRGBA(snake.Customizations.Color)
 		if err != nil {
@@ -239,9 +260,8 @@ func renderBoardToImage(board *Board) (*image.RGBA, []color.Color) {
 			}
 		}
 
-		addScaledLabel(img, 2, yOffset, fmt.Sprintf("%d", len(snake.Body)), scaledFontFace, bodyColor) // Render each snake name starting from (10, yOffset)
+		addScaledLabel(img, 10, yOffset, fmt.Sprintf("%3d", len(snake.Body)), bodyColor) // Render each snake name starting from (10, yOffset)
 		yOffset += 20
-
 	}
 
 	// Draw food (in green)
@@ -252,6 +272,21 @@ func renderBoardToImage(board *Board) (*image.RGBA, []color.Color) {
 	}
 
 	return img, palette
+}
+
+// Helper function to add text (snake names) using the basic font
+func addScaledLabel(img *image.RGBA, x, y int, label string, col color.RGBA) {
+	point := fixed.Point26_6{
+		X: fixed.I(x),
+		Y: fixed.I(y),
+	}
+	d := &font.Drawer{
+		Dst:  img,
+		Src:  image.NewUniform(col),
+		Face: basicfont.Face7x13,
+		Dot:  point,
+	}
+	d.DrawString(label)
 }
 
 // Convert hex string (e.g., "#FF5733" or "FF5733") to color.RGBA
@@ -294,131 +329,68 @@ func drawCell(img *image.RGBA, x, y int, c color.RGBA) {
 	}
 }
 
-// Helper function to load a scalable font (e.g., Courier New) and return a smaller version of it
-func loadScaledFont(size float64) font.Face {
-	// Load the TTF font file from the system or a path (Courier New or another font)
-	fontBytes, err := os.ReadFile("./pressstart.ttf") // Example font path
-	if err != nil {
-		log.Fatalf("Failed to load font: %v", err)
-	}
-
-	// Parse the font
-	ttf, err := opentype.Parse(fontBytes)
-	if err != nil {
-		log.Fatalf("Failed to parse font: %v", err)
-	}
-
-	// Create a new face with a scaled size
-	const dpi = 72
-	fontFace, err := opentype.NewFace(ttf, &opentype.FaceOptions{
-		Size:    size, // Font size in points
-		DPI:     dpi,
-		Hinting: font.HintingFull,
-	})
-	if err != nil {
-		log.Fatalf("Failed to create font face: %v", err)
-	}
-
-	return fontFace
-}
-
-// Helper function to add text (snake names) using the scaled font
-func addScaledLabel(img *image.RGBA, x, y int, label string, face font.Face, col color.RGBA) {
-	point := fixed.Point26_6{
-		X: fixed.I(x),
-		Y: fixed.I(y),
-	}
-	d := &font.Drawer{
-		Dst:  img,
-		Src:  image.NewUniform(col),
-		Face: face,
-		Dot:  point,
-	}
-	d.DrawString(label)
-}
-
-// Stitch together frames and encode as GIF animation in 15-second chunks
+// Stitch together frames and encode as GIF animation with dynamic delay to fit within 15 seconds
 func renderGameToGIF(frames []*Board, deviceID string, gregoryWon bool) error {
 
 	slog.Info("rendering game")
-	// Define how many frames to include per 15-second chunk
-	framesPerChunk := 150 // assuming 100ms per frame (10 frames per second, 15 seconds = 150 frames)
+	totalDuration := 13000                               // 15 seconds in milliseconds
+	maxDelayPerFrame := 20                               // Maximum delay of 200ms (200ms = 20 * 10ms)
+	framesPerChunk := len(frames)                        // Total number of frames in the game
+	delayPerFrame := totalDuration / framesPerChunk / 10 // Calculate the delay dynamically
 
-	// Function to encode and send a chunk of frames to Tidbyt
-	encodeAndSendChunk := func(chunkFrames []*Board) error {
-		var imagesChunk []*image.Paletted
-		var delaysChunk []int
-
-		// Loop through each board (frame) in the chunk and render it
-		for _, board := range chunkFrames {
-			img, palette := renderBoardToImage(board)
-
-			// Convert the image to a paletted image (required for GIFs)
-			palettedImage := image.NewPaletted(img.Bounds(), palette)
-			draw.FloydSteinberg.Draw(palettedImage, img.Bounds(), img, image.Point{})
-
-			// Append the paletted image and the delay (in 100ths of a second)
-			imagesChunk = append(imagesChunk, palettedImage)
-			delaysChunk = append(delaysChunk, 10) // 100ms per frame
-		}
-
-		// Create a buffer to store the GIF data
-		var buf bytes.Buffer
-
-		// Encode the images into a GIF
-		err := gif.EncodeAll(&buf, &gif.GIF{
-			Image: imagesChunk,
-			Delay: delaysChunk,
-		})
-		if err != nil {
-			return fmt.Errorf("failed to encode GIF: %v", err)
-		}
-
-		// Optionally, encode the GIF as base64 and send it to Tidbyt
-		webpBase64 := base64.StdEncoding.EncodeToString(buf.Bytes())
-		if err := PushToTidbyt(deviceID, webpBase64); err != nil {
-			return fmt.Errorf("failed to push to Tidbyt: %v", err)
-		}
-
-		return nil
+	// Cap the delay to ensure it's not longer than 200ms per frame
+	if delayPerFrame > maxDelayPerFrame {
+		delayPerFrame = maxDelayPerFrame
 	}
 
-	// Split frames into chunks of 15 seconds (150 frames per chunk)
-	for i := 0; i < len(frames); i += framesPerChunk {
-		end := i + framesPerChunk
-		if end > len(frames) {
-			end = len(frames)
+	// Arrays to store the full set of images and delays for the entire GIF
+	var images []*image.Paletted
+	var delays []int
+
+	// Loop through each board (frame) and render it
+	for i, board := range frames {
+		img, palette := renderBoardToImage(board)
+
+		// Convert the image to a paletted image (required for GIFs)
+		palettedImage := image.NewPaletted(img.Bounds(), palette)
+		draw.FloydSteinberg.Draw(palettedImage, img.Bounds(), img, image.Point{})
+
+		// Append the paletted image and the dynamic delay (in 100ths of a second)
+		images = append(images, palettedImage)
+		if i == len(frames)-1 {
+			delays = append(delays, 200) // longer delay on last frame
+		} else {
+			delays = append(delays, delayPerFrame) // Dynamic delay per frame
 		}
-
-		chunk := frames[i:end]
-
-		// Encode and send the chunk
-		if err := encodeAndSendChunk(chunk); err != nil {
-			return fmt.Errorf("failed to send chunk to Tidbyt: %v", err)
-		}
-
-		// Wait for 15 seconds before sending the next chunk
-		time.Sleep(time.Duration(len(chunk)*100) * time.Millisecond)
 	}
 
-	// If Gregory won, create a green screen at the end
+	// If Gregory won, append a green screen at the end, otherwise append a red screen
 	var winScreenPalette color.Palette
 	if gregoryWon {
 		winScreenPalette = color.Palette{color.RGBA{0, 255, 0, 255}}
 	} else {
 		winScreenPalette = color.Palette{color.RGBA{255, 0, 0, 255}}
 	}
-	redImage := image.NewPaletted(image.Rect(0, 0, canvasWidth, canvasHeight), winScreenPalette)
+	// Create the win/lose screen as a paletted image
+	finalScreen := image.NewPaletted(image.Rect(0, 0, canvasWidth, canvasHeight), winScreenPalette)
 
+	// Append the final screen image with a delay of 1 second (100 * 10ms = 1000ms)
+	images = append(images, finalScreen)
+	delays = append(delays, 100) // 1 second delay for the final screen
+
+	// Create a buffer to store the full GIF data
 	var buf bytes.Buffer
+
+	// Encode the images (including the final screen) into a single GIF
 	err := gif.EncodeAll(&buf, &gif.GIF{
-		Image: []*image.Paletted{redImage},
-		Delay: []int{10000},
+		Image: images,
+		Delay: delays,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to encode GIF: %v", err)
 	}
-	// Encode and send the chunk
+
+	// Encode the GIF as base64 and send it to Tidbyt (only one push)
 	webpBase64 := base64.StdEncoding.EncodeToString(buf.Bytes())
 	if err := PushToTidbyt(deviceID, webpBase64); err != nil {
 		return fmt.Errorf("failed to push to Tidbyt: %v", err)

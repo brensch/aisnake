@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -25,42 +24,6 @@ var (
 	webhookURL   string = ""
 	tidbytSecret string = ""
 )
-
-// Struct for Discord Webhook payload
-type WebhookPayload struct {
-	Content string `json:"content"`
-}
-
-func sendDiscordWebhook(webhookURL, message string) {
-	slog.Warn("discord message", "payload", message)
-	if webhookURL == "" {
-		// If webhook URL is empty, log the message instead
-		slog.Info("No webhook URL found, logging message instead", "message", message)
-		return
-	}
-
-	payload := WebhookPayload{
-		Content: message,
-	}
-	payloadBytes, err := json.Marshal(payload)
-	if err != nil {
-		slog.Error("failed to marshal payload", "err", err)
-		return
-	}
-
-	resp, err := http.Post(webhookURL, "application/json", bytes.NewBuffer(payloadBytes))
-	if err != nil {
-		slog.Error("failed to send discord webhook", "err", err)
-		return
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
-		slog.Error("received non ok message", "code", resp.StatusCode)
-		return
-	}
-
-}
 
 func getSecret(secretName string) (string, error) {
 	ctx := context.Background()
@@ -112,19 +75,12 @@ func main() {
 		webhookURL = "" // Ensure webhookURL is empty if retrieval fails
 	}
 
-	// tidBytSecretName := "projects/680796481131/secrets/tidbyt/versions/latest"
-	// tidbytSecret, err = getSecret(tidBytSecretName)
-	// if err != nil {
-	// 	slog.Error("Failed to retrieve Discord webhook secret", "error", err.Error())
-	// 	webhookURL = "" // Ensure webhookURL is empty if retrieval fails
-	// }
-
-	// Try to send a test message via webhook
-	sendDiscordWebhook(webhookURL, "Starting up")
-
-	defer func() {
-		sendDiscordWebhook(webhookURL, "Shutting down")
-	}()
+	tidBytSecretName := "projects/680796481131/secrets/tidbyt/versions/latest"
+	tidbytSecret, err = getSecret(tidBytSecretName)
+	if err != nil {
+		slog.Error("Failed to retrieve Discord webhook secret", "error", err.Error())
+		webhookURL = "" // Ensure webhookURL is empty if retrieval fails
+	}
 
 	http.HandleFunc("/", handleIndex)
 	http.HandleFunc("/start", handleStart)
@@ -158,15 +114,6 @@ func handleStart(w http.ResponseWriter, r *http.Request) {
 	gameStates[game.Game.ID] = make(map[string]*Node)
 
 	slog.Info("Game started", "game_id", game.Game.ID, "you", game.You)
-	var otherSnakes []string
-	for _, snake := range game.Board.Snakes {
-		if snake.ID == game.You.ID {
-			continue
-		}
-		otherSnakes = append(otherSnakes, snake.Name)
-	}
-
-	sendDiscordWebhook(webhookURL, fmt.Sprintf("Game %s started against %s", game.Game.ID, strings.Join(otherSnakes, ",")))
 
 	writeJSON(w, map[string]string{})
 }
@@ -297,30 +244,62 @@ func handleEnd(w http.ResponseWriter, r *http.Request) {
 
 	slog.Info("Game ended", "game", game)
 
-	outcome := describeGameOutcome(game)
-	// put you back onto the board if you died
-	game.Board.Snakes = append(game.Board.Snakes, game.You)
-	board := visualizeBoard(reorderSnakes(game.Board, game.You.ID), WithNewlineCharacter("\n"))
+	outcome, description := describeGameOutcome(game)
 
-	sendDiscordWebhook(webhookURL, fmt.Sprintf("Game %s finished on turn %d. %s.\nhttps://play.battlesnake.com/game/%s\n```\n%s\n```", game.Game.ID, game.Turn, outcome, game.Game.ID, board))
+	var otherSnakes []string
+	for _, snake := range game.Board.Snakes {
+		otherSnakes = append(otherSnakes, snake.Name)
+	}
 
-	// // WebSocket URL for the game
-	// wsURL := fmt.Sprintf("wss://engine.battlesnake.com/games/%s/events", game.Game.ID)
+	err := downloadAndUploadFile(context.Background(), game.Game.ID)
+	if err != nil {
+		sendDiscordWebhook(webhookURL, fmt.Sprintf("%s | %s", description, strings.Join(otherSnakes, ", ")), []Embed{})
+	} else {
+		sendDiscordWebhook(
+			webhookURL,
+			"",
+			[]Embed{
+				{
+					Title:       strings.Join(otherSnakes, ", "),
+					Description: description,
+					Image: &Image{
+						URL: fmt.Sprintf("https://storage.googleapis.com/gregorywebp/%s.gif", game.Game.ID),
+					},
+					Color: getColorForOutcome(outcome),
+					URL:   fmt.Sprintf("https://play.battlesnake.com/game/%s", game.Game.ID),
+					Fields: []EmbedField{
+						{
+							Name:   "turns",
+							Value:  fmt.Sprint(game.Turn),
+							Inline: true,
+						},
+						{
+							Name:   "final latency",
+							Value:  game.You.Latency,
+							Inline: true,
+						},
+					},
+				},
+			},
+		)
+	}
 
-	// // Collect game frames
-	// frames, won, err := collectGameFrames(wsURL)
-	// if err != nil {
-	// 	slog.Error("Failed to collect game frames", "error", err.Error())
-	// }
-	// slog.Info("got frames from websocket", "turns", len(frames))
-
-	// // Render frames to WebP and push to Tidbyt
-	// err = renderGameToGIF(frames, deviceID, won)
-	// if err != nil {
-	// 	slog.Error("Failed to render game to gif", "error", err.Error())
-	// }
+	RetrieveGameRenderAndSendToTidbyt(game.Game.ID)
 
 	writeJSON(w, map[string]string{})
+}
+
+func getColorForOutcome(outcome GameOutcome) int {
+	switch outcome {
+	case Win:
+		return 0x00FF00 // Green
+	case Draw:
+		return 0xFFFF00 // Yellow
+	case Loss:
+		return 0xFF0000 // Red
+	default:
+		return 0x0099ff // Default blue color for Discord
+	}
 }
 
 func writeJSON(w http.ResponseWriter, v interface{}) {
@@ -346,10 +325,19 @@ func boardHash(board Board) string {
 	return hash
 }
 
-func describeGameOutcome(game BattleSnakeGame) string {
+type GameOutcome int
+
+const (
+	Win GameOutcome = iota
+	Draw
+	Loss
+)
+
+// describeGameOutcome returns both the enum (GameOutcome) and a descriptive string.
+func describeGameOutcome(game BattleSnakeGame) (GameOutcome, string) {
 	// Check if you lost by colliding with a wall
 	if game.You.Head.X < 0 || game.You.Head.X >= game.Board.Width || game.You.Head.Y < 0 || game.You.Head.Y >= game.Board.Height {
-		return "You lost by crashing into a wall."
+		return Loss, "You lost by crashing into a wall."
 	}
 
 	// Check if you lost by colliding with another snake
@@ -357,7 +345,7 @@ func describeGameOutcome(game BattleSnakeGame) string {
 		if snake.ID != game.You.ID {
 			for _, segment := range snake.Body {
 				if game.You.Head == segment {
-					return fmt.Sprintf("You lost by colliding with %s.", snake.Name)
+					return Loss, fmt.Sprintf("You lost by colliding with %s.", snake.Name)
 				}
 			}
 		}
@@ -365,7 +353,7 @@ func describeGameOutcome(game BattleSnakeGame) string {
 
 	// Check if you lost by starving
 	if game.You.Health <= 0 {
-		return "You lost by starving to death."
+		return Loss, "You lost by starving to death."
 	}
 
 	// Check if all snakes died (a draw)
@@ -376,29 +364,29 @@ func describeGameOutcome(game BattleSnakeGame) string {
 		}
 	}
 	if livingSnakes == 0 {
-		return "It's a draw! All snakes died."
+		return Draw, "It's a draw! All snakes died."
 	}
 
 	// Check if you won because all other snakes starved or collided
 	if len(game.Board.Snakes) == 1 && game.Board.Snakes[0].ID == game.You.ID {
 		// If only your snake remains, it means you won
-		return "You won."
+		return Win, "You won."
 	}
 
 	// Check if an opponent starved
 	for _, snake := range game.Board.Snakes {
 		if snake.ID != game.You.ID && snake.Health <= 0 {
-			return fmt.Sprintf("You won because %s starved.", snake.Name)
+			return Win, fmt.Sprintf("You won because %s starved.", snake.Name)
 		}
 	}
 
 	// Check if you lost by entering a hazard
 	for _, hazard := range game.Board.Hazards {
 		if game.You.Head == hazard {
-			return "You lost by entering a hazard."
+			return Loss, "You lost by entering a hazard."
 		}
 	}
 
 	// Default outcome
-	return "Seems like a draw."
+	return Draw, "Seems like a draw."
 }
