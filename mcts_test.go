@@ -296,17 +296,19 @@ func TestMCTSVisualization(t *testing.T) {
 	}
 }
 
+// requires that snake in question is at index 0
 func TestMCTSVisualizationJSON(t *testing.T) {
 	testCases := []struct {
-		Description  string
-		InitialBoard string
-		Iterations   int
+		Description     string
+		InitialBoard    string
+		Iterations      int
+		AcceptableMoves []string
 	}{
-		// {
-		// 	Description:  "should not get transfixed by death",
-		// 	InitialBoard: `{"height":11,"width":11,"food":[{"x":0,"y":4},{"x":1,"y":4}],"hazards":[],"snakes":[{"id":"5baad214-ed5e-4794-bd30-f110e488c474","name":"mcts","health":97,"body":[{"x":3,"y":4},{"x":4,"y":4},{"x":4,"y":5},{"x":5,"y":5},{"x":6,"y":5}],"latency":"405","head":{"x":3,"y":4},"shout":"","customizations":{"color":"#888888","head":"default","tail":"default"}},{"id":"e55aa73a-a108-406c-af9e-9192a380c027","name":"soba","health":89,"body":[{"x":2,"y":5},{"x":2,"y":6},{"x":3,"y":6},{"x":4,"y":6}],"latency":"400","head":{"x":2,"y":5},"shout":"","customizations":{"color":"#118645","head":"replit-mark","tail":"replit-notmark"}}]}`,
-		// 	Iterations:   math.MaxInt,
-		// },
+		{
+			Description:  "should not get transfixed by death",
+			InitialBoard: `{"height":11,"width":11,"food":[{"x":0,"y":4},{"x":1,"y":4}],"hazards":[],"snakes":[{"id":"5baad214-ed5e-4794-bd30-f110e488c474","name":"mcts","health":97,"body":[{"x":3,"y":4},{"x":4,"y":4},{"x":4,"y":5},{"x":5,"y":5},{"x":6,"y":5}],"latency":"405","head":{"x":3,"y":4},"shout":"","customizations":{"color":"#888888","head":"default","tail":"default"}},{"id":"e55aa73a-a108-406c-af9e-9192a380c027","name":"soba","health":89,"body":[{"x":2,"y":5},{"x":2,"y":6},{"x":3,"y":6},{"x":4,"y":6}],"latency":"400","head":{"x":2,"y":5},"shout":"","customizations":{"color":"#118645","head":"replit-mark","tail":"replit-notmark"}}]}`,
+			Iterations:   math.MaxInt,
+		},
 		// {
 		// 	Description:  "should not butt heads",
 		// 	InitialBoard: `{"height":11,"width":11,"food":[{"x":4,"y":0},{"x":7,"y":4},{"x":9,"y":3},{"x":0,"y":4}],"hazards":[],"snakes":[{"id":"a82fcde3-2bed-4cc5-ac42-a19cc10175ca","name":"mcts","health":66,"body":[{"x":1,"y":9},{"x":0,"y":9},{"x":0,"y":8},{"x":0,"y":7}],"latency":"902","head":{"x":1,"y":9},"shout":"","customizations":{"color":"#888888","head":"default","tail":"default"}},{"id":"4a147cce-14d9-42ba-b5b2-e72b2ecf04a7","name":"soba","health":93,"body":[{"x":3,"y":9},{"x":3,"y":8},{"x":4,"y":8},{"x":5,"y":8},{"x":6,"y":8}],"latency":"401","head":{"x":3,"y":9},"shout":"","customizations":{"color":"#118645","head":"replit-mark","tail":"replit-notmark"}}]}`,
@@ -367,11 +369,12 @@ func TestMCTSVisualizationJSON(t *testing.T) {
 		// 	InitialBoard: `{"height":11,"width":11,"food":[{"X":4,"Y":10},{"X":0,"Y":1},{"X":9,"Y":2},{"X":0,"Y":0},{"X":0,"Y":3},{"X":9,"Y":10},{"X":9,"Y":5},{"X":6,"Y":0},{"X":2,"Y":0},{"X":1,"Y":10},{"X":9,"Y":4},{"X":7,"Y":10},{"X":8,"Y":1},{"X":6,"Y":6}],"hazards":[],"snakes":[{"id":"gs_P6tqpPjgJRCxPQm8yKTkd43S","name":"Gregory","health":21,"body":[{"X":6,"Y":5},{"X":5,"Y":5},{"X":5,"Y":6},{"X":4,"Y":6}],"latency":"458","head":{"X":6,"Y":5},"shout":"This is a nice move."},{"id":"gs_crwYTW6B7RkCh7YvQDmRJqhS","name":"soba","health":88,"body":[{"X":8,"Y":7},{"X":7,"Y":7},{"X":6,"Y":7},{"X":6,"Y":8},{"X":6,"Y":9},{"X":5,"Y":9},{"X":4,"Y":9},{"X":3,"Y":9}],"latency":"409","head":{"X":8,"Y":7},"shout":"swag"}]}`,
 		// 	Iterations:   math.MaxInt,
 		// },
-		{
-			Description:  "goes towards longer snake to its death. should escape left. caused by incorrectly judging winning position",
-			InitialBoard: `{"height":11,"width":11,"food":[{"x":10,"y":0},{"x":10,"y":3},{"x":8,"y":1},{"x":9,"y":0},{"x":3,"y":1},{"x":4,"y":2},{"x":8,"y":4},{"x":3,"y":0},{"x":9,"y":5},{"x":3,"y":8}],"hazards":[],"snakes":[{"id":"bbc27600-9763-4cce-954a-b3d6fa0d58de","name":"mcts","health":72,"body":[{"x":2,"y":8},{"x":2,"y":7},{"x":2,"y":6},{"x":2,"y":5},{"x":1,"y":5},{"x":1,"y":4},{"x":2,"y":4},{"x":2,"y":3},{"x":3,"y":3},{"x":4,"y":3},{"x":5,"y":3},{"x":6,"y":3},{"x":6,"y":4},{"x":6,"y":5},{"x":5,"y":5},{"x":4,"y":5},{"x":4,"y":4},{"x":3,"y":4},{"x":3,"y":5}],"latency":"451","head":{"x":2,"y":8},"shout":"","customizations":{"color":"#888888","head":"default","tail":"default"}},{"id":"a34717ee-ee2f-472e-ba78-a99e446a310a","name":"soba","health":92,"body":[{"x":5,"y":7},{"x":6,"y":7},{"x":7,"y":7},{"x":8,"y":7},{"x":9,"y":7},{"x":10,"y":7},{"x":10,"y":8},{"x":10,"y":9},{"x":10,"y":10},{"x":9,"y":10},{"x":9,"y":9},{"x":9,"y":8},{"x":8,"y":8},{"x":7,"y":8},{"x":6,"y":8},{"x":6,"y":9},{"x":5,"y":9},{"x":5,"y":8},{"x":4,"y":8},{"x":4,"y":9},{"x":3,"y":9},{"x":2,"y":9}],"latency":"401","head":{"x":5,"y":7},"shout":"","customizations":{"color":"#118645","head":"replit-mark","tail":"replit-notmark"}}]}`,
-			Iterations:   math.MaxInt,
-		},
+		// {
+		// 	Description:     "goes towards longer snake to its death. should escape left. caused by incorrectly judging winning position",
+		// 	InitialBoard:    `{"height":11,"width":11,"food":[{"x":10,"y":0},{"x":10,"y":3},{"x":8,"y":1},{"x":9,"y":0},{"x":3,"y":1},{"x":4,"y":2},{"x":8,"y":4},{"x":3,"y":0},{"x":9,"y":5},{"x":3,"y":8}],"hazards":[],"snakes":[{"id":"bbc27600-9763-4cce-954a-b3d6fa0d58de","name":"mcts","health":72,"body":[{"x":2,"y":8},{"x":2,"y":7},{"x":2,"y":6},{"x":2,"y":5},{"x":1,"y":5},{"x":1,"y":4},{"x":2,"y":4},{"x":2,"y":3},{"x":3,"y":3},{"x":4,"y":3},{"x":5,"y":3},{"x":6,"y":3},{"x":6,"y":4},{"x":6,"y":5},{"x":5,"y":5},{"x":4,"y":5},{"x":4,"y":4},{"x":3,"y":4},{"x":3,"y":5}],"latency":"451","head":{"x":2,"y":8},"shout":"","customizations":{"color":"#888888","head":"default","tail":"default"}},{"id":"a34717ee-ee2f-472e-ba78-a99e446a310a","name":"soba","health":92,"body":[{"x":5,"y":7},{"x":6,"y":7},{"x":7,"y":7},{"x":8,"y":7},{"x":9,"y":7},{"x":10,"y":7},{"x":10,"y":8},{"x":10,"y":9},{"x":10,"y":10},{"x":9,"y":10},{"x":9,"y":9},{"x":9,"y":8},{"x":8,"y":8},{"x":7,"y":8},{"x":6,"y":8},{"x":6,"y":9},{"x":5,"y":9},{"x":5,"y":8},{"x":4,"y":8},{"x":4,"y":9},{"x":3,"y":9},{"x":2,"y":9}],"latency":"401","head":{"x":5,"y":7},"shout":"","customizations":{"color":"#118645","head":"replit-mark","tail":"replit-notmark"}}]}`,
+		// 	Iterations:      math.MaxInt,
+		// 	AcceptableMoves: []string{"left"},
+		// },
 	}
 
 	for _, tc := range testCases {
@@ -385,8 +388,11 @@ func TestMCTSVisualizationJSON(t *testing.T) {
 			ctx, _ := context.WithTimeout(context.Background(), 500*time.Millisecond)
 
 			workers := runtime.NumCPU()
-			_ = workers
 			node := MCTS(ctx, "testid", rootBoard, tc.Iterations, workers, make(map[string]*Node))
+			bestMove := determineBestMove(node)
+
+			assert.Contains(t, tc.AcceptableMoves, bestMove, "snake made move it shouldn't have")
+
 			require.NotNil(t, node, "node is nil")
 
 			assert.NoError(t, GenerateMostVisitedPathWithAlternativesHtmlTree(node))
