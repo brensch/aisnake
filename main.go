@@ -30,6 +30,7 @@ var (
 	// TODO: make this non global
 	webhookURL   string = ""
 	tidbytSecret string = ""
+	loc          *time.Location
 )
 
 func getSecret(secretName string) (string, error) {
@@ -73,6 +74,12 @@ func main() {
 	}
 
 	var err error
+
+	loc, err = time.LoadLocation("America/Los_Angeles")
+	if err != nil {
+		slog.Error("failed to load tz", "error", err.Error())
+		loc = time.UTC
+	}
 
 	// Retrieve Discord webhook URL from Google Secret Manager
 	secretName := "projects/680796481131/secrets/discord_webhook/versions/latest"
@@ -269,7 +276,10 @@ func handleEnd(w http.ResponseWriter, r *http.Request) {
 
 	gameMeta, ok := gameMetaRegistry[game.Game.ID]
 	if !ok {
-		gameMeta = GameMeta{}
+		gameMeta = GameMeta{
+			otherSnakes: []string{"server reset during game"},
+			start:       time.Now(),
+		}
 	}
 	delete(gameMetaRegistry, game.Game.ID)
 
@@ -328,6 +338,9 @@ func handleEnd(w http.ResponseWriter, r *http.Request) {
 							Value:  fmt.Sprint(gameDuration.String()),
 							Inline: true,
 						},
+					},
+					Footer: &Footer{
+						Text: time.Now().In(loc).Format(time.RFC3339),
 					},
 				},
 			},
