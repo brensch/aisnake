@@ -195,7 +195,7 @@ func handleMove(w http.ResponseWriter, r *http.Request) {
 	// }()
 
 	// slog.Info("Visualized board", "board", visualizeBoard(game.Board))
-	// fmt.Println(visualizeBoard(game.Board))
+	fmt.Println(visualizeBoard(reorderedBoard))
 	// // Ensure the movetrees directory exists
 	// if err := os.MkdirAll("movetrees", os.ModePerm); err != nil {
 	// 	log.Println("Error creating movetrees directory:", err)

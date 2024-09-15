@@ -305,10 +305,18 @@ func TestMCTSVisualizationJSON(t *testing.T) {
 		AcceptableMoves []string
 	}{
 		{
-			Description:  "should not get transfixed by death",
-			InitialBoard: `{"height":11,"width":11,"food":[{"x":0,"y":4},{"x":1,"y":4}],"hazards":[],"snakes":[{"id":"5baad214-ed5e-4794-bd30-f110e488c474","name":"mcts","health":97,"body":[{"x":3,"y":4},{"x":4,"y":4},{"x":4,"y":5},{"x":5,"y":5},{"x":6,"y":5}],"latency":"405","head":{"x":3,"y":4},"shout":"","customizations":{"color":"#888888","head":"default","tail":"default"}},{"id":"e55aa73a-a108-406c-af9e-9192a380c027","name":"soba","health":89,"body":[{"x":2,"y":5},{"x":2,"y":6},{"x":3,"y":6},{"x":4,"y":6}],"latency":"400","head":{"x":2,"y":5},"shout":"","customizations":{"color":"#118645","head":"replit-mark","tail":"replit-notmark"}}]}`,
-			Iterations:   math.MaxInt,
+			Description:     "don't go into corner. non negotiable.",
+			InitialBoard:    `{"height":11,"width":11,"food":[{"x":7,"y":9},{"x":1,"y":8},{"x":10,"y":10},{"x":9,"y":9},{"x":4,"y":0},{"x":2,"y":0},{"x":5,"y":9},{"x":7,"y":1},{"x":2,"y":4},{"x":3,"y":7},{"x":0,"y":9}],"hazards":[],"snakes":[{"id":"708f16b8-783d-465a-b45e-c7000f4c9cea","name":"mcts","health":90,"body":[{"x":1,"y":0},{"x":1,"y":1},{"x":0,"y":1},{"x":0,"y":2},{"x":1,"y":2}],"latency":"400","head":{"x":1,"y":0},"shout":"","customizations":{"color":"#888888","head":"default","tail":"default"}},{"id":"a4e16294-0082-4064-8ae2-12ed0a5774a0","name":"soba","health":88,"body":[{"x":6,"y":3},{"x":6,"y":4},{"x":7,"y":4},{"x":7,"y":5},{"x":8,"y":5},{"x":8,"y":6},{"x":7,"y":6},{"x":6,"y":6},{"x":5,"y":6},{"x":5,"y":7}],"latency":"400","head":{"x":6,"y":3},"shout":"","customizations":{"color":"#118645","head":"replit-mark","tail":"replit-notmark"}}]}`,
+			Iterations:      math.MaxInt,
+			AcceptableMoves: []string{"right"},
 		},
+
+		// {
+		// 	Description:     "should not get transfixed by death",
+		// 	InitialBoard:    `{"height":11,"width":11,"food":[{"x":0,"y":4},{"x":1,"y":4}],"hazards":[],"snakes":[{"id":"5baad214-ed5e-4794-bd30-f110e488c474","name":"mcts","health":97,"body":[{"x":3,"y":4},{"x":4,"y":4},{"x":4,"y":5},{"x":5,"y":5},{"x":6,"y":5}],"latency":"405","head":{"x":3,"y":4},"shout":"","customizations":{"color":"#888888","head":"default","tail":"default"}},{"id":"e55aa73a-a108-406c-af9e-9192a380c027","name":"soba","health":89,"body":[{"x":2,"y":5},{"x":2,"y":6},{"x":3,"y":6},{"x":4,"y":6}],"latency":"400","head":{"x":2,"y":5},"shout":"","customizations":{"color":"#118645","head":"replit-mark","tail":"replit-notmark"}}]}`,
+		// 	Iterations:      math.MaxInt,
+		// 	AcceptableMoves: []string{"left", "down"},
+		// },
 		// {
 		// 	Description:  "should not butt heads",
 		// 	InitialBoard: `{"height":11,"width":11,"food":[{"x":4,"y":0},{"x":7,"y":4},{"x":9,"y":3},{"x":0,"y":4}],"hazards":[],"snakes":[{"id":"a82fcde3-2bed-4cc5-ac42-a19cc10175ca","name":"mcts","health":66,"body":[{"x":1,"y":9},{"x":0,"y":9},{"x":0,"y":8},{"x":0,"y":7}],"latency":"902","head":{"x":1,"y":9},"shout":"","customizations":{"color":"#888888","head":"default","tail":"default"}},{"id":"4a147cce-14d9-42ba-b5b2-e72b2ecf04a7","name":"soba","health":93,"body":[{"x":3,"y":9},{"x":3,"y":8},{"x":4,"y":8},{"x":5,"y":8},{"x":6,"y":8}],"latency":"401","head":{"x":3,"y":9},"shout":"","customizations":{"color":"#118645","head":"replit-mark","tail":"replit-notmark"}}]}`,
@@ -388,6 +396,7 @@ func TestMCTSVisualizationJSON(t *testing.T) {
 			ctx, _ := context.WithTimeout(context.Background(), 500*time.Millisecond)
 
 			workers := runtime.NumCPU()
+			t.Log("using workers", workers)
 			node := MCTS(ctx, "testid", rootBoard, tc.Iterations, workers, make(map[string]*Node))
 			bestMove := determineBestMove(node)
 

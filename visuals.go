@@ -322,7 +322,7 @@ func traverseAndBuildTree(node *Node, treeNode *TreeNode) {
 		childNode := &TreeNode{
 			ID:            fmt.Sprintf("Node_%p", child),
 			Visits:        child.Visits,
-			UCB:           child.UCT(node, 1.41),
+			UCB:           child.UCT(1.41),
 			IsMostVisited: i == 0, // Only mark the most visited path
 			Children:      make([]*TreeNode, 0),
 			Body:          visualizeNode(child),

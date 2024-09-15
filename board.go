@@ -211,6 +211,9 @@ func isPointInsideBoard(board *Board, point Point) bool {
 func isOccupied(board *Board, point Point, snakeIndex int) bool {
 	for i, snake := range board.Snakes {
 		snakeLength := len(snake.Body)
+		if snakeLength == 0 {
+			continue
+		}
 		// don't count our own tail since it will disappear if we are the ones moving
 		if i == snakeIndex {
 			snakeLength--
