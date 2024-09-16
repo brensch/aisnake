@@ -347,11 +347,11 @@ func TestMCTSVisualizationJSON(t *testing.T) {
 		// 	Iterations:      10,
 		// 	AcceptableMoves: []string{"up"},
 		// },
-		{
-			Description:  "control isn't right",
-			InitialBoard: `{"height":11,"width":11,"food":[{"x":0,"y":2},{"x":0,"y":4},{"x":7,"y":0},{"x":6,"y":10}],"hazards":[],"snakes":[{"id":"8d1de07d-92cf-4ac9-a23e-45aeb8bc14c1","name":"mcts","health":63,"body":[{"x":8,"y":3},{"x":7,"y":3},{"x":7,"y":4},{"x":6,"y":4},{"x":6,"y":3}],"latency":"406","head":{"x":8,"y":3},"shout":"","customizations":{"color":"#888888","head":"default","tail":"default"}},{"id":"a6afe25e-c5fc-450a-b9f1-40f638fe8be0","name":"soba","health":91,"body":[{"x":9,"y":6},{"x":8,"y":6},{"x":7,"y":6},{"x":6,"y":6},{"x":6,"y":7},{"x":6,"y":8}],"latency":"401","head":{"x":9,"y":6},"shout":"","customizations":{"color":"#118645","head":"replit-mark","tail":"replit-notmark"}}]}`,
-			Iterations:   math.MaxInt,
-		},
+		// {
+		// 	Description:  "control isn't right",
+		// 	InitialBoard: `{"height":11,"width":11,"food":[{"x":0,"y":2},{"x":0,"y":4},{"x":7,"y":0},{"x":6,"y":10}],"hazards":[],"snakes":[{"id":"8d1de07d-92cf-4ac9-a23e-45aeb8bc14c1","name":"mcts","health":63,"body":[{"x":8,"y":3},{"x":7,"y":3},{"x":7,"y":4},{"x":6,"y":4},{"x":6,"y":3}],"latency":"406","head":{"x":8,"y":3},"shout":"","customizations":{"color":"#888888","head":"default","tail":"default"}},{"id":"a6afe25e-c5fc-450a-b9f1-40f638fe8be0","name":"soba","health":91,"body":[{"x":9,"y":6},{"x":8,"y":6},{"x":7,"y":6},{"x":6,"y":6},{"x":6,"y":7},{"x":6,"y":8}],"latency":"401","head":{"x":9,"y":6},"shout":"","customizations":{"color":"#118645","head":"replit-mark","tail":"replit-notmark"}}]}`,
+		// 	Iterations:   math.MaxInt,
+		// },
 		// {
 		// 	Description:  "should move towards centre",
 		// 	InitialBoard: `{"height":11,"width":11,"food":[{"x":2,"y":0},{"x":9,"y":8},{"x":0,"y":0},{"x":7,"y":10}],"hazards":[],"snakes":[{"id":"15eec745-def3-4e65-8250-bbf9869d304f","name":"mcts","health":90,"body":[{"x":1,"y":5},{"x":1,"y":6},{"x":1,"y":7},{"x":1,"y":8}],"latency":"401","head":{"x":1,"y":5},"shout":"","customizations":{"color":"#888888","head":"default","tail":"default"}},{"id":"58977559-5285-417b-bde9-824d647160d9","name":"soba","health":96,"body":[{"x":2,"y":10},{"x":2,"y":9},{"x":2,"y":8},{"x":3,"y":8},{"x":4,"y":8},{"x":5,"y":8}],"latency":"401","head":{"x":2,"y":10},"shout":"","customizations":{"color":"#118645","head":"replit-mark","tail":"replit-notmark"}}]}`,
@@ -388,6 +388,34 @@ func TestMCTSVisualizationJSON(t *testing.T) {
 		// 	Iterations:      math.MaxInt,
 		// 	AcceptableMoves: []string{"left"},
 		// },
+
+		// {
+		// 	Description:     "go right. make sure we're not counting the tail of a snake yet to move due to turn based.",
+		// 	InitialBoard:    `{"height":11,"width":11,"food":[{"X":0,"Y":4},{"X":2,"Y":2},{"X":8,"Y":5},{"X":10,"Y":10}],"hazards":[],"snakes":[{"id":"gs_9TYTxfmrRfQFrtYDTg3644mS","name":"Gregory-Devory","health":39,"body":[{"X":6,"Y":7},{"X":6,"Y":6},{"X":6,"Y":5},{"X":5,"Y":5}],"latency":"408","head":{"X":6,"Y":7},"shout":"This is a nice move."},{"id":"gs_TShSt8KRPdjKSfyycqtjyfcb","name":"soba","health":82,"body":[{"X":4,"Y":7},{"X":5,"Y":7},{"X":5,"Y":8},{"X":6,"Y":8},{"X":7,"Y":8},{"X":7,"Y":7}],"latency":"417","head":{"X":4,"Y":7},"shout":"swag"}]}`,
+		// 	Iterations:      math.MaxInt,
+		// 	AcceptableMoves: []string{"right"},
+		// },
+
+		// need to fix,
+		{
+			Description:  "is not generating moves that could kill the second player, despite them not knowing for sure the first player would have moved to that position",
+			InitialBoard: `{"height":11,"width":11,"food":[{"X":0,"Y":10},{"X":9,"Y":0},{"X":8,"Y":8},{"X":6,"Y":10},{"X":7,"Y":8}],"hazards":[],"snakes":[{"id":"gs_XVqdb79vXkv9Wr8YkxFTgQS4","name":"Gregory-Devory","health":93,"body":[{"X":5,"Y":5},{"X":6,"Y":5},{"X":6,"Y":4},{"X":7,"Y":4},{"X":8,"Y":4},{"X":9,"Y":4},{"X":9,"Y":3},{"X":10,"Y":3},{"X":10,"Y":4},{"X":10,"Y":5}],"latency":"409","head":{"X":5,"Y":5},"shout":"This is a nice move."},{"id":"gs_FgjQVHF4mTMMXrkHhgRWKy3c","name":"soba","health":93,"body":[{"X":4,"Y":4},{"X":3,"Y":4},{"X":2,"Y":4},{"X":1,"Y":4},{"X":1,"Y":5},{"X":2,"Y":5},{"X":2,"Y":6}],"latency":"411","head":{"X":4,"Y":4},"shout":"swag"}]}`,
+			Iterations:   math.MaxInt,
+		},
+
+		// {
+		// 	Description:     "should not go up, can be killed",
+		// 	InitialBoard:    `{"height":11,"width":11,"food":[{"X":0,"Y":10},{"X":9,"Y":0},{"X":7,"Y":0},{"X":0,"Y":4}],"hazards":[],"snakes":[{"id":"gs_XVqdb79vXkv9Wr8YkxFTgQS4","name":"Gregory-Devory","health":95,"body":[{"X":4,"Y":4},{"X":5,"Y":4},{"X":5,"Y":5},{"X":5,"Y":6},{"X":5,"Y":7},{"X":6,"Y":7},{"X":6,"Y":6},{"X":6,"Y":5},{"X":6,"Y":4},{"X":6,"Y":3},{"X":7,"Y":3}],"latency":"410","head":{"X":4,"Y":4},"shout":"This is a nice move."},{"id":"gs_FgjQVHF4mTMMXrkHhgRWKy3c","name":"soba","health":93,"body":[{"X":2,"Y":6},{"X":3,"Y":6},{"X":4,"Y":6},{"X":4,"Y":7},{"X":3,"Y":7},{"X":2,"Y":7},{"X":1,"Y":7},{"X":0,"Y":7},{"X":0,"Y":8},{"X":1,"Y":8},{"X":2,"Y":8},{"X":2,"Y":9}],"latency":"418","head":{"X":2,"Y":6},"shout":"swag"}]}`,
+		// 	Iterations:      math.MaxInt,
+		// 	AcceptableMoves: []string{"left", "down"},
+		// },
+
+		// should go towards middle
+		// {
+		// 	Description: "placeholder",
+		// 	InitialBoard: `{"height":11,"width":11,"food":[{"X":10,"Y":7},{"X":10,"Y":6},{"X":0,"Y":2},{"X":6,"Y":9},{"X":8,"Y":10},{"X":7,"Y":1},{"X":10,"Y":2}],"hazards":[],"snakes":[{"id":"gs_JHybVxGpYSrmjVhpqDtPJbRY","name":"Gregory east","health":91,"body":[{"X":9,"Y":6},{"X":9,"Y":5},{"X":9,"Y":4},{"X":9,"Y":3},{"X":9,"Y":2},{"X":9,"Y":1},{"X":10,"Y":1},{"X":10,"Y":0},{"X":9,"Y":0},{"X":8,"Y":0},{"X":7,"Y":0},{"X":6,"Y":0},{"X":5,"Y":0},{"X":4,"Y":0},{"X":3,"Y":0}],"latency":"371","head":{"X":9,"Y":6},"shout":"This is a nice move."},{"id":"gs_jj6MWSrwfRWj7mf8SkHqRrSX","name":"soba","health":100,"body":[{"X":1,"Y":4},{"X":2,"Y":4},{"X":3,"Y":4},{"X":3,"Y":5},{"X":4,"Y":5},{"X":5,"Y":5},{"X":6,"Y":5},{"X":7,"Y":5},{"X":7,"Y":5}],"latency":"411","head":{"X":1,"Y":4},"shout":"swag"}]}`,
+		// 	Iterations:   math.MaxInt,
+		//   },
 	}
 
 	for _, tc := range testCases {
@@ -402,7 +430,7 @@ func TestMCTSVisualizationJSON(t *testing.T) {
 
 			workers := runtime.NumCPU()
 			t.Log("using workers", workers)
-			node := MCTS(ctx, "testid", rootBoard, tc.Iterations, 1, make(map[string]*Node))
+			node := MCTS(ctx, "testid", rootBoard, tc.Iterations, workers, make(map[string]*Node))
 			t.Log("made moves", node.Visits)
 			bestMove := determineBestMove(node)
 
@@ -410,7 +438,7 @@ func TestMCTSVisualizationJSON(t *testing.T) {
 
 			require.NotNil(t, node, "node is nil")
 
-			// assert.NoError(t, GenerateMostVisitedPathWithAlternativesHtmlTree(node))
+			assert.NoError(t, GenerateMostVisitedPathWithAlternativesHtmlTree(node))
 
 		})
 	}

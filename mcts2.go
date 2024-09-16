@@ -187,7 +187,8 @@ func worker(sharedData *SharedData) {
 			// Node has been visited before; use existing MyScore.
 			score = node.MyScore
 
-			// Update visits atomically.
+			// Update visits and score atomically.
+			atomicAddFloat64(&node.Score, score)
 			atomic.AddInt64(&node.Visits, 1)
 		}
 

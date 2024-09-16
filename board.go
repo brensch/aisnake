@@ -67,8 +67,7 @@ func resolveCollisions(board *Board, snakeIndex int, newHead Point) {
 		if i != snakeIndex && board.Snakes[i].Health > 0 { // Skip dead snakes
 			// Check for head-to-head collision
 			if newHead == board.Snakes[i].Head {
-				// Kill shortest snake
-				// equal length, both die
+				// Kill the shorter snake; if equal length, both die
 				if len(board.Snakes[i].Body) == len(board.Snakes[snakeIndex].Body) {
 					deadSnakes[snakeIndex] = true
 					deadSnakes[i] = true
@@ -79,7 +78,6 @@ func resolveCollisions(board *Board, snakeIndex int, newHead Point) {
 					break
 				}
 				deadSnakes[i] = true
-
 			}
 		}
 	}
@@ -87,12 +85,81 @@ func resolveCollisions(board *Board, snakeIndex int, newHead Point) {
 	// After head collisions are resolved, check if the new head overlaps any snake's body
 	for i := range board.Snakes {
 		if board.Snakes[i].Health > 0 { // Skip dead snakes
-			for _, segment := range board.Snakes[i].Body[1:] {
+			// Adjust body length if the other snake has not yet moved
+			body := board.Snakes[i].Body
+			if i > snakeIndex {
+				if len(body) > 0 {
+					body = body[:len(body)-1] // Remove last segment (tail)
+				}
+			}
+			for _, segment := range body[1:] { // Exclude the head
 				if newHead == segment {
 					// If the new head overlaps any body part, kill the snake
 					deadSnakes[snakeIndex] = true
 					break
 				}
+			}
+		}
+	}
+
+	// New Logic: Check possible moves of snakes that move before us
+	for i := 0; i < snakeIndex; i++ {
+		opponent := board.Snakes[i]
+		if opponent.Health <= 0 {
+			continue // Skip dead snakes
+		}
+
+		// Ensure the opponent has at least two segments
+		if len(opponent.Body) < 2 {
+			continue
+		}
+
+		neck := opponent.Body[1]
+
+		// Generate possible positions the opponent could have moved to from their neck
+		possiblePositions := []Point{
+			{X: neck.X + 1, Y: neck.Y},
+			{X: neck.X - 1, Y: neck.Y},
+			{X: neck.X, Y: neck.Y + 1},
+			{X: neck.X, Y: neck.Y - 1},
+		}
+
+		// Check if any of these positions match our head position
+		for _, pos := range possiblePositions {
+			// Ensure the position is within board boundaries
+			if pos.X < 0 || pos.X >= board.Width || pos.Y < 0 || pos.Y >= board.Height {
+				continue
+			}
+
+			// // Check if the position is not occupied by any snake's body
+			// occupied := false
+			// for _, snake := range board.Snakes {
+			// 	if snake.Health <= 0 {
+			// 		continue
+			// 	}
+			// 	for _, segment := range snake.Body {
+			// 		if segment == pos {
+			// 			occupied = true
+			// 			break
+			// 		}
+			// 	}
+			// 	if occupied {
+			// 		break
+			// 	}
+			// }
+			// if occupied {
+			// 	continue
+			// }
+
+			// If the position is our head position
+			if pos == newHead {
+				// If the opponent is longer or equal in length, we die
+				if len(opponent.Body) >= len(board.Snakes[snakeIndex].Body) {
+					deadSnakes[snakeIndex] = true
+					break
+				}
+				// If we are longer, the opponent dies (but since they move before us, they have already moved)
+				// In this context, we cannot mark them as dead here
 			}
 		}
 	}
@@ -181,22 +248,30 @@ func generateSafeMoves(board Board, snakeIndex int) []Direction {
 	}
 
 	head := snake.Body[0]
+	var neck Point
+	// TODO: could remove the length check here since we should be guaranteed nonzero length.
+	if len(snake.Body) > 1 {
+		neck = snake.Body[1]
+	}
+
 	possibleDirections := []Direction{Up, Down, Left, Right}
-	dangerZones := markDangerZones(&board, snakeIndex) // Only consider remaining snakes
 	safeMoves := []Direction{}
 
 	for _, direction := range possibleDirections {
 		nextMove := moveInDirection(head, direction)
 
-		// Check if the move is within the board, not occupied, and check danger zones
-		if isPointInsideBoard(&board, nextMove) && !isOccupied(&board, nextMove, snakeIndex) {
-			// Check if the move leads into a danger zone
-			dangerLength := dangerZones[nextMove.Y][nextMove.X]
-			if dangerLength == 0 || len(snake.Body) >= dangerLength {
-				// Safe if there's no danger or the current snake is longer
-				safeMoves = append(safeMoves, direction)
-			}
+		// Check if the move is within the board boundaries
+		if !isPointInsideBoard(&board, nextMove) {
+			continue // Move is out of bounds
 		}
+
+		// Check if the move is into the snake's own neck
+		if nextMove == neck {
+			continue // Move is into the snake's own neck
+		}
+
+		// Otherwise, it's a safe move
+		safeMoves = append(safeMoves, direction)
 	}
 
 	return safeMoves
@@ -214,13 +289,24 @@ func isOccupied(board *Board, point Point, snakeIndex int) bool {
 		if snakeLength == 0 {
 			continue
 		}
-		// don't count our own tail since it will disappear if we are the ones moving
+		body := snake.Body
 		if i == snakeIndex {
-			snakeLength--
+			// Don't count our own tail since it will disappear if we are the ones moving
+			if snakeLength > 1 {
+				body = body[:snakeLength-1]
+			} else {
+				body = []Point{}
+			}
+		} else if i > snakeIndex {
+			// The snake hasn't moved yet; we need to remove its last segment (tail)
+			if snakeLength > 1 {
+				body = body[:snakeLength-1]
+			} else {
+				body = []Point{}
+			}
 		}
-		// want to not include heads so we can do hazard check potentially.
-		// this is used in generate safe moves.
-		for _, bodyPart := range snake.Body[1:snakeLength] {
+		// Now check if point is in the adjusted body
+		for _, bodyPart := range body {
 			if bodyPart.X == point.X && bodyPart.Y == point.Y {
 				return true
 			}

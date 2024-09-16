@@ -94,8 +94,6 @@ func main() {
 		slog.Error("Failed to retrieve tidbyt webhook secret", "error", err.Error())
 	}
 
-	RetrieveGameRenderAndSendToTidbyt("e1aa81f3-8d4a-4b0b-99f1-e14367f72958")
-
 	http.HandleFunc("/", handleIndex)
 	http.HandleFunc("/start", handleStart)
 	http.HandleFunc("/move", handleMove)
@@ -109,9 +107,9 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 	response := map[string]string{
 		"apiversion": "1",
 		"author":     "brensch",
-		"color":      "#888888",
-		"head":       "default",
-		"tail":       "default",
+		"color":      "#00ff00",
+		"head":       "replit-mark",
+		"tail":       "replit-notmark",
 		"version":    "0.1.0",
 	}
 	writeJSON(w, response)
@@ -167,7 +165,7 @@ func handleMove(w http.ResponseWriter, r *http.Request) {
 
 	reorderedBoard := reorderSnakes(game.Board, game.You.ID)
 	// 100ms safety timeout
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(game.Game.Timeout-100)*time.Millisecond)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(game.Game.Timeout-150)*time.Millisecond)
 	defer cancel()
 
 	workers := runtime.NumCPU()
@@ -180,7 +178,6 @@ func handleMove(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, response)
 
-	// go func() {
 	// reset this gamestate and load in new nodes
 	gameStates[game.Game.ID] = make(map[string]*Node)
 	saveNodesAtDepth2(mctsResult, gameStates[game.Game.ID])
@@ -192,10 +189,9 @@ func handleMove(w http.ResponseWriter, r *http.Request) {
 		"depth", mctsResult.Visits,
 		"board", reorderedBoard,
 	)
-	// }()
 
 	// slog.Info("Visualized board", "board", visualizeBoard(game.Board))
-	fmt.Println(visualizeBoard(reorderedBoard))
+	// fmt.Println(visualizeBoard(reorderedBoard))
 	// // Ensure the movetrees directory exists
 	// if err := os.MkdirAll("movetrees", os.ModePerm); err != nil {
 	// 	log.Println("Error creating movetrees directory:", err)
