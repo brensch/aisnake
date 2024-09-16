@@ -5,7 +5,6 @@ import (
 	"log/slog"
 	"math"
 	"sync"
-	"sync/atomic"
 )
 
 // Node represents a node in the MCTS tree.
@@ -147,10 +146,8 @@ func bestChild(node *Node, explorationParam float64) *Node {
 
 // SharedData holds shared information for workers.
 type SharedData struct {
-	rootNode        *Node
-	totalIterations int64
-	iterationsDone  int64 // Use atomic counter.
-	ctx             context.Context
+	rootNode *Node
+	ctx      context.Context
 }
 
 // MCTS performs the Monte Carlo Tree Search with concurrency.
@@ -171,10 +168,8 @@ func MCTS(ctx context.Context, gameID string, rootBoard Board, iterations int, n
 	}
 
 	sharedData := &SharedData{
-		rootNode:        rootNode,
-		totalIterations: int64(iterations),
-		iterationsDone:  0,
-		ctx:             ctx,
+		rootNode: rootNode,
+		ctx:      ctx,
 	}
 
 	var wg sync.WaitGroup
@@ -201,12 +196,6 @@ func worker(sharedData *SharedData) {
 			// Continue execution.
 		}
 
-		// Atomically increment iterationsDone.
-		iterationsDone := atomic.AddInt64(&sharedData.iterationsDone, 1)
-		if iterationsDone > sharedData.totalIterations {
-			return
-		}
-
 		node := selectNode(sharedData.ctx, sharedData.rootNode)
 
 		// If context was cancelled during selection.
@@ -228,11 +217,16 @@ func worker(sharedData *SharedData) {
 			node.mutex.Unlock()
 		} else {
 			// Node has been visited before; use existing MyScore.
+			score = node.MyScore
 			node.mutex.Unlock()
 		}
 
 		// Backpropagation.
-		n := node
+		n := node.Parent
+		// TODO: figure this out for multiplayer
+		if node.SnakeIndex == 1 {
+			score = -score
+		}
 		for n != nil {
 			n.mutex.Lock()
 			n.Visits++
