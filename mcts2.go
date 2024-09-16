@@ -177,7 +177,7 @@ func worker(sharedData *SharedData) {
 		var score float64
 		if atomic.LoadInt64(&node.Visits) == 0 {
 			// Evaluate from the perspective of the root snake.
-			score = evaluateBoard(node.Board, node.SnakeIndex)
+			score = evaluateBoard(node.Board, node.SnakeIndex, modules)
 
 			// Update node's own score and visits atomically.
 			atomic.AddInt64(&node.Visits, 1)
@@ -277,8 +277,30 @@ func atomicAddFloat64(addr *float64, delta float64) {
 	}
 }
 
+// EvaluationFunc defines the function signature for evaluation modules.
+type EvaluationFunc func(board Board, rootSnakeIndex int) float64
+
+// EvaluationModule defines a struct that holds an evaluation function and its corresponding weight.
+type EvaluationModule struct {
+	EvalFunc EvaluationFunc
+	Weight   float64
+}
+
+var (
+	modules = []EvaluationModule{
+		{
+			EvalFunc: voronoiEvaluation,
+			Weight:   6,
+		},
+		{
+			EvalFunc: lengthEvaluation,
+			Weight:   2,
+		},
+	}
+)
+
 // evaluateBoard evaluates the board state from the perspective of the root snake.
-func evaluateBoard(board Board, rootSnakeIndex int) float64 {
+func evaluateBoard(board Board, rootSnakeIndex int, modules []EvaluationModule) float64 {
 	if rootSnakeIndex < 0 || rootSnakeIndex >= len(board.Snakes) {
 		// Invalid snake index.
 		return 0
@@ -286,8 +308,9 @@ func evaluateBoard(board Board, rootSnakeIndex int) float64 {
 
 	rootSnake := board.Snakes[rootSnakeIndex]
 
+	// If the root snake is dead, return an extreme negative score.
 	if isSnakeDead(rootSnake) {
-		return -1
+		return -2
 	}
 
 	// Check if all opponents are dead.
@@ -297,16 +320,42 @@ func evaluateBoard(board Board, rootSnakeIndex int) float64 {
 			aliveOpponents++
 		}
 	}
+
+	// If all opponents are dead, return an extreme positive score.
 	if aliveOpponents == 0 {
-		return 1
+		return 2
 	}
 
-	// Voronoi evaluation: Calculate the area controlled by each snake.
+	// Calculate the sum of all weights for normalization.
+	totalWeight := 0.0
+	for _, module := range modules {
+		totalWeight += module.Weight
+	}
+
+	// Accumulate weighted evaluations from each module.
+	totalScore := 0.0
+	for _, module := range modules {
+		moduleScore := module.EvalFunc(board, rootSnakeIndex)
+		weightedScore := (module.Weight / totalWeight) * moduleScore
+		totalScore += weightedScore
+	}
+
+	// Return the final score normalized between -1 and 1.
+	if totalScore > 1 {
+		return 1
+	} else if totalScore < -1 {
+		return -1
+	}
+
+	return totalScore
+}
+
+// voronoiEvaluation evaluates the board based on Voronoi control.
+func voronoiEvaluation(board Board, rootSnakeIndex int) float64 {
 	voronoi := GenerateVoronoi(board)
 	totalCells := float64(board.Width * board.Height)
 	rootControlledCells := 0.0
 	opponentsControlledCells := 0.0
-	lengthBonus := 0.0
 
 	// Count the number of cells each snake controls in the Voronoi diagram.
 	for y := 0; y < board.Height; y++ {
@@ -318,6 +367,15 @@ func evaluateBoard(board Board, rootSnakeIndex int) float64 {
 			}
 		}
 	}
+
+	// Return the difference in controlled areas as a score.
+	return (rootControlledCells - opponentsControlledCells) / totalCells
+}
+
+// lengthEvaluation evaluates the board based on the length of the root snake compared to opponents.
+func lengthEvaluation(board Board, rootSnakeIndex int) float64 {
+	rootSnake := board.Snakes[rootSnakeIndex]
+	lengthBonus := 0.0
 
 	// Calculate length bonus/penalty.
 	for i, opponent := range board.Snakes {
@@ -334,6 +392,5 @@ func evaluateBoard(board Board, rootSnakeIndex int) float64 {
 		}
 	}
 
-	// Return a score based on the difference in controlled areas and length bonus.
-	return ((rootControlledCells - opponentsControlledCells) / totalCells) + lengthBonus
+	return lengthBonus
 }

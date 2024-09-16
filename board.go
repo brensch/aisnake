@@ -68,12 +68,14 @@ func resolveCollisions(board *Board, snakeIndex int, newHead Point) {
 			// Check for head-to-head collision
 			if newHead == board.Snakes[i].Head {
 				// Kill the shorter snake; if equal length, both die
-				if len(board.Snakes[i].Body) == len(board.Snakes[snakeIndex].Body) {
+				// we truncated the snake at snakeindex, so add 1 to it
+				usLength := len(board.Snakes[snakeIndex].Body) + 1
+				if len(board.Snakes[i].Body) == usLength {
 					deadSnakes[snakeIndex] = true
 					deadSnakes[i] = true
 					break
 				}
-				if len(board.Snakes[i].Body) > len(board.Snakes[snakeIndex].Body) {
+				if len(board.Snakes[i].Body) > usLength {
 					deadSnakes[snakeIndex] = true
 					break
 				}
@@ -102,67 +104,48 @@ func resolveCollisions(board *Board, snakeIndex int, newHead Point) {
 		}
 	}
 
-	// New Logic: Check possible moves of snakes that move before us
-	for i := 0; i < snakeIndex; i++ {
-		opponent := board.Snakes[i]
-		if opponent.Health <= 0 {
-			continue // Skip dead snakes
-		}
+	// TODO: this may be needed
+	// // New Logic: Check possible moves of snakes that move before us
+	// for i := 0; i < snakeIndex; i++ {
+	// 	opponent := board.Snakes[i]
+	// 	if opponent.Health <= 0 {
+	// 		continue // Skip dead snakes
+	// 	}
 
-		// Ensure the opponent has at least two segments
-		if len(opponent.Body) < 2 {
-			continue
-		}
+	// 	// Ensure the opponent has at least two segments
+	// 	if len(opponent.Body) < 2 {
+	// 		continue
+	// 	}
 
-		neck := opponent.Body[1]
+	// 	neck := opponent.Body[1]
 
-		// Generate possible positions the opponent could have moved to from their neck
-		possiblePositions := []Point{
-			{X: neck.X + 1, Y: neck.Y},
-			{X: neck.X - 1, Y: neck.Y},
-			{X: neck.X, Y: neck.Y + 1},
-			{X: neck.X, Y: neck.Y - 1},
-		}
+	// 	// Generate possible positions the opponent could have moved to from their neck
+	// 	possiblePositions := []Point{
+	// 		{X: neck.X + 1, Y: neck.Y},
+	// 		{X: neck.X - 1, Y: neck.Y},
+	// 		{X: neck.X, Y: neck.Y + 1},
+	// 		{X: neck.X, Y: neck.Y - 1},
+	// 	}
 
-		// Check if any of these positions match our head position
-		for _, pos := range possiblePositions {
-			// Ensure the position is within board boundaries
-			if pos.X < 0 || pos.X >= board.Width || pos.Y < 0 || pos.Y >= board.Height {
-				continue
-			}
+	// 	// Check if any of these positions match our head position
+	// 	for _, pos := range possiblePositions {
+	// 		// Ensure the position is within board boundaries
+	// 		if pos.X < 0 || pos.X >= board.Width || pos.Y < 0 || pos.Y >= board.Height {
+	// 			continue
+	// 		}
 
-			// // Check if the position is not occupied by any snake's body
-			// occupied := false
-			// for _, snake := range board.Snakes {
-			// 	if snake.Health <= 0 {
-			// 		continue
-			// 	}
-			// 	for _, segment := range snake.Body {
-			// 		if segment == pos {
-			// 			occupied = true
-			// 			break
-			// 		}
-			// 	}
-			// 	if occupied {
-			// 		break
-			// 	}
-			// }
-			// if occupied {
-			// 	continue
-			// }
-
-			// If the position is our head position
-			if pos == newHead {
-				// If the opponent is longer or equal in length, we die
-				if len(opponent.Body) >= len(board.Snakes[snakeIndex].Body) {
-					deadSnakes[snakeIndex] = true
-					break
-				}
-				// If we are longer, the opponent dies (but since they move before us, they have already moved)
-				// In this context, we cannot mark them as dead here
-			}
-		}
-	}
+	// 		// If the position is our head position
+	// 		if pos == newHead {
+	// 			// If the opponent is longer or equal in length, we die
+	// 			if len(opponent.Body) >= len(board.Snakes[snakeIndex].Body) {
+	// 				deadSnakes[snakeIndex] = true
+	// 				break
+	// 			}
+	// 			// If we are longer, the opponent dies (but since they move before us, they have already moved)
+	// 			// In this context, we cannot mark them as dead here
+	// 		}
+	// 	}
+	// }
 
 	// Mark dead snakes
 	markDeadSnakes(board, deadSnakes)

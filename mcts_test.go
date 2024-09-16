@@ -396,12 +396,12 @@ func TestMCTSVisualizationJSON(t *testing.T) {
 		// 	AcceptableMoves: []string{"right"},
 		// },
 
-		// need to fix,
-		{
-			Description:  "is not generating moves that could kill the second player, despite them not knowing for sure the first player would have moved to that position",
-			InitialBoard: `{"height":11,"width":11,"food":[{"X":0,"Y":10},{"X":9,"Y":0},{"X":8,"Y":8},{"X":6,"Y":10},{"X":7,"Y":8}],"hazards":[],"snakes":[{"id":"gs_XVqdb79vXkv9Wr8YkxFTgQS4","name":"Gregory-Devory","health":93,"body":[{"X":5,"Y":5},{"X":6,"Y":5},{"X":6,"Y":4},{"X":7,"Y":4},{"X":8,"Y":4},{"X":9,"Y":4},{"X":9,"Y":3},{"X":10,"Y":3},{"X":10,"Y":4},{"X":10,"Y":5}],"latency":"409","head":{"X":5,"Y":5},"shout":"This is a nice move."},{"id":"gs_FgjQVHF4mTMMXrkHhgRWKy3c","name":"soba","health":93,"body":[{"X":4,"Y":4},{"X":3,"Y":4},{"X":2,"Y":4},{"X":1,"Y":4},{"X":1,"Y":5},{"X":2,"Y":5},{"X":2,"Y":6}],"latency":"411","head":{"X":4,"Y":4},"shout":"swag"}]}`,
-			Iterations:   math.MaxInt,
-		},
+		// seems like should go right still
+		// {
+		// 	Description:  "is not generating moves that could kill the second player, despite them not knowing for sure the first player would have moved to that position",
+		// 	InitialBoard: `{"height":11,"width":11,"food":[{"X":0,"Y":10},{"X":9,"Y":0},{"X":8,"Y":8},{"X":6,"Y":10},{"X":7,"Y":8}],"hazards":[],"snakes":[{"id":"gs_XVqdb79vXkv9Wr8YkxFTgQS4","name":"Gregory-Devory","health":93,"body":[{"X":5,"Y":5},{"X":6,"Y":5},{"X":6,"Y":4},{"X":7,"Y":4},{"X":8,"Y":4},{"X":9,"Y":4},{"X":9,"Y":3},{"X":10,"Y":3},{"X":10,"Y":4},{"X":10,"Y":5}],"latency":"409","head":{"X":5,"Y":5},"shout":"This is a nice move."},{"id":"gs_FgjQVHF4mTMMXrkHhgRWKy3c","name":"soba","health":93,"body":[{"X":4,"Y":4},{"X":3,"Y":4},{"X":2,"Y":4},{"X":1,"Y":4},{"X":1,"Y":5},{"X":2,"Y":5},{"X":2,"Y":6}],"latency":"411","head":{"X":4,"Y":4},"shout":"swag"}]}`,
+		// 	Iterations:   math.MaxInt,
+		// },
 
 		// {
 		// 	Description:     "should not go up, can be killed",
@@ -416,6 +416,20 @@ func TestMCTSVisualizationJSON(t *testing.T) {
 		// 	InitialBoard: `{"height":11,"width":11,"food":[{"X":10,"Y":7},{"X":10,"Y":6},{"X":0,"Y":2},{"X":6,"Y":9},{"X":8,"Y":10},{"X":7,"Y":1},{"X":10,"Y":2}],"hazards":[],"snakes":[{"id":"gs_JHybVxGpYSrmjVhpqDtPJbRY","name":"Gregory east","health":91,"body":[{"X":9,"Y":6},{"X":9,"Y":5},{"X":9,"Y":4},{"X":9,"Y":3},{"X":9,"Y":2},{"X":9,"Y":1},{"X":10,"Y":1},{"X":10,"Y":0},{"X":9,"Y":0},{"X":8,"Y":0},{"X":7,"Y":0},{"X":6,"Y":0},{"X":5,"Y":0},{"X":4,"Y":0},{"X":3,"Y":0}],"latency":"371","head":{"X":9,"Y":6},"shout":"This is a nice move."},{"id":"gs_jj6MWSrwfRWj7mf8SkHqRrSX","name":"soba","health":100,"body":[{"X":1,"Y":4},{"X":2,"Y":4},{"X":3,"Y":4},{"X":3,"Y":5},{"X":4,"Y":5},{"X":5,"Y":5},{"X":6,"Y":5},{"X":7,"Y":5},{"X":7,"Y":5}],"latency":"411","head":{"X":1,"Y":4},"shout":"swag"}]}`,
 		// 	Iterations:   math.MaxInt,
 		//   },
+
+		// indicates issue with the way we discount moves that could have potentially got the opponent killed in a 50/50 scenario.
+		// ie the opponent could have gone right and we actually would have died here.
+		// {
+		// 	Description:  "left would kill us if opponent went right",
+		// 	InitialBoard: `{"height":11,"width":11,"food":[{"X":10,"Y":5},{"X":8,"Y":5},{"X":5,"Y":1},{"X":9,"Y":3}],"hazards":[],"snakes":[{"id":"gs_F4gXmmV6fw7YrSKJyvBb86WD","name":"Gregory-Devory","health":79,"body":[{"X":3,"Y":8},{"X":3,"Y":9},{"X":3,"Y":10},{"X":4,"Y":10},{"X":5,"Y":10},{"X":6,"Y":10},{"X":6,"Y":9},{"X":7,"Y":9},{"X":8,"Y":9},{"X":9,"Y":9},{"X":9,"Y":8},{"X":9,"Y":7},{"X":8,"Y":7},{"X":8,"Y":6},{"X":7,"Y":6},{"X":7,"Y":7},{"X":6,"Y":7},{"X":6,"Y":6},{"X":6,"Y":5},{"X":5,"Y":5},{"X":5,"Y":4},{"X":6,"Y":4},{"X":6,"Y":3},{"X":6,"Y":2},{"X":5,"Y":2},{"X":5,"Y":3},{"X":4,"Y":3},{"X":4,"Y":2}],"latency":"358","head":{"X":3,"Y":8},"shout":"This is a nice move."},{"id":"gs_4WdBrhRvppTMq7DbYh7R38HP","name":"soba","health":81,"body":[{"X":2,"Y":7},{"X":2,"Y":6},{"X":1,"Y":6},{"X":1,"Y":5},{"X":1,"Y":4},{"X":0,"Y":4},{"X":0,"Y":3},{"X":0,"Y":2},{"X":0,"Y":1},{"X":1,"Y":1},{"X":2,"Y":1},{"X":3,"Y":1},{"X":3,"Y":2},{"X":2,"Y":2},{"X":1,"Y":2},{"X":1,"Y":3},{"X":2,"Y":3},{"X":3,"Y":3},{"X":3,"Y":4},{"X":2,"Y":4},{"X":2,"Y":5},{"X":3,"Y":5},{"X":4,"Y":5},{"X":4,"Y":6},{"X":3,"Y":6}],"latency":"411","head":{"X":2,"Y":7},"shout":"swag"}]}`,
+		// 	Iterations:   math.MaxInt,
+		// },
+
+		{
+			Description:  "left will kill us",
+			InitialBoard: `{"height":11,"width":11,"food":[{"X":3,"Y":1},{"X":2,"Y":5},{"X":3,"Y":9}],"hazards":[],"snakes":[{"id":"gs_Rp48WwRj6gYrVpx87HGWrXxG","name":"Gregory-Devory","health":82,"body":[{"X":3,"Y":5},{"X":3,"Y":4},{"X":3,"Y":3},{"X":3,"Y":2}],"latency":"377","head":{"X":3,"Y":5},"shout":"This is a nice move."},{"id":"gs_Vr6bGPmHHVWT6dfmdFGXpbgV","name":"soba","health":96,"body":[{"X":2,"Y":4},{"X":1,"Y":4},{"X":1,"Y":3},{"X":1,"Y":2},{"X":0,"Y":2}],"latency":"409","head":{"X":2,"Y":4},"shout":"swag"}]}`,
+			Iterations:   math.MaxInt,
+		},
 	}
 
 	for _, tc := range testCases {

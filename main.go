@@ -165,7 +165,7 @@ func handleMove(w http.ResponseWriter, r *http.Request) {
 
 	reorderedBoard := reorderSnakes(game.Board, game.You.ID)
 	// 100ms safety timeout
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(game.Game.Timeout-150)*time.Millisecond)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(game.Game.Timeout-100)*time.Millisecond)
 	defer cancel()
 
 	workers := runtime.NumCPU()
