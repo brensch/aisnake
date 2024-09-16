@@ -223,17 +223,14 @@ func worker(sharedData *SharedData) {
 
 		// Backpropagation.
 		n := node.Parent
-		// TODO: figure this out for multiplayer
-		if node.SnakeIndex == 1 {
-			score = -score
-		}
+
 		for n != nil {
+			score = -score
 			n.mutex.Lock()
 			n.Visits++
 			n.Score += score
 			n.mutex.Unlock()
 			n = n.Parent
-			score = -score
 		}
 	}
 }
