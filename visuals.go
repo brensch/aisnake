@@ -251,7 +251,7 @@ func visualizeNode(node *Node) string {
 
 type TreeNode struct {
 	ID            string      `json:"id"`
-	Visits        int         `json:"visits"`
+	Visits        int64       `json:"visits"`
 	AverageScore  float64     `json:"avg_score"`
 	UCB           float64     `json:"ucb"`
 	IsMostVisited bool        `json:"isMostVisited"`

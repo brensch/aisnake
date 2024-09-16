@@ -232,7 +232,7 @@ func reorderSnakes(board Board, youID string) Board {
 
 func determineBestMove(node *Node) string {
 	var bestChild *Node
-	maxVisits := -1
+	maxVisits := int64(-1)
 
 	for _, child := range node.Children {
 		if child.Visits > maxVisits {

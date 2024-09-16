@@ -13,7 +13,7 @@ type Node struct {
 	SnakeIndex int // The index of the snake whose turn it is at this node.
 	Parent     *Node
 	Children   []*Node
-	Visits     int
+	Visits     int64
 	Score      float64 // Cumulative score from simulations.
 	MyScore    float64 // The initial evaluation score of this node.
 
@@ -42,24 +42,17 @@ func NewNode(board Board, snakeIndex int, parent *Node) *Node {
 
 // expand adds children to the node based on the board's state.
 func expand(node *Node) {
-	// Node must be locked when calling expand.
-	// If already expanded, return immediately.
-	if node.isExpanded {
-		return
-	}
-
-	node.isExpanding = true
-	defer func() {
+	// If the node is terminal, it can't be expanded.
+	if isTerminal(node.Board) {
+		node.mutex.Lock()
 		node.isExpanding = false
 		node.isExpanded = true
 		node.cond.Broadcast()
-	}()
-
-	// If the node is terminal, it can't be expanded.
-	if isTerminal(node.Board) {
+		node.mutex.Unlock()
 		return
 	}
 
+	// Prepare to expand without holding the lock.
 	nextSnakeIndex := (node.SnakeIndex + 1) % len(node.Board.Snakes)
 
 	// Generate moves for the current snake.
@@ -69,15 +62,25 @@ func expand(node *Node) {
 		moves = []Direction{Up, Down, Left, Right}
 	}
 
+	newChildren := make([]*Node, 0, len(moves))
 	for _, move := range moves {
 		newBoard := copyBoard(node.Board)
 		applyMove(&newBoard, nextSnakeIndex, move)
 
-		// Next snake's turn.
-
 		child := NewNode(newBoard, nextSnakeIndex, node)
-		node.Children = append(node.Children, child)
+		newChildren = append(newChildren, child)
 	}
+
+	// Lock the node to update shared state.
+	node.mutex.Lock()
+	defer func() {
+		node.isExpanding = false
+		node.isExpanded = true
+		node.cond.Broadcast()
+		node.mutex.Unlock()
+	}()
+
+	node.Children = newChildren
 }
 
 // isTerminal checks if the game has reached a terminal state.
@@ -113,7 +116,7 @@ func (n *Node) UCT(explorationParam float64) float64 {
 
 // bestChild selects the best child node based on the UCT value.
 func bestChild(node *Node, explorationParam float64) *Node {
-	// Node must be locked when calling bestChild.
+	// No need to lock node here as UCT function handles locking.
 	if len(node.Children) == 0 {
 		return nil // No children available.
 	}
@@ -188,7 +191,7 @@ func MCTS(ctx context.Context, gameID string, rootBoard Board, iterations int, n
 // worker performs MCTS iterations, managing synchronization appropriately.
 func worker(sharedData *SharedData) {
 	for {
-		// Check if the context is done or iterations are completed.
+		// Check if the context is done.
 		select {
 		case <-sharedData.ctx.Done():
 			return
@@ -205,11 +208,11 @@ func worker(sharedData *SharedData) {
 
 		// Simulation.
 		var score float64
-		node.mutex.Lock()
 		if node.Visits == 0 {
-			node.mutex.Unlock() // Unlock before simulation.
 			// Evaluate from the perspective of the root snake.
 			score = evaluateBoard(node.Board, node.SnakeIndex)
+
+			// Lock the node to update its own score and visits.
 			node.mutex.Lock()
 			node.MyScore = score // Save the initial evaluation score.
 			node.Score += score  // Update cumulative score.
@@ -218,47 +221,65 @@ func worker(sharedData *SharedData) {
 		} else {
 			// Node has been visited before; use existing MyScore.
 			score = node.MyScore
+
+			// Lock the node to update visits.
+			node.mutex.Lock()
+			node.Visits++
 			node.mutex.Unlock()
 		}
 
 		// Backpropagation.
 		n := node.Parent
-
 		for n != nil {
+			// Flip the score to represent the opponent's perspective.
 			score = -score
+
+			// Lock each node during backpropagation to update score and visits.
 			n.mutex.Lock()
-			n.Visits++
 			n.Score += score
+			n.Visits++
 			n.mutex.Unlock()
 			n = n.Parent
 		}
 	}
 }
 
-// selectNode traverses the tree, handling synchronization and waiting appropriately.
+// selectNode traverses the tree, handling synchronization and avoiding unnecessary blocking.
 func selectNode(ctx context.Context, rootNode *Node) *Node {
 	node := rootNode
-	node.mutex.Lock()
 
+	// We will traverse the tree without holding locks except when necessary.
 	for {
 		// Check for context cancellation.
 		select {
 		case <-ctx.Done():
-			node.mutex.Unlock()
 			return nil
 		default:
 			// Continue execution.
 		}
 
-		// If node is being expanded by another worker, wait.
+		node.mutex.Lock()
+
+		// If node is being expanded by another worker, avoid waiting.
 		if node.isExpanding {
-			node.cond.Wait()
+			node.mutex.Unlock()
+			// Instead of waiting, start over from the root node.
+			node = rootNode
 			continue
 		}
 
 		// If node is not fully expanded, expand it.
 		if !node.isExpanded {
+			// Mark the node as expanding.
+			node.isExpanding = true
+			node.mutex.Unlock()
+
+			// Expand the node without holding the lock.
 			expand(node)
+
+			// After expansion, start over from the root node.
+			node = rootNode
+			continue
 		}
 
 		// If the node is a leaf node (no children), return it.
@@ -276,16 +297,9 @@ func selectNode(ctx context.Context, rootNode *Node) *Node {
 			return node
 		}
 
-		// Lock the best child node before moving on.
-		bestChildNode.mutex.Lock()
+		// Move to the best child without holding the parent lock.
 		node.mutex.Unlock()
 		node = bestChildNode
-
-		// If the node has not been visited yet, return it.
-		if node.Visits == 0 {
-			node.mutex.Unlock()
-			return node
-		}
 	}
 }
 
