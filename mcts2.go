@@ -5,82 +5,54 @@ import (
 	"log/slog"
 	"math"
 	"sync"
+	"sync/atomic"
+	"unsafe"
 )
 
 // Node represents a node in the MCTS tree.
 type Node struct {
-	Board      Board
-	SnakeIndex int // The index of the snake whose turn it is at this node.
-	Parent     *Node
-	Children   []*Node
-	Visits     int64
-	Score      float64 // Cumulative score from simulations.
-	MyScore    float64 // The initial evaluation score of this node.
+	Board           Board
+	SnakeIndex      int // The index of the snake whose turn it is at this node.
+	Parent          *Node
+	Children        []*Node
+	Visits          int64
+	Score           float64 // Cumulative score from simulations.
+	MyScore         float64 // The initial evaluation score of this node.
+	UnexpandedMoves []Direction
 
-	mutex       sync.Mutex
-	cond        *sync.Cond
-	isExpanding bool
-	isExpanded  bool
+	mutex sync.Mutex
 }
 
-// NewNode initializes a new Node with synchronization primitives.
+// NewNode initializes a new Node and generates possible moves.
 func NewNode(board Board, snakeIndex int, parent *Node) *Node {
 	node := &Node{
-		Board:       board,
-		SnakeIndex:  snakeIndex,
-		Parent:      parent,
-		Children:    make([]*Node, 0),
-		Visits:      0,
-		Score:       0,
-		MyScore:     0, // Initialize MyScore to zero.
-		isExpanding: false,
-		isExpanded:  false,
-	}
-	node.cond = sync.NewCond(&node.mutex)
-	return node
-}
-
-// expand adds children to the node based on the board's state.
-func expand(node *Node) {
-	// If the node is terminal, it can't be expanded.
-	if isTerminal(node.Board) {
-		node.mutex.Lock()
-		node.isExpanding = false
-		node.isExpanded = true
-		node.cond.Broadcast()
-		node.mutex.Unlock()
-		return
+		Board:           board,
+		SnakeIndex:      snakeIndex,
+		Parent:          parent,
+		Children:        make([]*Node, 0),
+		Visits:          0,
+		Score:           0,
+		MyScore:         0,
+		UnexpandedMoves: nil,
 	}
 
-	// Prepare to expand without holding the lock.
-	nextSnakeIndex := (node.SnakeIndex + 1) % len(node.Board.Snakes)
+	// If the node is terminal, there are no moves to expand.
+	if isTerminal(board) {
+		return node
+	}
 
-	// Generate moves for the current snake.
-	moves := generateSafeMoves(node.Board, nextSnakeIndex)
+	// Compute the next snake's index.
+	nextSnakeIndex := (snakeIndex + 1) % len(board.Snakes)
+
+	// Generate possible moves for the next snake.
+	moves := generateSafeMoves(board, nextSnakeIndex)
 	if len(moves) == 0 {
 		// If no safe moves, include all possible moves.
 		moves = []Direction{Up, Down, Left, Right}
 	}
 
-	newChildren := make([]*Node, 0, len(moves))
-	for _, move := range moves {
-		newBoard := copyBoard(node.Board)
-		applyMove(&newBoard, nextSnakeIndex, move)
-
-		child := NewNode(newBoard, nextSnakeIndex, node)
-		newChildren = append(newChildren, child)
-	}
-
-	// Lock the node to update shared state.
-	node.mutex.Lock()
-	defer func() {
-		node.isExpanding = false
-		node.isExpanded = true
-		node.cond.Broadcast()
-		node.mutex.Unlock()
-	}()
-
-	node.Children = newChildren
+	node.UnexpandedMoves = moves
+	return node
 }
 
 // isTerminal checks if the game has reached a terminal state.
@@ -94,29 +66,27 @@ func isTerminal(board Board) bool {
 	return aliveSnakesCount <= 1
 }
 
-// isSnakeDead checks if a snake is dead by looking at its health and body length.
+// isSnakeDead checks if a snake is dead.
 func isSnakeDead(snake Snake) bool {
 	return len(snake.Body) == 0 || snake.Health <= 0
 }
 
 // UCT calculates the Upper Confidence Bound for Trees (UCT) value.
 func (n *Node) UCT(explorationParam float64) float64 {
-	n.mutex.Lock()
-	defer n.mutex.Unlock()
-
-	if n.Visits == 0 {
+	visits := atomic.LoadInt64(&n.Visits)
+	if visits == 0 {
 		return math.MaxFloat64
 	}
 
-	exploitation := n.Score / float64(n.Visits)
-	exploration := explorationParam * math.Sqrt(math.Log(float64(n.Parent.Visits))/float64(n.Visits))
+	parentVisits := atomic.LoadInt64(&n.Parent.Visits)
+	exploitation := n.Score / float64(visits)
+	exploration := explorationParam * math.Sqrt(math.Log(float64(parentVisits))/float64(visits))
 
 	return exploitation + exploration
 }
 
 // bestChild selects the best child node based on the UCT value.
 func bestChild(node *Node, explorationParam float64) *Node {
-	// No need to lock node here as UCT function handles locking.
 	if len(node.Children) == 0 {
 		return nil // No children available.
 	}
@@ -139,8 +109,7 @@ func bestChild(node *Node, explorationParam float64) *Node {
 		}
 	}
 
-	// Randomly select among the best nodes (optional, for tie-breaking).
-	// Here, we'll just return the first one.
+	// Return the first among the best nodes (can be randomized if desired).
 	if len(bestNodes) > 0 {
 		return bestNodes[0]
 	}
@@ -163,11 +132,9 @@ func MCTS(ctx context.Context, gameID string, rootBoard Board, iterations int, n
 		slog.Info("board cache lookup", "hit", true, "cache_size", len(gameStates), "visits", existingNode.Visits)
 		rootNode = existingNode
 	} else {
-		// Otherwise, create a new node and add it to the game state map.
 		slog.Info("board cache lookup", "hit", false, "cache_size", len(gameStates))
-		// Initialize rootNode with the current snake's index (e.g., 0 for our AI snake).
+		// Initialize rootNode with the current snake's index (e.g., -1 for the initial state).
 		rootNode = NewNode(rootBoard, -1, nil)
-		// We don't expand the root node here; expansion is handled during selection.
 	}
 
 	sharedData := &SharedData{
@@ -208,24 +175,20 @@ func worker(sharedData *SharedData) {
 
 		// Simulation.
 		var score float64
-		if node.Visits == 0 {
+		if atomic.LoadInt64(&node.Visits) == 0 {
 			// Evaluate from the perspective of the root snake.
 			score = evaluateBoard(node.Board, node.SnakeIndex)
 
-			// Lock the node to update its own score and visits.
-			node.mutex.Lock()
+			// Update node's own score and visits atomically.
+			atomic.AddInt64(&node.Visits, 1)
+			atomicAddFloat64(&node.Score, score)
 			node.MyScore = score // Save the initial evaluation score.
-			node.Score += score  // Update cumulative score.
-			node.Visits++        // Increment visit count.
-			node.mutex.Unlock()
 		} else {
 			// Node has been visited before; use existing MyScore.
 			score = node.MyScore
 
-			// Lock the node to update visits.
-			node.mutex.Lock()
-			node.Visits++
-			node.mutex.Unlock()
+			// Update visits atomically.
+			atomic.AddInt64(&node.Visits, 1)
 		}
 
 		// Backpropagation.
@@ -234,21 +197,18 @@ func worker(sharedData *SharedData) {
 			// Flip the score to represent the opponent's perspective.
 			score = -score
 
-			// Lock each node during backpropagation to update score and visits.
-			n.mutex.Lock()
-			n.Score += score
-			n.Visits++
-			n.mutex.Unlock()
+			// Update score and visits atomically.
+			atomic.AddInt64(&n.Visits, 1)
+			atomicAddFloat64(&n.Score, score)
 			n = n.Parent
 		}
 	}
 }
 
-// selectNode traverses the tree, handling synchronization and avoiding unnecessary blocking.
+// selectNode traverses the tree, expanding nodes as needed.
 func selectNode(ctx context.Context, rootNode *Node) *Node {
 	node := rootNode
 
-	// We will traverse the tree without holding locks except when necessary.
 	for {
 		// Check for context cancellation.
 		select {
@@ -259,47 +219,60 @@ func selectNode(ctx context.Context, rootNode *Node) *Node {
 		}
 
 		node.mutex.Lock()
-
-		// If node is being expanded by another worker, avoid waiting.
-		if node.isExpanding {
-			node.mutex.Unlock()
-			// Instead of waiting, start over from the root node.
-			node = rootNode
-			continue
-		}
-
-		// If node is not fully expanded, expand it.
-		if !node.isExpanded {
-			// Mark the node as expanding.
-			node.isExpanding = true
+		// If there are unexpanded moves, expand one.
+		if len(node.UnexpandedMoves) > 0 {
+			// Pop a move from UnexpandedMoves.
+			move := node.UnexpandedMoves[0]
+			node.UnexpandedMoves = node.UnexpandedMoves[1:]
 			node.mutex.Unlock()
 
-			// Expand the node without holding the lock.
-			expand(node)
+			// Create child node.
+			newBoard := copyBoard(node.Board)
+			nextSnakeIndex := (node.SnakeIndex + 1) % len(node.Board.Snakes)
+			applyMove(&newBoard, nextSnakeIndex, move)
 
-			// After expansion, start over from the root node.
-			node = rootNode
-			continue
+			child := NewNode(newBoard, nextSnakeIndex, node)
+
+			// Append the child to node.Children.
+			node.mutex.Lock()
+			node.Children = append(node.Children, child)
+			node.mutex.Unlock()
+
+			return child
 		}
+		// No unexpanded moves.
+		node.mutex.Unlock()
 
 		// If the node is a leaf node (no children), return it.
+		node.mutex.Lock()
 		if len(node.Children) == 0 {
 			node.mutex.Unlock()
 			return node
 		}
+		node.mutex.Unlock()
 
 		// Node is expanded and has children.
 		// Select the best child.
 		bestChildNode := bestChild(node, 1.41)
 		if bestChildNode == nil {
 			// No valid child found.
-			node.mutex.Unlock()
 			return node
 		}
 
-		// Move to the best child without holding the parent lock.
-		node.mutex.Unlock()
+		// Move to the best child.
 		node = bestChildNode
+	}
+}
+
+// atomicAddFloat64 performs an atomic addition on a float64 variable.
+func atomicAddFloat64(addr *float64, delta float64) {
+	for {
+		old := atomic.LoadUint64((*uint64)(unsafe.Pointer(addr)))
+		newVal := math.Float64frombits(old) + delta
+		newBits := math.Float64bits(newVal)
+		if atomic.CompareAndSwapUint64((*uint64)(unsafe.Pointer(addr)), old, newBits) {
+			return
+		}
 	}
 }
 
