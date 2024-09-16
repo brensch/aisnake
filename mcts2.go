@@ -61,19 +61,20 @@ func expand(node *Node) {
 		return
 	}
 
+	nextSnakeIndex := (node.SnakeIndex + 1) % len(node.Board.Snakes)
+
 	// Generate moves for the current snake.
-	moves := generateSafeMoves(node.Board, node.SnakeIndex)
+	moves := generateSafeMoves(node.Board, nextSnakeIndex)
 	if len(moves) == 0 {
 		// If no safe moves, include all possible moves.
 		moves = []Direction{Up, Down, Left, Right}
 	}
 
-	// Next snake's turn.
-	nextSnakeIndex := (node.SnakeIndex + 1) % len(node.Board.Snakes)
-
 	for _, move := range moves {
 		newBoard := copyBoard(node.Board)
-		applyMove(&newBoard, node.SnakeIndex, move)
+		applyMove(&newBoard, nextSnakeIndex, move)
+
+		// Next snake's turn.
 
 		child := NewNode(newBoard, nextSnakeIndex, node)
 		node.Children = append(node.Children, child)
@@ -150,7 +151,6 @@ type SharedData struct {
 	totalIterations int64
 	iterationsDone  int64 // Use atomic counter.
 	ctx             context.Context
-	rootSnakeIndex  int // The index of the snake we're evaluating for (our AI snake).
 }
 
 // MCTS performs the Monte Carlo Tree Search with concurrency.
@@ -166,7 +166,7 @@ func MCTS(ctx context.Context, gameID string, rootBoard Board, iterations int, n
 		// Otherwise, create a new node and add it to the game state map.
 		slog.Info("board cache lookup", "hit", false, "cache_size", len(gameStates))
 		// Initialize rootNode with the current snake's index (e.g., 0 for our AI snake).
-		rootNode = NewNode(rootBoard, 0, nil)
+		rootNode = NewNode(rootBoard, -1, nil)
 		// We don't expand the root node here; expansion is handled during selection.
 	}
 
@@ -175,7 +175,6 @@ func MCTS(ctx context.Context, gameID string, rootBoard Board, iterations int, n
 		totalIterations: int64(iterations),
 		iterationsDone:  0,
 		ctx:             ctx,
-		rootSnakeIndex:  0, // Set this to the index of our AI snake.
 	}
 
 	var wg sync.WaitGroup
@@ -220,8 +219,8 @@ func worker(sharedData *SharedData) {
 		node.mutex.Lock()
 		if node.Visits == 0 {
 			node.mutex.Unlock() // Unlock before simulation.
-			// Evaluate from the perspective of rootSnakeIndex.
-			score = evaluateBoard(node.Board, sharedData.rootSnakeIndex)
+			// Evaluate from the perspective of the root snake.
+			score = evaluateBoard(node.Board, node.SnakeIndex)
 			node.mutex.Lock()
 			node.MyScore = score // Save the initial evaluation score.
 			node.Score += score  // Update cumulative score.
@@ -233,13 +232,14 @@ func worker(sharedData *SharedData) {
 		}
 
 		// Backpropagation.
-		n := node.Parent
+		n := node
 		for n != nil {
 			n.mutex.Lock()
 			n.Visits++
 			n.Score += score
 			n.mutex.Unlock()
 			n = n.Parent
+			score = -score
 		}
 	}
 }
