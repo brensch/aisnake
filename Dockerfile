@@ -20,6 +20,9 @@ FROM alpine:latest
 # Set the Current Working Directory inside the runtime container
 WORKDIR /app
 
+# Install tzdata for timezone support in the runtime
+RUN apk add --no-cache tzdata
+
 # Copy the compiled binary from the builder stage
 COPY --from=builder /app/main .
 
