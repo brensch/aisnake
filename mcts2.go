@@ -131,15 +131,11 @@ func MCTS(ctx context.Context, gameID string, rootBoard Board, iterations int, n
 		rootNode = NewNode(rootBoard, -1, nil)
 	}
 
-	var wg sync.WaitGroup
 	for i := 0; i < numWorkers; i++ {
-		wg.Add(1)
-		go func(workerID int) {
-			defer wg.Done()
-			worker(ctx, rootNode)
-		}(i)
+		go worker(ctx, rootNode)
 	}
-	wg.Wait()
+
+	<-ctx.Done()
 
 	return rootNode
 }
@@ -286,7 +282,7 @@ var (
 		},
 		{
 			EvalFunc: lengthEvaluation,
-			Weight:   2,
+			Weight:   6,
 		},
 	}
 )
@@ -365,23 +361,53 @@ func voronoiEvaluation(board Board, rootSnakeIndex int) float64 {
 }
 
 // lengthEvaluation evaluates the board based on the length of the root snake compared to opponents.
+// The bonus/penalty is constrained between -1 and 1, with specific scaling logic.
 func lengthEvaluation(board Board, rootSnakeIndex int) float64 {
 	rootSnake := board.Snakes[rootSnakeIndex]
+	rootLength := len(rootSnake.Body)
 	lengthBonus := 0.0
 
 	// Calculate length bonus/penalty.
 	for i, opponent := range board.Snakes {
 		if i != rootSnakeIndex && !isSnakeDead(opponent) {
-			lengthDifference := len(rootSnake.Body) - len(opponent.Body)
+			opponentLength := len(opponent.Body)
+			lengthDifference := rootLength - opponentLength
 
-			if lengthDifference >= 2 {
-				// Bonus for being longer.
-				lengthBonus += 0.3 * float64(lengthDifference)
+			if lengthDifference > 0 {
+				// If root snake is longer, calculate bonus.
+				if lengthDifference == 1 {
+					lengthBonus += 0.5
+				} else if float64(rootLength) > 1.1*float64(opponentLength) {
+					// Cap bonus at 1.0 for being 10% longer.
+					lengthBonus += 1.0
+				} else {
+					// Scale between 0.5 and 1.0 as the length difference increases up to 10% longer.
+					extraLengthRatio := float64(rootLength) / float64(opponentLength)
+					lengthBonus += 0.5 + 0.5*((extraLengthRatio-1.0)/0.1)
+				}
 			} else {
-				// Penalty for being shorter.
-				lengthBonus += 0.1 * float64(lengthDifference)
+				// If root snake is shorter, calculate penalty.
+				if lengthDifference == -1 {
+					lengthBonus -= 0.1
+				} else {
+					// Scale penalty down to -1.0 for being 60% or less of the opponent's length.
+					minLength := 0.6 * float64(opponentLength)
+					if float64(rootLength) <= minLength {
+						lengthBonus -= 1.0
+					} else {
+						// Scale between -0.1 and -1.0 as the root snake gets closer to 60% of the opponent's length.
+						lengthBonus -= 0.1 + 0.9*((float64(opponentLength)-float64(rootLength))/(float64(opponentLength)*0.4))
+					}
+				}
 			}
 		}
+	}
+
+	// Ensure the result is between -1 and 1.
+	if lengthBonus > 1.0 {
+		lengthBonus = 1.0
+	} else if lengthBonus < -1.0 {
+		lengthBonus = -1.0
 	}
 
 	return lengthBonus

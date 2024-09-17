@@ -164,8 +164,8 @@ func handleMove(w http.ResponseWriter, r *http.Request) {
 	}
 
 	reorderedBoard := reorderSnakes(game.Board, game.You.ID)
-	// 100ms safety timeout
-	ctx, cancel := context.WithDeadline(context.Background(), start.Add(time.Duration(game.Game.Timeout-50)*time.Millisecond))
+	// timeout to signify end of move
+	ctx, cancel := context.WithDeadline(context.Background(), start.Add(time.Duration(game.Game.Timeout-110)*time.Millisecond))
 	defer cancel()
 
 	workers := runtime.NumCPU()
@@ -187,13 +187,11 @@ func handleMove(w http.ResponseWriter, r *http.Request) {
 		"board", reorderedBoard,
 	)
 
-	go func() {
-		// reset this gamestate and load in new nodes
-		gameSaveStart := time.Now()
-		gameStates[game.Game.ID] = make(map[string]*Node)
-		saveNodesAtDepth2(mctsResult, gameStates[game.Game.ID])
-		slog.Debug("finished saving game state", "duration", time.Since(gameSaveStart).Milliseconds())
-	}()
+	// reset this gamestate and load in new nodes
+	gameSaveStart := time.Now()
+	gameStates[game.Game.ID] = make(map[string]*Node)
+	saveNodesAtDepth2(mctsResult, gameStates[game.Game.ID])
+	slog.Debug("finished saving game state", "duration", time.Since(gameSaveStart).Milliseconds())
 
 	// slog.Info("Visualized board", "board", visualizeBoard(game.Board))
 	// fmt.Println(visualizeBoard(reorderedBoard))
