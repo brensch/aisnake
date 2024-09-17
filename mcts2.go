@@ -158,7 +158,7 @@ func worker(ctx context.Context, rootNode *Node) {
 		node := selectNode(ctx, rootNode)
 
 		// If context was cancelled during selection.
-		if node == nil {
+		if node == nil || ctx.Err() != nil {
 			return
 		}
 
@@ -184,6 +184,9 @@ func worker(ctx context.Context, rootNode *Node) {
 		// Backpropagation.
 		n := node.Parent
 		for n != nil {
+			if ctx.Err() != nil {
+				return
+			}
 			// Flip the score to represent the opponent's perspective.
 			score = -score
 
