@@ -1,0 +1,33 @@
+# Build stage
+FROM golang:1.23-alpine AS builder
+
+# Set the Current Working Directory inside the build container
+WORKDIR /app
+
+# Copy the go module files and download dependencies
+COPY go.mod go.sum ./
+RUN go mod download
+
+# Copy the source files
+COPY pingtest ./pingtest
+
+# Build the Go app
+RUN go build -o main ./pingtest
+
+# Final stage
+FROM alpine:latest
+
+# Set the Current Working Directory inside the runtime container
+WORKDIR /app
+
+# Install tzdata for timezone support in the runtime (optional)
+RUN apk add --no-cache tzdata
+
+# Copy the compiled binary from the builder stage
+COPY --from=builder /app/main .
+
+# Expose port 8080 to the outside world
+EXPOSE 8080
+
+# Command to run the executable
+CMD ["./main"]
