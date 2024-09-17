@@ -116,12 +116,6 @@ func bestChild(node *Node, explorationParam float64) *Node {
 	return nil
 }
 
-// SharedData holds shared information for workers.
-type SharedData struct {
-	rootNode *Node
-	ctx      context.Context
-}
-
 // MCTS performs the Monte Carlo Tree Search with concurrency.
 func MCTS(ctx context.Context, gameID string, rootBoard Board, iterations int, numWorkers int, gameStates map[string]*Node) *Node {
 	// Generate the hash for the current board state.
@@ -137,17 +131,12 @@ func MCTS(ctx context.Context, gameID string, rootBoard Board, iterations int, n
 		rootNode = NewNode(rootBoard, -1, nil)
 	}
 
-	sharedData := &SharedData{
-		rootNode: rootNode,
-		ctx:      ctx,
-	}
-
 	var wg sync.WaitGroup
 	for i := 0; i < numWorkers; i++ {
 		wg.Add(1)
 		go func(workerID int) {
 			defer wg.Done()
-			worker(sharedData)
+			worker(ctx, rootNode)
 		}(i)
 	}
 	wg.Wait()
@@ -156,17 +145,17 @@ func MCTS(ctx context.Context, gameID string, rootBoard Board, iterations int, n
 }
 
 // worker performs MCTS iterations, managing synchronization appropriately.
-func worker(sharedData *SharedData) {
+func worker(ctx context.Context, rootNode *Node) {
 	for {
 		// Check if the context is done.
 		select {
-		case <-sharedData.ctx.Done():
+		case <-ctx.Done():
 			return
 		default:
 			// Continue execution.
 		}
 
-		node := selectNode(sharedData.ctx, sharedData.rootNode)
+		node := selectNode(ctx, rootNode)
 
 		// If context was cancelled during selection.
 		if node == nil {
