@@ -285,15 +285,25 @@ func handleEnd(w http.ResponseWriter, r *http.Request) {
 	outcome, description := describeGameOutcome(game)
 
 	// TODO: only works for duels
-	rank, score, err := GetDuelsRankAndScore()
+	ranks, err := GetCompetitionResults()
 	if err != nil {
-		rank = -1
-		score = -1
+		slog.Error("failed to get ranks", "error", err)
+	}
+
+	var ranksEmbeds []EmbedField
+	inline := false
+	for _, rank := range ranks {
+		ranksEmbeds = append(ranksEmbeds, EmbedField{
+			Name:   fmt.Sprintf("%s rating", rank.Name),
+			Value:  fmt.Sprintf("%d [%d]", rank.Score, rank.Rank),
+			Inline: inline,
+		})
+		inline = true
 	}
 
 	gameDuration := end.Sub(gameMeta.start)
 
-	slog.Info("Game ended", "game", game, "rank", rank, "score", score, "duration_ms", gameDuration.Milliseconds())
+	slog.Info("Game ended", "game", game, "ranks", ranks, "duration_ms", gameDuration.Milliseconds())
 
 	err = downloadAndUploadFile(context.Background(), game.Game.ID)
 	if err != nil {
@@ -311,7 +321,7 @@ func handleEnd(w http.ResponseWriter, r *http.Request) {
 					},
 					Color: getColorForOutcome(outcome),
 					URL:   fmt.Sprintf("https://play.battlesnake.com/game/%s", game.Game.ID),
-					Fields: []EmbedField{
+					Fields: append([]EmbedField{
 						{
 							Name:   "turns",
 							Value:  fmt.Sprint(game.Turn),
@@ -323,21 +333,11 @@ func handleEnd(w http.ResponseWriter, r *http.Request) {
 							Inline: true,
 						},
 						{
-							Name:   "rank",
-							Value:  fmt.Sprint(rank),
-							Inline: true,
-						},
-						{
-							Name:   "score",
-							Value:  fmt.Sprint(score),
-							Inline: true,
-						},
-						{
 							Name:   "game duration",
 							Value:  fmt.Sprint(gameDuration.String()),
 							Inline: true,
 						},
-					},
+					}, ranksEmbeds...),
 					Footer: &Footer{
 						Text: time.Now().In(loc).Format(time.RFC3339),
 					},
