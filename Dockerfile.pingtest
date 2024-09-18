@@ -9,10 +9,10 @@ COPY go.mod go.sum ./
 RUN go mod download
 
 # Copy the source files
-COPY . .
+COPY pingtest ./pingtest
 
 # Build the Go app
-RUN go build -o main .
+RUN go build -o main ./pingtest
 
 # Final stage
 FROM alpine:latest
@@ -20,7 +20,7 @@ FROM alpine:latest
 # Set the Current Working Directory inside the runtime container
 WORKDIR /app
 
-# Install tzdata for timezone support in the runtime
+# Install tzdata for timezone support in the runtime (optional)
 RUN apk add --no-cache tzdata
 
 # Copy the compiled binary from the builder stage

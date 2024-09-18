@@ -251,7 +251,7 @@ func visualizeNode(node *Node) string {
 
 type TreeNode struct {
 	ID            string      `json:"id"`
-	Visits        int         `json:"visits"`
+	Visits        int64       `json:"visits"`
 	AverageScore  float64     `json:"avg_score"`
 	UCB           float64     `json:"ucb"`
 	IsMostVisited bool        `json:"isMostVisited"`
@@ -322,7 +322,7 @@ func traverseAndBuildTree(node *Node, treeNode *TreeNode) {
 		childNode := &TreeNode{
 			ID:            fmt.Sprintf("Node_%p", child),
 			Visits:        child.Visits,
-			UCB:           child.UCT(node, 1.41),
+			UCB:           child.UCT(1.41),
 			IsMostVisited: i == 0, // Only mark the most visited path
 			Children:      make([]*TreeNode, 0),
 			Body:          visualizeNode(child),

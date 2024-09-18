@@ -285,7 +285,7 @@ func TestMCTSVisualization(t *testing.T) {
 			ctx, _ := context.WithTimeout(context.Background(), 1000*time.Millisecond)
 			// node := MCTS(ctx, rootBoard, tc.Iterations, numCPUs)
 			workers := runtime.NumCPU()
-			node := MCTS(ctx, "testid", rootBoard, tc.Iterations, workers, make(map[string]*Node))
+			node := MCTS(ctx, "testid", rootBoard, tc.Iterations, 2*workers, make(map[string]*Node))
 
 			require.NotNil(t, node, "node is nil")
 
@@ -304,35 +304,48 @@ func TestMCTSVisualizationJSON(t *testing.T) {
 		Iterations      int
 		AcceptableMoves []string
 	}{
-		{
-			Description:  "should not get transfixed by death",
-			InitialBoard: `{"height":11,"width":11,"food":[{"x":0,"y":4},{"x":1,"y":4}],"hazards":[],"snakes":[{"id":"5baad214-ed5e-4794-bd30-f110e488c474","name":"mcts","health":97,"body":[{"x":3,"y":4},{"x":4,"y":4},{"x":4,"y":5},{"x":5,"y":5},{"x":6,"y":5}],"latency":"405","head":{"x":3,"y":4},"shout":"","customizations":{"color":"#888888","head":"default","tail":"default"}},{"id":"e55aa73a-a108-406c-af9e-9192a380c027","name":"soba","health":89,"body":[{"x":2,"y":5},{"x":2,"y":6},{"x":3,"y":6},{"x":4,"y":6}],"latency":"400","head":{"x":2,"y":5},"shout":"","customizations":{"color":"#118645","head":"replit-mark","tail":"replit-notmark"}}]}`,
-			Iterations:   math.MaxInt,
-		},
 		// {
-		// 	Description:  "should not butt heads",
-		// 	InitialBoard: `{"height":11,"width":11,"food":[{"x":4,"y":0},{"x":7,"y":4},{"x":9,"y":3},{"x":0,"y":4}],"hazards":[],"snakes":[{"id":"a82fcde3-2bed-4cc5-ac42-a19cc10175ca","name":"mcts","health":66,"body":[{"x":1,"y":9},{"x":0,"y":9},{"x":0,"y":8},{"x":0,"y":7}],"latency":"902","head":{"x":1,"y":9},"shout":"","customizations":{"color":"#888888","head":"default","tail":"default"}},{"id":"4a147cce-14d9-42ba-b5b2-e72b2ecf04a7","name":"soba","health":93,"body":[{"x":3,"y":9},{"x":3,"y":8},{"x":4,"y":8},{"x":5,"y":8},{"x":6,"y":8}],"latency":"401","head":{"x":3,"y":9},"shout":"","customizations":{"color":"#118645","head":"replit-mark","tail":"replit-notmark"}}]}`,
-		// 	Iterations:   math.MaxInt,
+		// 	Description:     "don't go into corner. non negotiable.",
+		// 	InitialBoard:    `{"height":11,"width":11,"food":[{"x":7,"y":9},{"x":1,"y":8},{"x":10,"y":10},{"x":9,"y":9},{"x":4,"y":0},{"x":2,"y":0},{"x":5,"y":9},{"x":7,"y":1},{"x":2,"y":4},{"x":3,"y":7},{"x":0,"y":9}],"hazards":[],"snakes":[{"id":"708f16b8-783d-465a-b45e-c7000f4c9cea","name":"mcts","health":90,"body":[{"x":1,"y":0},{"x":1,"y":1},{"x":0,"y":1},{"x":0,"y":2},{"x":1,"y":2}],"latency":"400","head":{"x":1,"y":0},"shout":"","customizations":{"color":"#888888","head":"default","tail":"default"}},{"id":"a4e16294-0082-4064-8ae2-12ed0a5774a0","name":"soba","health":88,"body":[{"x":6,"y":3},{"x":6,"y":4},{"x":7,"y":4},{"x":7,"y":5},{"x":8,"y":5},{"x":8,"y":6},{"x":7,"y":6},{"x":6,"y":6},{"x":5,"y":6},{"x":5,"y":7}],"latency":"400","head":{"x":6,"y":3},"shout":"","customizations":{"color":"#118645","head":"replit-mark","tail":"replit-notmark"}}]}`,
+		// 	Iterations:      math.MaxInt,
+		// 	AcceptableMoves: []string{"right"},
+		// },
+
+		// {
+		// 	Description:     "should not get transfixed by death",
+		// 	InitialBoard:    `{"height":11,"width":11,"food":[{"x":0,"y":4},{"x":1,"y":4}],"hazards":[],"snakes":[{"id":"5baad214-ed5e-4794-bd30-f110e488c474","name":"mcts","health":97,"body":[{"x":3,"y":4},{"x":4,"y":4},{"x":4,"y":5},{"x":5,"y":5},{"x":6,"y":5}],"latency":"405","head":{"x":3,"y":4},"shout":"","customizations":{"color":"#888888","head":"default","tail":"default"}},{"id":"e55aa73a-a108-406c-af9e-9192a380c027","name":"soba","health":89,"body":[{"x":2,"y":5},{"x":2,"y":6},{"x":3,"y":6},{"x":4,"y":6}],"latency":"400","head":{"x":2,"y":5},"shout":"","customizations":{"color":"#118645","head":"replit-mark","tail":"replit-notmark"}}]}`,
+		// 	Iterations:      math.MaxInt,
+		// 	AcceptableMoves: []string{"left", "down"},
 		// },
 		// {
-		// 	Description:  "should not go into corner",
-		// 	InitialBoard: `{"height":11,"width":11,"food":[{"x":5,"y":5},{"x":0,"y":2},{"x":1,"y":2},{"x":6,"y":1},{"x":8,"y":3},{"x":7,"y":4}],"hazards":[],"snakes":[{"id":"732e98bd-90f7-4c74-bb0d-08a59c3d1604","name":"mcts","health":88,"body":[{"x":9,"y":10},{"x":9,"y":9},{"x":10,"y":9},{"x":10,"y":8},{"x":10,"y":7}],"latency":"902","head":{"x":9,"y":10},"shout":"","customizations":{"color":"#888888","head":"default","tail":"default"}},{"id":"f9b45e5b-af6a-47f0-9bcb-7b78f7caa534","name":"soba","health":89,"body":[{"x":1,"y":10},{"x":0,"y":10},{"x":0,"y":9},{"x":1,"y":9},{"x":2,"y":9},{"x":3,"y":9}],"latency":"401","head":{"x":1,"y":10},"shout":"","customizations":{"color":"#118645","head":"replit-mark","tail":"replit-notmark"}}]}`,
-		// 	Iterations:   math.MaxInt,
+		// 	Description:     "should not butt heads",
+		// 	InitialBoard:    `{"height":11,"width":11,"food":[{"x":4,"y":0},{"x":7,"y":4},{"x":9,"y":3},{"x":0,"y":4}],"hazards":[],"snakes":[{"id":"a82fcde3-2bed-4cc5-ac42-a19cc10175ca","name":"mcts","health":66,"body":[{"x":1,"y":9},{"x":0,"y":9},{"x":0,"y":8},{"x":0,"y":7}],"latency":"902","head":{"x":1,"y":9},"shout":"","customizations":{"color":"#888888","head":"default","tail":"default"}},{"id":"4a147cce-14d9-42ba-b5b2-e72b2ecf04a7","name":"soba","health":93,"body":[{"x":3,"y":9},{"x":3,"y":8},{"x":4,"y":8},{"x":5,"y":8},{"x":6,"y":8}],"latency":"401","head":{"x":3,"y":9},"shout":"","customizations":{"color":"#118645","head":"replit-mark","tail":"replit-notmark"}}]}`,
+		// 	Iterations:      math.MaxInt,
+		// 	AcceptableMoves: []string{"down"},
 		// },
 		// {
-		// 	Description:  "don't pass through yourself",
-		// 	InitialBoard: `{"height":11,"width":11,"food":[{"x":2,"y":9}],"hazards":[],"snakes":[{"id":"0238ebfc-896f-4cd8-a132-3b06a92a3b02","name":"mcts","health":97,"body":[{"x":10,"y":9},{"x":9,"y":9},{"x":9,"y":8},{"x":9,"y":7},{"x":10,"y":7},{"x":10,"y":6},{"x":10,"y":5}],"latency":"907","head":{"x":10,"y":9},"shout":"","customizations":{"color":"#888888","head":"default","tail":"default"}},{"id":"983869f1-491d-4323-951d-dc822d7cc787","name":"soba","health":61,"body":[{"x":3,"y":6},{"x":4,"y":6},{"x":5,"y":6},{"x":5,"y":5},{"x":5,"y":4}],"latency":"400","head":{"x":3,"y":6},"shout":"","customizations":{"color":"#118645","head":"replit-mark","tail":"replit-notmark"}}]}`,
-		// 	Iterations:   math.MaxInt,
+		// 	Description:     "should not go into corner",
+		// 	InitialBoard:    `{"height":11,"width":11,"food":[{"x":5,"y":5},{"x":0,"y":2},{"x":1,"y":2},{"x":6,"y":1},{"x":8,"y":3},{"x":7,"y":4}],"hazards":[],"snakes":[{"id":"732e98bd-90f7-4c74-bb0d-08a59c3d1604","name":"mcts","health":88,"body":[{"x":9,"y":10},{"x":9,"y":9},{"x":10,"y":9},{"x":10,"y":8},{"x":10,"y":7}],"latency":"902","head":{"x":9,"y":10},"shout":"","customizations":{"color":"#888888","head":"default","tail":"default"}},{"id":"f9b45e5b-af6a-47f0-9bcb-7b78f7caa534","name":"soba","health":89,"body":[{"x":1,"y":10},{"x":0,"y":10},{"x":0,"y":9},{"x":1,"y":9},{"x":2,"y":9},{"x":3,"y":9}],"latency":"401","head":{"x":1,"y":10},"shout":"","customizations":{"color":"#118645","head":"replit-mark","tail":"replit-notmark"}}]}`,
+		// 	Iterations:      math.MaxInt,
+		// 	AcceptableMoves: []string{"left"},
 		// },
 		// {
-		// 	Description:  "should down, counter intuitive (seems like left but will get boxed out of top. may need further investigation)",
-		// 	InitialBoard: `{"height":11,"width":11,"food":[{"x":0,"y":0},{"x":1,"y":3},{"x":2,"y":3},{"x":1,"y":4},{"x":4,"y":9}],"hazards":[],"snakes":[{"id":"a5053727-e14f-43aa-ba60-8bb43c54610c","name":"mcts","health":77,"body":[{"x":8,"y":5},{"x":8,"y":6},{"x":9,"y":6},{"x":9,"y":7},{"x":9,"y":8},{"x":9,"y":9},{"x":9,"y":10},{"x":10,"y":10},{"x":10,"y":9},{"x":10,"y":8},{"x":10,"y":7}],"latency":"904","head":{"x":8,"y":5},"shout":"","customizations":{"color":"#888888","head":"default","tail":"default"}},{"id":"6653a691-0d7e-4f0f-a9ed-e430e87b003d","name":"soba","health":76,"body":[{"x":5,"y":6},{"x":6,"y":6},{"x":6,"y":7},{"x":5,"y":7},{"x":4,"y":7},{"x":3,"y":7},{"x":3,"y":6},{"x":2,"y":6},{"x":1,"y":6},{"x":1,"y":5},{"x":2,"y":5}],"latency":"400","head":{"x":5,"y":6},"shout":"","customizations":{"color":"#118645","head":"replit-mark","tail":"replit-notmark"}}]}`,
-		// 	Iterations:   math.MaxInt,
+		// 	Description:     "don't pass through yourself",
+		// 	InitialBoard:    `{"height":11,"width":11,"food":[{"x":2,"y":9}],"hazards":[],"snakes":[{"id":"0238ebfc-896f-4cd8-a132-3b06a92a3b02","name":"mcts","health":97,"body":[{"x":10,"y":9},{"x":9,"y":9},{"x":9,"y":8},{"x":9,"y":7},{"x":10,"y":7},{"x":10,"y":6},{"x":10,"y":5}],"latency":"907","head":{"x":10,"y":9},"shout":"","customizations":{"color":"#888888","head":"default","tail":"default"}},{"id":"983869f1-491d-4323-951d-dc822d7cc787","name":"soba","health":61,"body":[{"x":3,"y":6},{"x":4,"y":6},{"x":5,"y":6},{"x":5,"y":5},{"x":5,"y":4}],"latency":"400","head":{"x":3,"y":6},"shout":"","customizations":{"color":"#118645","head":"replit-mark","tail":"replit-notmark"}}]}`,
+		// 	Iterations:      math.MaxInt,
+		// 	AcceptableMoves: []string{"up"},
 		// },
 		// {
-		// 	Description:  "don't get transfixed by draws",
-		// 	InitialBoard: `{"height":11,"width":11,"food":[{"x":8,"y":0},{"x":5,"y":5},{"x":5,"y":10},{"x":10,"y":4}],"hazards":[],"snakes":[{"id":"6fb7c491-2ad6-4718-83c6-613840dfe0ea","name":"mcts","health":96,"body":[{"x":6,"y":0},{"x":5,"y":0},{"x":4,"y":0},{"x":3,"y":0}],"latency":"902","head":{"x":6,"y":0},"shout":"","customizations":{"color":"#888888","head":"default","tail":"default"}},{"id":"eaf1ae04-8bcb-4e74-8ab7-6328d207f797","name":"soba","health":94,"body":[{"x":4,"y":2},{"x":5,"y":2},{"x":5,"y":1}],"latency":"401","head":{"x":4,"y":2},"shout":"","customizations":{"color":"#118645","head":"replit-mark","tail":"replit-notmark"}}]}`,
-		// 	Iterations:   math.MaxInt,
+		// 	Description:     "should down, counter intuitive (seems like left but will get boxed out of top. may need further investigation)",
+		// 	InitialBoard:    `{"height":11,"width":11,"food":[{"x":0,"y":0},{"x":1,"y":3},{"x":2,"y":3},{"x":1,"y":4},{"x":4,"y":9}],"hazards":[],"snakes":[{"id":"a5053727-e14f-43aa-ba60-8bb43c54610c","name":"mcts","health":77,"body":[{"x":8,"y":5},{"x":8,"y":6},{"x":9,"y":6},{"x":9,"y":7},{"x":9,"y":8},{"x":9,"y":9},{"x":9,"y":10},{"x":10,"y":10},{"x":10,"y":9},{"x":10,"y":8},{"x":10,"y":7}],"latency":"904","head":{"x":8,"y":5},"shout":"","customizations":{"color":"#888888","head":"default","tail":"default"}},{"id":"6653a691-0d7e-4f0f-a9ed-e430e87b003d","name":"soba","health":76,"body":[{"x":5,"y":6},{"x":6,"y":6},{"x":6,"y":7},{"x":5,"y":7},{"x":4,"y":7},{"x":3,"y":7},{"x":3,"y":6},{"x":2,"y":6},{"x":1,"y":6},{"x":1,"y":5},{"x":2,"y":5}],"latency":"400","head":{"x":5,"y":6},"shout":"","customizations":{"color":"#118645","head":"replit-mark","tail":"replit-notmark"}}]}`,
+		// 	Iterations:      math.MaxInt,
+		// 	AcceptableMoves: []string{"left", "down"}, // left seems better but down is possibly correct
+		// },
+		// {
+		// 	Description:     "don't get transfixed by draws",
+		// 	InitialBoard:    `{"height":11,"width":11,"food":[{"x":8,"y":0},{"x":5,"y":5},{"x":5,"y":10},{"x":10,"y":4}],"hazards":[],"snakes":[{"id":"6fb7c491-2ad6-4718-83c6-613840dfe0ea","name":"mcts","health":96,"body":[{"x":6,"y":0},{"x":5,"y":0},{"x":4,"y":0},{"x":3,"y":0}],"latency":"902","head":{"x":6,"y":0},"shout":"","customizations":{"color":"#888888","head":"default","tail":"default"}},{"id":"eaf1ae04-8bcb-4e74-8ab7-6328d207f797","name":"soba","health":94,"body":[{"x":4,"y":2},{"x":5,"y":2},{"x":5,"y":1}],"latency":"401","head":{"x":4,"y":2},"shout":"","customizations":{"color":"#118645","head":"replit-mark","tail":"replit-notmark"}}]}`,
+		// 	Iterations:      10,
+		// 	AcceptableMoves: []string{"up"},
 		// },
 		// {
 		// 	Description:  "control isn't right",
@@ -375,6 +388,48 @@ func TestMCTSVisualizationJSON(t *testing.T) {
 		// 	Iterations:      math.MaxInt,
 		// 	AcceptableMoves: []string{"left"},
 		// },
+
+		// {
+		// 	Description:     "go right. make sure we're not counting the tail of a snake yet to move due to turn based.",
+		// 	InitialBoard:    `{"height":11,"width":11,"food":[{"X":0,"Y":4},{"X":2,"Y":2},{"X":8,"Y":5},{"X":10,"Y":10}],"hazards":[],"snakes":[{"id":"gs_9TYTxfmrRfQFrtYDTg3644mS","name":"Gregory-Devory","health":39,"body":[{"X":6,"Y":7},{"X":6,"Y":6},{"X":6,"Y":5},{"X":5,"Y":5}],"latency":"408","head":{"X":6,"Y":7},"shout":"This is a nice move."},{"id":"gs_TShSt8KRPdjKSfyycqtjyfcb","name":"soba","health":82,"body":[{"X":4,"Y":7},{"X":5,"Y":7},{"X":5,"Y":8},{"X":6,"Y":8},{"X":7,"Y":8},{"X":7,"Y":7}],"latency":"417","head":{"X":4,"Y":7},"shout":"swag"}]}`,
+		// 	Iterations:      math.MaxInt,
+		// 	AcceptableMoves: []string{"right"},
+		// },
+
+		// seems like should go right still
+		// {
+		// 	Description:  "is not generating moves that could kill the second player, despite them not knowing for sure the first player would have moved to that position",
+		// 	InitialBoard: `{"height":11,"width":11,"food":[{"X":0,"Y":10},{"X":9,"Y":0},{"X":8,"Y":8},{"X":6,"Y":10},{"X":7,"Y":8}],"hazards":[],"snakes":[{"id":"gs_XVqdb79vXkv9Wr8YkxFTgQS4","name":"Gregory-Devory","health":93,"body":[{"X":5,"Y":5},{"X":6,"Y":5},{"X":6,"Y":4},{"X":7,"Y":4},{"X":8,"Y":4},{"X":9,"Y":4},{"X":9,"Y":3},{"X":10,"Y":3},{"X":10,"Y":4},{"X":10,"Y":5}],"latency":"409","head":{"X":5,"Y":5},"shout":"This is a nice move."},{"id":"gs_FgjQVHF4mTMMXrkHhgRWKy3c","name":"soba","health":93,"body":[{"X":4,"Y":4},{"X":3,"Y":4},{"X":2,"Y":4},{"X":1,"Y":4},{"X":1,"Y":5},{"X":2,"Y":5},{"X":2,"Y":6}],"latency":"411","head":{"X":4,"Y":4},"shout":"swag"}]}`,
+		// 	Iterations:   math.MaxInt,
+		// },
+
+		// {
+		// 	Description:     "should not go up, can be killed",
+		// 	InitialBoard:    `{"height":11,"width":11,"food":[{"X":0,"Y":10},{"X":9,"Y":0},{"X":7,"Y":0},{"X":0,"Y":4}],"hazards":[],"snakes":[{"id":"gs_XVqdb79vXkv9Wr8YkxFTgQS4","name":"Gregory-Devory","health":95,"body":[{"X":4,"Y":4},{"X":5,"Y":4},{"X":5,"Y":5},{"X":5,"Y":6},{"X":5,"Y":7},{"X":6,"Y":7},{"X":6,"Y":6},{"X":6,"Y":5},{"X":6,"Y":4},{"X":6,"Y":3},{"X":7,"Y":3}],"latency":"410","head":{"X":4,"Y":4},"shout":"This is a nice move."},{"id":"gs_FgjQVHF4mTMMXrkHhgRWKy3c","name":"soba","health":93,"body":[{"X":2,"Y":6},{"X":3,"Y":6},{"X":4,"Y":6},{"X":4,"Y":7},{"X":3,"Y":7},{"X":2,"Y":7},{"X":1,"Y":7},{"X":0,"Y":7},{"X":0,"Y":8},{"X":1,"Y":8},{"X":2,"Y":8},{"X":2,"Y":9}],"latency":"418","head":{"X":2,"Y":6},"shout":"swag"}]}`,
+		// 	Iterations:      math.MaxInt,
+		// 	AcceptableMoves: []string{"left", "down"},
+		// },
+
+		// should go towards middle
+		// {
+		// 	Description: "placeholder",
+		// 	InitialBoard: `{"height":11,"width":11,"food":[{"X":10,"Y":7},{"X":10,"Y":6},{"X":0,"Y":2},{"X":6,"Y":9},{"X":8,"Y":10},{"X":7,"Y":1},{"X":10,"Y":2}],"hazards":[],"snakes":[{"id":"gs_JHybVxGpYSrmjVhpqDtPJbRY","name":"Gregory east","health":91,"body":[{"X":9,"Y":6},{"X":9,"Y":5},{"X":9,"Y":4},{"X":9,"Y":3},{"X":9,"Y":2},{"X":9,"Y":1},{"X":10,"Y":1},{"X":10,"Y":0},{"X":9,"Y":0},{"X":8,"Y":0},{"X":7,"Y":0},{"X":6,"Y":0},{"X":5,"Y":0},{"X":4,"Y":0},{"X":3,"Y":0}],"latency":"371","head":{"X":9,"Y":6},"shout":"This is a nice move."},{"id":"gs_jj6MWSrwfRWj7mf8SkHqRrSX","name":"soba","health":100,"body":[{"X":1,"Y":4},{"X":2,"Y":4},{"X":3,"Y":4},{"X":3,"Y":5},{"X":4,"Y":5},{"X":5,"Y":5},{"X":6,"Y":5},{"X":7,"Y":5},{"X":7,"Y":5}],"latency":"411","head":{"X":1,"Y":4},"shout":"swag"}]}`,
+		// 	Iterations:   math.MaxInt,
+		//   },
+
+		// indicates issue with the way we discount moves that could have potentially got the opponent killed in a 50/50 scenario.
+		// ie the opponent could have gone right and we actually would have died here.
+		// {
+		// 	Description:  "left would kill us if opponent went right",
+		// 	InitialBoard: `{"height":11,"width":11,"food":[{"X":10,"Y":5},{"X":8,"Y":5},{"X":5,"Y":1},{"X":9,"Y":3}],"hazards":[],"snakes":[{"id":"gs_F4gXmmV6fw7YrSKJyvBb86WD","name":"Gregory-Devory","health":79,"body":[{"X":3,"Y":8},{"X":3,"Y":9},{"X":3,"Y":10},{"X":4,"Y":10},{"X":5,"Y":10},{"X":6,"Y":10},{"X":6,"Y":9},{"X":7,"Y":9},{"X":8,"Y":9},{"X":9,"Y":9},{"X":9,"Y":8},{"X":9,"Y":7},{"X":8,"Y":7},{"X":8,"Y":6},{"X":7,"Y":6},{"X":7,"Y":7},{"X":6,"Y":7},{"X":6,"Y":6},{"X":6,"Y":5},{"X":5,"Y":5},{"X":5,"Y":4},{"X":6,"Y":4},{"X":6,"Y":3},{"X":6,"Y":2},{"X":5,"Y":2},{"X":5,"Y":3},{"X":4,"Y":3},{"X":4,"Y":2}],"latency":"358","head":{"X":3,"Y":8},"shout":"This is a nice move."},{"id":"gs_4WdBrhRvppTMq7DbYh7R38HP","name":"soba","health":81,"body":[{"X":2,"Y":7},{"X":2,"Y":6},{"X":1,"Y":6},{"X":1,"Y":5},{"X":1,"Y":4},{"X":0,"Y":4},{"X":0,"Y":3},{"X":0,"Y":2},{"X":0,"Y":1},{"X":1,"Y":1},{"X":2,"Y":1},{"X":3,"Y":1},{"X":3,"Y":2},{"X":2,"Y":2},{"X":1,"Y":2},{"X":1,"Y":3},{"X":2,"Y":3},{"X":3,"Y":3},{"X":3,"Y":4},{"X":2,"Y":4},{"X":2,"Y":5},{"X":3,"Y":5},{"X":4,"Y":5},{"X":4,"Y":6},{"X":3,"Y":6}],"latency":"411","head":{"X":2,"Y":7},"shout":"swag"}]}`,
+		// 	Iterations:   math.MaxInt,
+		// },
+
+		{
+			Description:  "left will kill us",
+			InitialBoard: `{"height":11,"width":11,"food":[{"X":3,"Y":1},{"X":2,"Y":5},{"X":3,"Y":9}],"hazards":[],"snakes":[{"id":"gs_Rp48WwRj6gYrVpx87HGWrXxG","name":"Gregory-Devory","health":82,"body":[{"X":3,"Y":5},{"X":3,"Y":4},{"X":3,"Y":3},{"X":3,"Y":2}],"latency":"377","head":{"X":3,"Y":5},"shout":"This is a nice move."},{"id":"gs_Vr6bGPmHHVWT6dfmdFGXpbgV","name":"soba","health":96,"body":[{"X":2,"Y":4},{"X":1,"Y":4},{"X":1,"Y":3},{"X":1,"Y":2},{"X":0,"Y":2}],"latency":"409","head":{"X":2,"Y":4},"shout":"swag"}]}`,
+			Iterations:   math.MaxInt,
+		},
 	}
 
 	for _, tc := range testCases {
@@ -388,10 +443,12 @@ func TestMCTSVisualizationJSON(t *testing.T) {
 			ctx, _ := context.WithTimeout(context.Background(), 500*time.Millisecond)
 
 			workers := runtime.NumCPU()
+			t.Log("using workers", workers)
 			node := MCTS(ctx, "testid", rootBoard, tc.Iterations, workers, make(map[string]*Node))
+			t.Log("made moves", node.Visits)
 			bestMove := determineBestMove(node)
 
-			assert.Contains(t, tc.AcceptableMoves, bestMove, "snake made move it shouldn't have")
+			assert.Contains(t, tc.AcceptableMoves, bestMove, "snake made move it shouldn't have, moved %s", bestMove)
 
 			require.NotNil(t, node, "node is nil")
 

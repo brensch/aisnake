@@ -4,7 +4,6 @@ package main
 // 	"context"
 // 	"log/slog"
 // 	"math"
-// 	"sync"
 // )
 
 // type Node struct {
@@ -15,9 +14,6 @@ package main
 // 	Visits     int
 // 	Score      float64
 // 	MyScore    float64
-
-// 	mu         sync.RWMutex // Read-Write Mutex to protect the node's state
-// 	childrenMu sync.RWMutex // Read-Write Mutex for protecting children initialization
 // }
 
 // func NewNode(board Board, snakeIndex int) *Node {
@@ -32,9 +28,6 @@ package main
 
 // // Expand the node to add children based on the board's state
 // func expand(node *Node) {
-// 	node.childrenMu.Lock() // Protect child initialization
-// 	defer node.childrenMu.Unlock()
-
 // 	// If already expanded, return immediately
 // 	if len(node.Children) > 0 {
 // 		return
@@ -73,23 +66,6 @@ package main
 // }
 
 // func (n *Node) UCT(parent *Node, explorationParam float64) float64 {
-// 	// Acquire locks in a consistent order to prevent deadlocks
-// 	if n == parent {
-// 		// Avoid double-locking if n and parent are the same node
-// 		n.mu.RLock()
-// 		defer n.mu.RUnlock()
-// 	} else if n.SnakeIndex < parent.SnakeIndex {
-// 		n.mu.RLock()
-// 		parent.mu.RLock()
-// 		defer n.mu.RUnlock()
-// 		defer parent.mu.RUnlock()
-// 	} else {
-// 		parent.mu.RLock()
-// 		n.mu.RLock()
-// 		defer n.mu.RUnlock()
-// 		defer parent.mu.RUnlock()
-// 	}
-
 // 	if n.Visits == 0 {
 // 		return math.MaxFloat64
 // 	}
@@ -102,9 +78,6 @@ package main
 
 // // Select the best child node based on the UCT value
 // func bestChild(node *Node, explorationParam float64) *Node {
-// 	node.childrenMu.RLock() // Protect access to children
-// 	defer node.childrenMu.RUnlock()
-
 // 	if len(node.Children) == 0 {
 // 		return nil // No children available
 // 	}
@@ -114,10 +87,9 @@ package main
 
 // 	for _, child := range node.Children {
 // 		if child == nil {
-// 			continue // Skip nil children, in case of race condition or partial initialization
+// 			continue // Skip nil children
 // 		}
 
-// 		// Lock the child and parent for reading Visits and Score
 // 		value := child.UCT(node, explorationParam)
 
 // 		if value > bestValue {
@@ -144,80 +116,62 @@ package main
 // 		expand(rootNode)
 // 	}
 
-// 	nodeChan := make(chan *Node, numWorkers) // Channel to distribute work
+// 	for i := 0; i < iterations; i++ {
+// 		// Check for cancellation before each iteration
+// 		select {
+// 		case <-ctx.Done():
+// 			return rootNode
+// 		default:
+// 			// Continue execution
+// 		}
 
-// 	// Central coordinator goroutine
-// 	go func() {
-// 		for i := 0; i < iterations; i++ {
-// 			node := rootNode
-// 			for {
-// 				node.childrenMu.RLock()
-// 				hasChildren := len(node.Children) > 0
-// 				node.childrenMu.RUnlock()
-// 				if !hasChildren {
-// 					break
-// 				}
-// 				nextNode := bestChild(node, 1.41)
-// 				if nextNode == nil {
-// 					break // Break the loop if no valid child is found
-// 				}
-// 				node = nextNode
-// 			}
+// 		node := rootNode
+// 		// Selection
+// 		for {
+// 			// Check for cancellation during selection
 // 			select {
-// 			case nodeChan <- node:
 // 			case <-ctx.Done():
-// 				close(nodeChan)
-// 				return
+// 				return rootNode
+// 			default:
+// 				// Continue execution
+// 			}
+
+// 			if len(node.Children) == 0 {
+// 				break
+// 			}
+// 			nextNode := bestChild(node, 1.41)
+// 			if nextNode == nil {
+// 				break
+// 			}
+// 			node = nextNode
+// 		}
+
+// 		// Expansion
+// 		if !isTerminal(node.Board) && node.Visits > 0 {
+// 			expand(node)
+// 			if len(node.Children) > 0 {
+// 				// Optionally, select a child to proceed (e.g., the first one)
+// 				node = node.Children[0]
 // 			}
 // 		}
-// 		close(nodeChan)
-// 	}()
 
-// 	// Worker goroutines
-// 	var wg sync.WaitGroup
-// 	for i := 0; i < numWorkers; i++ {
-// 		wg.Add(1)
-// 		go func() {
-// 			defer wg.Done()
-// 			for node := range nodeChan {
-// 				if node == nil {
-// 					continue // Skip processing if node is nil
-// 				}
+// 		// Simulation
+// 		var score float64
+// 		if node.Visits == 0 {
+// 			score = evaluateBoard(node.Board, node.SnakeIndex)
+// 			node.MyScore = score
+// 		} else {
+// 			score = node.MyScore
+// 		}
 
-// 				// Lock node before processing
-// 				node.mu.RLock()
-// 				isTerminalNode := isTerminal(node.Board)
-// 				visits := node.Visits
-// 				node.mu.RUnlock()
-
-// 				if !isTerminalNode && visits > 0 {
-// 					expand(node)
-// 				}
-
-// 				// Simulation
-// 				var score float64
-// 				node.mu.Lock()
-// 				if node.Visits == 0 {
-// 					score = evaluateBoard(node.Board, node.SnakeIndex)
-// 					node.MyScore = score
-// 				} else {
-// 					score = node.MyScore
-// 				}
-// 				node.mu.Unlock()
-
-// 				// Backpropagation
-// 				for n := node; n != nil; n = n.Parent {
-// 					n.mu.Lock()
-// 					n.Visits++
-// 					n.Score += score
-// 					n.mu.Unlock()
-// 					score = -score
-// 				}
-// 			}
-// 		}()
+// 		// Backpropagation
+// 		for n := node; n != nil; n = n.Parent {
+// 			n.Visits++
+// 			n.Score += score
+// 			score = -score
+// 		}
 // 	}
 
-// 	wg.Wait()
 // 	return rootNode
 // }
 
@@ -226,13 +180,13 @@ package main
 // 		return -2
 // 	}
 
-// 	// TODO: won't work for multiplayer
+// 	// TODO: Adjust for multiplayer scenarios
 // 	if isSnakeDead(board.Snakes[(snakeIndex+1)%len(board.Snakes)]) {
 // 		return 2
 // 	}
 
 // 	// Voronoi evaluation: Calculate the area controlled by each snake
-// 	// note, not actually voronoi. brendonoi let's say.
+// 	// Note: This is a simplified version
 // 	voronoi := GenerateVoronoi(board)
 // 	totalCells := float64(board.Width * board.Height)
 // 	controlledCells := 0.0
@@ -250,24 +204,22 @@ package main
 // 		}
 // 	}
 
-// 	// Calculate capped length bonus/penalty
-// 	// TODO: this is probably not going to work for multiplayer
+// 	// Calculate length bonus/penalty
 // 	mySnake := board.Snakes[snakeIndex]
 // 	for i, opponent := range board.Snakes {
 // 		if i != snakeIndex && !isSnakeDead(opponent) {
 // 			lengthDifference := len(mySnake.Body) - len(opponent.Body)
 
 // 			if lengthDifference >= 2 {
-// 				// Cap the bonus for being at least 1 longer than the opponent
-// 				lengthBonus += 0.3 * float64(lengthDifference) // Higher reward, but capped
+// 				// Bonus for being longer
+// 				lengthBonus += 0.3 * float64(lengthDifference)
 // 			} else {
-// 				// Penalize for being shorter
+// 				// Penalty for being shorter
 // 				lengthBonus += 0.1 * float64(lengthDifference)
 // 			}
 // 		}
 // 	}
 
-// 	// Return a score between -1 and 1 based on the difference in controlled areas,
-// 	// with a capped length bonus/penalty.
+// 	// Return a score based on the difference in controlled areas and length bonus
 // 	return ((controlledCells - opponentsCells) / totalCells) + lengthBonus
 // }

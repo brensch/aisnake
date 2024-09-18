@@ -94,8 +94,6 @@ func main() {
 		slog.Error("Failed to retrieve tidbyt webhook secret", "error", err.Error())
 	}
 
-	RetrieveGameRenderAndSendToTidbyt("e1aa81f3-8d4a-4b0b-99f1-e14367f72958")
-
 	http.HandleFunc("/", handleIndex)
 	http.HandleFunc("/start", handleStart)
 	http.HandleFunc("/move", handleMove)
@@ -109,9 +107,9 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 	response := map[string]string{
 		"apiversion": "1",
 		"author":     "brensch",
-		"color":      "#888888",
-		"head":       "default",
-		"tail":       "default",
+		"color":      "#00ff00",
+		"head":       "replit-mark",
+		"tail":       "replit-notmark",
 		"version":    "0.1.0",
 	}
 	writeJSON(w, response)
@@ -166,8 +164,8 @@ func handleMove(w http.ResponseWriter, r *http.Request) {
 	}
 
 	reorderedBoard := reorderSnakes(game.Board, game.You.ID)
-	// 100ms safety timeout
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(game.Game.Timeout-100)*time.Millisecond)
+	// timeout to signify end of move
+	ctx, cancel := context.WithDeadline(context.Background(), start.Add(time.Duration(game.Game.Timeout-110)*time.Millisecond))
 	defer cancel()
 
 	workers := runtime.NumCPU()
@@ -180,10 +178,6 @@ func handleMove(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, response)
 
-	// go func() {
-	// reset this gamestate and load in new nodes
-	gameStates[game.Game.ID] = make(map[string]*Node)
-	saveNodesAtDepth2(mctsResult, gameStates[game.Game.ID])
 	slog.Info("Move processed",
 		"game_id", game.Game.ID,
 		"snake_id", game.You.ID,
@@ -192,10 +186,15 @@ func handleMove(w http.ResponseWriter, r *http.Request) {
 		"depth", mctsResult.Visits,
 		"board", reorderedBoard,
 	)
-	// }()
+
+	// reset this gamestate and load in new nodes
+	gameSaveStart := time.Now()
+	gameStates[game.Game.ID] = make(map[string]*Node)
+	saveNodesAtDepth2(mctsResult, gameStates[game.Game.ID])
+	slog.Debug("finished saving game state", "duration", time.Since(gameSaveStart).Milliseconds())
 
 	// slog.Info("Visualized board", "board", visualizeBoard(game.Board))
-	// fmt.Println(visualizeBoard(game.Board))
+	// fmt.Println(visualizeBoard(reorderedBoard))
 	// // Ensure the movetrees directory exists
 	// if err := os.MkdirAll("movetrees", os.ModePerm); err != nil {
 	// 	log.Println("Error creating movetrees directory:", err)
@@ -232,7 +231,7 @@ func reorderSnakes(board Board, youID string) Board {
 
 func determineBestMove(node *Node) string {
 	var bestChild *Node
-	maxVisits := -1
+	maxVisits := int64(-1)
 
 	for _, child := range node.Children {
 		if child.Visits > maxVisits {
