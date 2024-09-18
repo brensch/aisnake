@@ -1,5 +1,7 @@
 package main
 
+import "fmt"
+
 // Direction represents possible movement directions for a snake.
 type Direction int
 
@@ -9,6 +11,7 @@ const (
 	Down
 	Left
 	Right
+	NoMove
 )
 
 // AllDirections provides a slice of all possible directions.
@@ -16,6 +19,10 @@ var AllDirections = []Direction{Up, Down, Left, Right}
 
 // applyMove applies the move of a single snake directly to the provided board without returning a new board.
 func applyMove(board *Board, snakeIndex int, direction Direction) {
+	snake := &board.Snakes[snakeIndex]
+	if len(snake.Body) == 0 {
+		return
+	}
 	// Track the initial head position of the snake
 	initialHead := board.Snakes[snakeIndex].Head
 
@@ -23,7 +30,6 @@ func applyMove(board *Board, snakeIndex int, direction Direction) {
 	newHead := moveHead(initialHead, direction)
 
 	// Move the snake's head and body
-	snake := &board.Snakes[snakeIndex]
 	snake.Body = append([]Point{newHead}, snake.Body...) // Add new head to the body
 	snake.Head = newHead                                 // Update the head position
 
@@ -46,6 +52,10 @@ func applyMove(board *Board, snakeIndex int, direction Direction) {
 		}
 	}
 
+	if len(snake.Body) == 1 {
+		fmt.Println("got 0 snake", snakeIndex)
+		fmt.Println(visualizeBoard(*board))
+	}
 	// remove the last segment for the move
 	snake.Body = snake.Body[:len(snake.Body)-1]
 	// If the snake ate food, reset health and add an additional segment on the tail

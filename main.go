@@ -162,16 +162,22 @@ func handleMove(w http.ResponseWriter, r *http.Request) {
 		slog.Error("failed to find gamestate. probably reset during a game.")
 		gameState = make(map[string]*Node)
 	}
+	_ = gameState
 
 	reorderedBoard := reorderSnakes(game.Board, game.You.ID)
+	fmt.Println(visualizeBoard(reorderedBoard))
+	b, _ := json.Marshal(reorderedBoard)
+	fmt.Println(string(b))
+
 	// timeout to signify end of move
 	ctx, cancel := context.WithDeadline(context.Background(), start.Add(time.Duration(game.Game.Timeout-110)*time.Millisecond))
 	defer cancel()
 
 	workers := runtime.NumCPU()
-	mctsResult := MCTS(ctx, game.Game.ID, reorderedBoard, math.MaxInt, workers, gameState)
-	bestMove := determineBestMove(mctsResult)
-
+	// mctsResult := MCTS(ctx, game.Game.ID, reorderedBoard, math.MaxInt, workers, gameState)
+	// bestMove := determineBestMove(mctsResult)
+	mctsResult := MultiMCTS(ctx, game.Game.ID, reorderedBoard, math.MaxInt, workers, map[string]*MultiNode{})
+	bestMove := MultiDetermineBestMove(mctsResult, 0)
 	response := map[string]string{
 		"move":  bestMove,
 		"shout": "This is a nice move.",
@@ -190,7 +196,7 @@ func handleMove(w http.ResponseWriter, r *http.Request) {
 	// reset this gamestate and load in new nodes
 	gameSaveStart := time.Now()
 	gameStates[game.Game.ID] = make(map[string]*Node)
-	saveNodesAtDepth2(mctsResult, gameStates[game.Game.ID])
+	// saveNodesAtDepth2(mctsResult, gameStates[game.Game.ID])
 	slog.Debug("finished saving game state", "duration", time.Since(gameSaveStart).Milliseconds())
 
 	// slog.Info("Visualized board", "board", visualizeBoard(game.Board))
@@ -305,48 +311,51 @@ func handleEnd(w http.ResponseWriter, r *http.Request) {
 
 	slog.Info("Game ended", "game", game, "ranks", ranks, "duration_ms", gameDuration.Milliseconds())
 
-	err = downloadAndUploadFile(context.Background(), game.Game.ID)
-	if err != nil {
-		sendDiscordWebhook(webhookURL, fmt.Sprintf("%s | %s", description, strings.Join(gameMeta.otherSnakes, ", ")), []Embed{})
-	} else {
-		sendDiscordWebhook(
-			webhookURL,
-			"",
-			[]Embed{
-				{
-					Title:       strings.Join(gameMeta.otherSnakes, ", "),
-					Description: description,
-					Image: &Image{
-						URL: fmt.Sprintf("https://storage.googleapis.com/gregorywebp/%s.gif", game.Game.ID),
-					},
-					Color: getColorForOutcome(outcome),
-					URL:   fmt.Sprintf("https://play.battlesnake.com/game/%s", game.Game.ID),
-					Fields: append([]EmbedField{
-						{
-							Name:   "turns",
-							Value:  fmt.Sprint(game.Turn),
-							Inline: true,
+	go func() {
+
+		err = downloadAndUploadFile(context.Background(), game.Game.ID)
+		if err != nil {
+			sendDiscordWebhook(webhookURL, fmt.Sprintf("%s | %s", description, strings.Join(gameMeta.otherSnakes, ", ")), []Embed{})
+		} else {
+			sendDiscordWebhook(
+				webhookURL,
+				"",
+				[]Embed{
+					{
+						Title:       strings.Join(gameMeta.otherSnakes, ", "),
+						Description: description,
+						Image: &Image{
+							URL: fmt.Sprintf("https://storage.googleapis.com/gregorywebp/%s.gif", game.Game.ID),
 						},
-						{
-							Name:   "latency",
-							Value:  game.You.Latency,
-							Inline: true,
+						Color: getColorForOutcome(outcome),
+						URL:   fmt.Sprintf("https://play.battlesnake.com/game/%s", game.Game.ID),
+						Fields: append([]EmbedField{
+							{
+								Name:   "turns",
+								Value:  fmt.Sprint(game.Turn),
+								Inline: true,
+							},
+							{
+								Name:   "latency",
+								Value:  game.You.Latency,
+								Inline: true,
+							},
+							{
+								Name:   "game duration",
+								Value:  fmt.Sprint(gameDuration.String()),
+								Inline: true,
+							},
+						}, ranksEmbeds...),
+						Footer: &Footer{
+							Text: time.Now().In(loc).Format(time.RFC3339),
 						},
-						{
-							Name:   "game duration",
-							Value:  fmt.Sprint(gameDuration.String()),
-							Inline: true,
-						},
-					}, ranksEmbeds...),
-					Footer: &Footer{
-						Text: time.Now().In(loc).Format(time.RFC3339),
 					},
 				},
-			},
-		)
-	}
+			)
+		}
 
-	RetrieveGameRenderAndSendToTidbyt(game.Game.ID)
+		RetrieveGameRenderAndSendToTidbyt(game.Game.ID)
+	}()
 
 	writeJSON(w, map[string]string{})
 }

@@ -24,6 +24,18 @@ gcloud run deploy battlesnake-server-stage \
     --memory 8Gi \
     --max-instances 1
 
+# multi
+docker build -t gcr.io/snakey/battlesnake-server-multiplayer .
+docker push gcr.io/snakey/battlesnake-server-multiplayer
+gcloud run deploy battlesnake-server-multiplayer \
+    --image gcr.io/snakey/battlesnake-server-multiplayer \
+    --platform managed \
+    --region us-west1 \
+    --allow-unauthenticated \
+    --cpu 8 \
+    --memory 8Gi \
+    --max-instances 1
+
 
 # pingtest
 docker build -t gcr.io/snakey/battlesnake-server-ping -f Dockerfile.pingtest .

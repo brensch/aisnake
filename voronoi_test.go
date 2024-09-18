@@ -306,7 +306,7 @@ func TestEvaluate(t *testing.T) {
 			var board Board
 			assert.NoError(t, json.Unmarshal([]byte(tc.InitialBoard), &board))
 
-			result := evaluateBoard(board, tc.SnakeIndex, modules)
+			result := evaluateBoard(board, modules)
 			t.Log(result)
 		})
 	}

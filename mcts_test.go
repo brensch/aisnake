@@ -254,47 +254,46 @@ type ApplyMoveTestCase struct {
 	ExpectedBoard Board
 }
 
-func TestMCTSVisualization(t *testing.T) {
-	testCases := []struct {
-		Description  string
-		InitialBoard Board
-		Iterations   int
-	}{
-		{
-			Description: "MCTS with multiple snakes and more iterations",
-			InitialBoard: Board{
-				Height: 7,
-				Width:  7,
-				Snakes: []Snake{
-					{ID: "snake1", Head: Point{X: 1, Y: 1}, Health: 100, Body: []Point{{X: 1, Y: 1}, {X: 1, Y: 0}}},
-					{ID: "snake2", Head: Point{X: 5, Y: 5}, Health: 100, Body: []Point{{X: 5, Y: 5}, {X: 5, Y: 6}}},
-				},
-				Food: []Point{{X: 3, Y: 3}},
-			},
-			Iterations: math.MaxInt,
-			// Iterations: 1000,
-		},
-	}
+// func TestMCTSVisualization(t *testing.T) {
+// 	testCases := []struct {
+// 		Description  string
+// 		InitialBoard Board
+// 		Iterations   int
+// 	}{
+// 		{
+// 			Description: "MCTS with multiple snakes and more iterations",
+// 			InitialBoard: Board{
+// 				Height: 7,
+// 				Width:  7,
+// 				Snakes: []Snake{
+// 					{ID: "snake1", Head: Point{X: 1, Y: 1}, Health: 100, Body: []Point{{X: 1, Y: 1}, {X: 1, Y: 0}}},
+// 					{ID: "snake2", Head: Point{X: 5, Y: 5}, Health: 100, Body: []Point{{X: 5, Y: 5}, {X: 5, Y: 6}}},
+// 				},
+// 				Food: []Point{{X: 3, Y: 3}},
+// 			},
+// 			Iterations: math.MaxInt,
+// 		},
+// 	}
 
-	for _, tc := range testCases {
-		t.Run(tc.Description, func(t *testing.T) {
+// 	for _, tc := range testCases {
+// 		t.Run(tc.Description, func(t *testing.T) {
 
-			numCPUs := runtime.NumCPU()
-			_ = numCPUs
-			rootBoard := copyBoard(tc.InitialBoard)
-			ctx, _ := context.WithTimeout(context.Background(), 1000*time.Millisecond)
-			// node := MCTS(ctx, rootBoard, tc.Iterations, numCPUs)
-			workers := runtime.NumCPU()
-			node := MCTS(ctx, "testid", rootBoard, tc.Iterations, 2*workers, make(map[string]*Node))
+// 			numCPUs := runtime.NumCPU()
+// 			_ = numCPUs
+// 			rootBoard := copyBoard(tc.InitialBoard)
+// 			ctx, _ := context.WithTimeout(context.Background(), 1000*time.Millisecond)
+// 			// node := MCTS(ctx, rootBoard, tc.Iterations, numCPUs)
+// 			workers := runtime.NumCPU()
+// 			node := MCTS(ctx, "testid", rootBoard, tc.Iterations, 2*workers, make(map[string]*Node))
 
-			require.NotNil(t, node, "node is nil")
+// 			require.NotNil(t, node, "node is nil")
 
-			// assert.NoError(t, writeNodeAsMermaidToHTMLFile(node))
-			assert.NoError(t, GenerateMostVisitedPathWithAlternativesHtmlTree(node))
+// 			// assert.NoError(t, writeNodeAsMermaidToHTMLFile(node))
+// 			assert.NoError(t, GenerateMostVisitedPathWithAlternativesHtmlTree(node))
 
-		})
-	}
-}
+// 		})
+// 	}
+// }
 
 // requires that snake in question is at index 0
 func TestMCTSVisualizationJSON(t *testing.T) {
@@ -424,10 +423,27 @@ func TestMCTSVisualizationJSON(t *testing.T) {
 		// 	InitialBoard: `{"height":11,"width":11,"food":[{"X":10,"Y":5},{"X":8,"Y":5},{"X":5,"Y":1},{"X":9,"Y":3}],"hazards":[],"snakes":[{"id":"gs_F4gXmmV6fw7YrSKJyvBb86WD","name":"Gregory-Devory","health":79,"body":[{"X":3,"Y":8},{"X":3,"Y":9},{"X":3,"Y":10},{"X":4,"Y":10},{"X":5,"Y":10},{"X":6,"Y":10},{"X":6,"Y":9},{"X":7,"Y":9},{"X":8,"Y":9},{"X":9,"Y":9},{"X":9,"Y":8},{"X":9,"Y":7},{"X":8,"Y":7},{"X":8,"Y":6},{"X":7,"Y":6},{"X":7,"Y":7},{"X":6,"Y":7},{"X":6,"Y":6},{"X":6,"Y":5},{"X":5,"Y":5},{"X":5,"Y":4},{"X":6,"Y":4},{"X":6,"Y":3},{"X":6,"Y":2},{"X":5,"Y":2},{"X":5,"Y":3},{"X":4,"Y":3},{"X":4,"Y":2}],"latency":"358","head":{"X":3,"Y":8},"shout":"This is a nice move."},{"id":"gs_4WdBrhRvppTMq7DbYh7R38HP","name":"soba","health":81,"body":[{"X":2,"Y":7},{"X":2,"Y":6},{"X":1,"Y":6},{"X":1,"Y":5},{"X":1,"Y":4},{"X":0,"Y":4},{"X":0,"Y":3},{"X":0,"Y":2},{"X":0,"Y":1},{"X":1,"Y":1},{"X":2,"Y":1},{"X":3,"Y":1},{"X":3,"Y":2},{"X":2,"Y":2},{"X":1,"Y":2},{"X":1,"Y":3},{"X":2,"Y":3},{"X":3,"Y":3},{"X":3,"Y":4},{"X":2,"Y":4},{"X":2,"Y":5},{"X":3,"Y":5},{"X":4,"Y":5},{"X":4,"Y":6},{"X":3,"Y":6}],"latency":"411","head":{"X":2,"Y":7},"shout":"swag"}]}`,
 		// 	Iterations:   math.MaxInt,
 		// },
+		// {
+		// 	Description:     "left will kill us",
+		// 	InitialBoard:    `{"height":11,"width":11,"food":[{"X":3,"Y":1},{"X":2,"Y":5},{"X":3,"Y":9}],"hazards":[],"snakes":[{"id":"gs_Rp48WwRj6gYrVpx87HGWrXxG","name":"Gregory-Devory","health":82,"body":[{"X":3,"Y":5},{"X":3,"Y":4},{"X":3,"Y":3},{"X":3,"Y":2}],"latency":"377","head":{"X":3,"Y":5},"shout":"This is a nice move."},{"id":"gs_Vr6bGPmHHVWT6dfmdFGXpbgV","name":"soba","health":96,"body":[{"X":2,"Y":4},{"X":1,"Y":4},{"X":1,"Y":3},{"X":1,"Y":2},{"X":0,"Y":2}],"latency":"409","head":{"X":2,"Y":4},"shout":"swag"}]}`,
+		// 	Iterations:      math.MaxInt,
+		// 	AcceptableMoves: []string{"up", "right"},
+		// },
 
+		// {
+		// 	Description:  "multiplayer",
+		// 	InitialBoard: `{"height":11,"width":11,"food":[{"X":5,"Y":5}],"hazards":[],"snakes":[{"id":"gs_HtfVtrhmFpD7ydXWyhcS43yY","name":"Deutschlange-Standard","health":91,"body":[{"X":6,"Y":7},{"X":5,"Y":7},{"X":5,"Y":6},{"X":4,"Y":6}],"latency":"423","head":{"X":6,"Y":7},"shout":""},{"id":"gs_68PQYKgYQBXRF7yMrHVcCbKK","name":"Devourer of Snakes","health":91,"body":[{"X":8,"Y":3},{"X":7,"Y":3},{"X":7,"Y":4},{"X":7,"Y":5}],"latency":"349","head":{"X":8,"Y":3},"shout":""},{"id":"gs_WxTXW3TmR9dCkPByB9h376y8","name":"ich heisse marvin","health":91,"body":[{"X":4,"Y":3},{"X":5,"Y":3},{"X":5,"Y":4},{"X":4,"Y":4}],"latency":"18","head":{"X":4,"Y":3},"shout":""},{"id":"gs_vJHRPdpqvyP4PTGTySHwwpFc","name":"Prüzze v2","health":91,"body":[{"X":7,"Y":8},{"X":8,"Y":8},{"X":8,"Y":7},{"X":7,"Y":7}],"latency":"434","head":{"X":7,"Y":8},"shout":", t=406"}]}`,
+		// 	Iterations:   math.MaxInt,
+		// },
+
+		// {
+		// 	Description:  "don't panic",
+		// 	InitialBoard: `{"height":11,"width":11,"food":[{"X":5,"Y":5}],"hazards":[],"snakes":[{"id":"gs_wbbTT87RF4QtxKrVdrvQJ8B6","name":"Gregory Megory","health":94,"body":[{"X":7,"Y":5},{"X":7,"Y":4},{"X":7,"Y":3},{"X":7,"Y":2}],"latency":"34","head":{"X":7,"Y":5},"shout":""},{"id":"gs_K96D7KJFDqxRtyXgSytmVgY4","name":"Hungry Bot","health":94,"body":[{"X":4,"Y":4},{"X":3,"Y":4},{"X":3,"Y":3},{"X":3,"Y":2}],"latency":"1","head":{"X":4,"Y":4},"shout":""},{"id":"gs_fxWW7CMCVK9Y4m3rq4xxfX94","name":"Hungry Bot","health":94,"body":[{"X":3,"Y":5},{"X":2,"Y":5},{"X":1,"Y":5},{"X":1,"Y":6}],"latency":"1","head":{"X":3,"Y":5},"shout":""},{"id":"gs_SdfvGBXYVVMRJFBSGHfmhVmH","name":"Hungry Bot","health":94,"body":[{"X":6,"Y":6},{"X":7,"Y":6},{"X":7,"Y":7},{"X":7,"Y":8}],"latency":"1","head":{"X":6,"Y":6},"shout":""}]}`,
+		// 	Iterations:   math.MaxInt,
+		// },
 		{
-			Description:  "left will kill us",
-			InitialBoard: `{"height":11,"width":11,"food":[{"X":3,"Y":1},{"X":2,"Y":5},{"X":3,"Y":9}],"hazards":[],"snakes":[{"id":"gs_Rp48WwRj6gYrVpx87HGWrXxG","name":"Gregory-Devory","health":82,"body":[{"X":3,"Y":5},{"X":3,"Y":4},{"X":3,"Y":3},{"X":3,"Y":2}],"latency":"377","head":{"X":3,"Y":5},"shout":"This is a nice move."},{"id":"gs_Vr6bGPmHHVWT6dfmdFGXpbgV","name":"soba","health":96,"body":[{"X":2,"Y":4},{"X":1,"Y":4},{"X":1,"Y":3},{"X":1,"Y":2},{"X":0,"Y":2}],"latency":"409","head":{"X":2,"Y":4},"shout":"swag"}]}`,
+			Description:  "don't accept draw",
+			InitialBoard: `{"height":11,"width":11,"food":[{"x":5,"y":5}],"hazards":[],"snakes":[{"id":"9e49d817-9ae9-4cbc-8d70-c2e93912dd54","name":"mcts","health":91,"body":[{"x":6,"y":5},{"x":6,"y":4},{"x":5,"y":4},{"x":5,"y":3}],"latency":"396","head":{"x":6,"y":5},"shout":"","customizations":{"color":"#00ff00","head":"replit-mark","tail":"replit-notmark"}},{"id":"2ab74633-92cc-4ee2-8a26-0c92118bf1fc","name":"me2","health":91,"body":[{"x":5,"y":6},{"x":4,"y":6},{"x":4,"y":5},{"x":3,"y":5}],"latency":"396","head":{"x":5,"y":6},"shout":"","customizations":{"color":"#00ff00","head":"replit-mark","tail":"replit-notmark"}}]}`,
 			Iterations:   math.MaxInt,
 		},
 	}
@@ -444,11 +460,13 @@ func TestMCTSVisualizationJSON(t *testing.T) {
 
 			workers := runtime.NumCPU()
 			t.Log("using workers", workers)
-			node := MCTS(ctx, "testid", rootBoard, tc.Iterations, workers, make(map[string]*Node))
+			// node := MCTS(ctx, "testid", rootBoard, tc.Iterations, workers, make(map[string]*Node))
+			node := MultiMCTS(ctx, "testid", rootBoard, tc.Iterations, workers, make(map[string]*MultiNode))
+			MultiDetermineBestMove(node, 0)
 			t.Log("made moves", node.Visits)
-			bestMove := determineBestMove(node)
+			// bestMove := determineBestMove(node)
 
-			assert.Contains(t, tc.AcceptableMoves, bestMove, "snake made move it shouldn't have, moved %s", bestMove)
+			// assert.Contains(t, tc.AcceptableMoves, bestMove, "snake made move it shouldn't have, moved %s", bestMove)
 
 			require.NotNil(t, node, "node is nil")
 

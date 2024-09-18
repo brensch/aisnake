@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"math"
 	"sync"
@@ -11,13 +12,15 @@ import (
 
 // Node represents a node in the MCTS tree.
 type Node struct {
-	Board           Board
-	SnakeIndex      int // The index of the snake whose turn it is at this node.
-	Parent          *Node
-	Children        []*Node
-	Visits          int64
-	Score           float64 // Cumulative score from simulations.
-	MyScore         float64 // The initial evaluation score of this node.
+	Board      Board
+	SnakeIndex int // The index of the snake whose turn it is at this node.
+	Parent     *Node
+	Children   []*Node
+	Visits     int64
+	Score      float64 // Cumulative score from simulations.
+	// MyScore         []float64 // The initial evaluation score of this node.
+	MyScore atomic.Value // Will store []float64
+
 	UnexpandedMoves []Direction
 
 	mutex sync.Mutex
@@ -26,13 +29,12 @@ type Node struct {
 // NewNode initializes a new Node and generates possible moves.
 func NewNode(board Board, snakeIndex int, parent *Node) *Node {
 	node := &Node{
-		Board:           board,
+		Board:           copyBoard(board), //TODO: explore if this is necessary
 		SnakeIndex:      snakeIndex,
 		Parent:          parent,
 		Children:        make([]*Node, 0),
 		Visits:          0,
 		Score:           0,
-		MyScore:         0,
 		UnexpandedMoves: nil,
 	}
 
@@ -43,6 +45,20 @@ func NewNode(board Board, snakeIndex int, parent *Node) *Node {
 
 	// Compute the next snake's index.
 	nextSnakeIndex := (snakeIndex + 1) % len(board.Snakes)
+	originalNextSnake := nextSnakeIndex
+
+	// do not generate nodes for dead snakes
+	for {
+		if !isSnakeDead(board.Snakes[nextSnakeIndex]) {
+			break
+		}
+		nextSnakeIndex = (nextSnakeIndex + 1) % len(board.Snakes)
+		// this means we've checked all the snakes
+		if nextSnakeIndex == originalNextSnake {
+			return node
+		}
+
+	}
 
 	// Generate possible moves for the next snake.
 	moves := generateSafeMoves(board, nextSnakeIndex)
@@ -140,7 +156,6 @@ func MCTS(ctx context.Context, gameID string, rootBoard Board, iterations int, n
 	return rootNode
 }
 
-// worker performs MCTS iterations, managing synchronization appropriately.
 func worker(ctx context.Context, rootNode *Node) {
 	for {
 		// Check if the context is done.
@@ -159,21 +174,31 @@ func worker(ctx context.Context, rootNode *Node) {
 		}
 
 		// Simulation.
-		var score float64
+		var scores []float64
 		if atomic.LoadInt64(&node.Visits) == 0 {
 			// Evaluate from the perspective of the root snake.
-			score = evaluateBoard(node.Board, node.SnakeIndex, modules)
-
-			// Update node's own score and visits atomically.
+			scores = evaluateBoard(node.Board, modules)
+			if len(scores) == 0 {
+				fmt.Println(visualizeBoard(node.Board))
+				panic(node)
+			}
+			// Atomically store the initial evaluation score.
+			node.MyScore.Store(scores)
 			atomic.AddInt64(&node.Visits, 1)
-			atomicAddFloat64(&node.Score, score)
-			node.MyScore = score // Save the initial evaluation score.
+			atomicAddFloat64(&node.Score, scores[node.SnakeIndex])
 		} else {
 			// Node has been visited before; use existing MyScore.
-			score = node.MyScore
+			scoresInterface := node.MyScore.Load()
+			// this indicates the node has not finished computing its scores.
+			// seems like this means i'm not locking correctly, but not sure it's worth fixing.
+			// played around with various different locking strategies but they all end up slower.
+			if scoresInterface == nil {
+				continue
+			}
+			scores = scoresInterface.([]float64)
 
 			// Update visits and score atomically.
-			atomicAddFloat64(&node.Score, score)
+			atomicAddFloat64(&node.Score, scores[node.SnakeIndex])
 			atomic.AddInt64(&node.Visits, 1)
 		}
 
@@ -183,11 +208,15 @@ func worker(ctx context.Context, rootNode *Node) {
 			if ctx.Err() != nil {
 				return
 			}
+			atomic.AddInt64(&n.Visits, 1)
+
+			if n.SnakeIndex == -1 {
+				break
+			}
 			// Flip the score to represent the opponent's perspective.
-			score = -score
+			score := scores[n.SnakeIndex]
 
 			// Update score and visits atomically.
-			atomic.AddInt64(&n.Visits, 1)
 			atomicAddFloat64(&n.Score, score)
 			n = n.Parent
 		}
@@ -263,152 +292,4 @@ func atomicAddFloat64(addr *float64, delta float64) {
 			return
 		}
 	}
-}
-
-// EvaluationFunc defines the function signature for evaluation modules.
-type EvaluationFunc func(board Board, rootSnakeIndex int) float64
-
-// EvaluationModule defines a struct that holds an evaluation function and its corresponding weight.
-type EvaluationModule struct {
-	EvalFunc EvaluationFunc
-	Weight   float64
-}
-
-var (
-	modules = []EvaluationModule{
-		{
-			EvalFunc: voronoiEvaluation,
-			Weight:   6,
-		},
-		{
-			EvalFunc: lengthEvaluation,
-			Weight:   6,
-		},
-	}
-)
-
-// evaluateBoard evaluates the board state from the perspective of the root snake.
-func evaluateBoard(board Board, rootSnakeIndex int, modules []EvaluationModule) float64 {
-	if rootSnakeIndex < 0 || rootSnakeIndex >= len(board.Snakes) {
-		// Invalid snake index.
-		return 0
-	}
-
-	rootSnake := board.Snakes[rootSnakeIndex]
-
-	// If the root snake is dead, return an extreme negative score.
-	if isSnakeDead(rootSnake) {
-		return -2
-	}
-
-	// Check if all opponents are dead.
-	aliveOpponents := 0
-	for i, snake := range board.Snakes {
-		if i != rootSnakeIndex && !isSnakeDead(snake) {
-			aliveOpponents++
-		}
-	}
-
-	// If all opponents are dead, return an extreme positive score.
-	if aliveOpponents == 0 {
-		return 2
-	}
-
-	// Calculate the sum of all weights for normalization.
-	totalWeight := 0.0
-	for _, module := range modules {
-		totalWeight += module.Weight
-	}
-
-	// Accumulate weighted evaluations from each module.
-	totalScore := 0.0
-	for _, module := range modules {
-		moduleScore := module.EvalFunc(board, rootSnakeIndex)
-		weightedScore := (module.Weight / totalWeight) * moduleScore
-		totalScore += weightedScore
-	}
-
-	// Return the final score normalized between -1 and 1.
-	if totalScore > 1 {
-		return 1
-	} else if totalScore < -1 {
-		return -1
-	}
-
-	return totalScore
-}
-
-// voronoiEvaluation evaluates the board based on Voronoi control.
-func voronoiEvaluation(board Board, rootSnakeIndex int) float64 {
-	voronoi := GenerateVoronoi(board)
-	totalCells := float64(board.Width * board.Height)
-	rootControlledCells := 0.0
-	opponentsControlledCells := 0.0
-
-	// Count the number of cells each snake controls in the Voronoi diagram.
-	for y := 0; y < board.Height; y++ {
-		for x := 0; x < board.Width; x++ {
-			if voronoi[y][x] == rootSnakeIndex {
-				rootControlledCells++
-			} else if voronoi[y][x] != -1 {
-				opponentsControlledCells++
-			}
-		}
-	}
-
-	// Return the difference in controlled areas as a score.
-	return (rootControlledCells - opponentsControlledCells) / totalCells
-}
-
-// lengthEvaluation evaluates the board based on the length of the root snake compared to opponents.
-// The bonus/penalty is constrained between -1 and 1, with specific scaling logic.
-func lengthEvaluation(board Board, rootSnakeIndex int) float64 {
-	rootSnake := board.Snakes[rootSnakeIndex]
-	rootLength := len(rootSnake.Body)
-	lengthBonus := 0.0
-
-	// Calculate length bonus/penalty.
-	for i, opponent := range board.Snakes {
-		if i != rootSnakeIndex && !isSnakeDead(opponent) {
-			opponentLength := len(opponent.Body)
-			lengthDifference := rootLength - opponentLength
-
-			if lengthDifference > 0 {
-				// If root snake is longer, calculate bonus.
-				if lengthDifference == 1 {
-					lengthBonus += 0.5
-				} else if float64(rootLength) > 1.1*float64(opponentLength) {
-					// Cap bonus at 1.0 for being 10% longer.
-					lengthBonus += 1.0
-				} else {
-					// Scale between 0.5 and 1.0 as the length difference increases up to 10% longer.
-					extraLengthRatio := float64(rootLength) / float64(opponentLength)
-					lengthBonus += 0.5 + 0.5*((extraLengthRatio-1.0)/0.1)
-				}
-			} else {
-				// If root snake is shorter, calculate penalty.
-				if lengthDifference == -1 {
-					lengthBonus -= 0.1
-				} else {
-					// Scale penalty down to -1.0 for being 60% or less of the opponent's length.
-					minLength := 0.6 * float64(opponentLength)
-					if float64(rootLength) <= minLength {
-						lengthBonus -= 1.0
-					} else {
-						// Scale between -0.1 and -1.0 as the root snake gets closer to 60% of the opponent's length.
-						lengthBonus -= 0.1 + 0.9*((float64(opponentLength)-float64(rootLength))/(float64(opponentLength)*0.4))
-					}
-				}
-			}
-		}
-	}
-
-	// Ensure the result is between -1 and 1.
-	if lengthBonus > 1.0 {
-		lengthBonus = 1.0
-	} else if lengthBonus < -1.0 {
-		lengthBonus = -1.0
-	}
-
-	return lengthBonus
 }
