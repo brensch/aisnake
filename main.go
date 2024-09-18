@@ -351,19 +351,6 @@ func handleEnd(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, map[string]string{})
 }
 
-func getColorForOutcome(outcome GameOutcome) int {
-	switch outcome {
-	case Win:
-		return 0x00FF00 // Green
-	case Draw:
-		return 0xFFFF00 // Yellow
-	case Loss:
-		return 0xFF0000 // Red
-	default:
-		return 0x0099ff // Default blue color for Discord
-	}
-}
-
 func writeJSON(w http.ResponseWriter, v interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(v)
@@ -385,70 +372,4 @@ func boardHash(board Board) string {
 	}
 
 	return hash
-}
-
-type GameOutcome int
-
-const (
-	Win GameOutcome = iota
-	Draw
-	Loss
-)
-
-// describeGameOutcome returns both the enum (GameOutcome) and a descriptive string.
-func describeGameOutcome(game BattleSnakeGame) (GameOutcome, string) {
-	// Check if you lost by colliding with a wall
-	if game.You.Head.X < 0 || game.You.Head.X >= game.Board.Width || game.You.Head.Y < 0 || game.You.Head.Y >= game.Board.Height {
-		return Loss, "You lost by crashing into a wall."
-	}
-
-	// Check if you lost by colliding with another snake
-	for _, snake := range game.Board.Snakes {
-		if snake.ID != game.You.ID {
-			for _, segment := range snake.Body {
-				if game.You.Head == segment {
-					return Loss, fmt.Sprintf("You lost by colliding with %s.", snake.Name)
-				}
-			}
-		}
-	}
-
-	// Check if you lost by starving
-	if game.You.Health <= 0 {
-		return Loss, "You lost by starving to death."
-	}
-
-	// Check if all snakes died (a draw)
-	livingSnakes := 0
-	for _, snake := range game.Board.Snakes {
-		if snake.Health > 0 {
-			livingSnakes++
-		}
-	}
-	if livingSnakes == 0 {
-		return Draw, "It's a draw! All snakes died."
-	}
-
-	// Check if you won because all other snakes starved or collided
-	if len(game.Board.Snakes) == 1 && game.Board.Snakes[0].ID == game.You.ID {
-		// If only your snake remains, it means you won
-		return Win, "You won."
-	}
-
-	// Check if an opponent starved
-	for _, snake := range game.Board.Snakes {
-		if snake.ID != game.You.ID && snake.Health <= 0 {
-			return Win, fmt.Sprintf("You won because %s starved.", snake.Name)
-		}
-	}
-
-	// Check if you lost by entering a hazard
-	for _, hazard := range game.Board.Hazards {
-		if game.You.Head == hazard {
-			return Loss, "You lost by entering a hazard."
-		}
-	}
-
-	// Default outcome
-	return Draw, "Seems like a draw."
 }
