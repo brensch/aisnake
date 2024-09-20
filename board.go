@@ -232,8 +232,8 @@ func markDangerZones(board *Board, snakeIndex int) [][]int {
 	return dangerZones
 }
 
-// Generate safe moves (directions), taking into account other snakes' potential movements
-// and only marking them dangerous if the snake is larger or the same size.
+// Generate safe moves (directions), not counting heads, and ignoring tails of snakes that have moved after it.
+// needs to generate move in the board to avoid panics.
 func generateSafeMoves(board Board, snakeIndex int) []Direction {
 	snake := board.Snakes[snakeIndex]
 	if isSnakeDead(snake) {
@@ -249,6 +249,7 @@ func generateSafeMoves(board Board, snakeIndex int) []Direction {
 
 	possibleDirections := []Direction{Up, Down, Left, Right}
 	safeMoves := []Direction{}
+	backupMoves := []Direction{}
 
 	for _, direction := range possibleDirections {
 		nextMove := moveInDirection(head, direction)
@@ -263,8 +264,40 @@ func generateSafeMoves(board Board, snakeIndex int) []Direction {
 			continue // Move is into the snake's own neck
 		}
 
+		// backups are moves that stay inbounds and aren't our neck
+		backupMoves = append(backupMoves, direction)
+
+		// don't collide with bodies of other snakes
+		foundCollision := false
+		for i, snake := range board.Snakes {
+
+			lengthToCheck := len(snake.Body)
+			if i > snakeIndex {
+				lengthToCheck--
+			}
+
+			// don't include the head ever. don't include the tail if the snake has not moved yet.
+			for _, body := range snake.Body[1:lengthToCheck] {
+				if nextMove != body {
+					continue
+				}
+				foundCollision = true
+				break
+			}
+			if foundCollision {
+				break
+			}
+		}
+		if foundCollision {
+			continue
+		}
+
 		// Otherwise, it's a safe move
 		safeMoves = append(safeMoves, direction)
+	}
+
+	if len(safeMoves) == 0 {
+		return backupMoves
 	}
 
 	return safeMoves

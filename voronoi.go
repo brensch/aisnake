@@ -31,7 +31,7 @@ var (
 		},
 		{
 			EvalFunc: trappedEvaluation,
-			Weight:   10,
+			Weight:   20,
 		},
 	}
 )
@@ -234,6 +234,7 @@ func evaluateBoard(node *Node, modules []EvaluationModule) []float64 {
 	for _, module := range modules {
 		moduleScores := module.EvalFunc(node.Board, context)
 		for i := 0; i < numSnakes; i++ {
+			// fmt.Println(moduleScores)
 			weightedScore := (module.Weight / totalWeight) * moduleScores[i]
 			scores[i] += weightedScore
 		}

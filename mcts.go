@@ -298,8 +298,16 @@ func worker(ctx context.Context, rootNode *Node) {
 			if n.SnakeIndex == -1 {
 				break
 			}
-			// Flip the score to represent the opponent's perspective.
-			score := scores[n.SnakeIndex]
+			// the score is the current snake's score, minus the other snakes averaged by 3.
+			score := float64(0)
+
+			for i, snakeScore := range scores {
+				if i == n.SnakeIndex {
+					score += snakeScore
+					continue
+				}
+				score -= snakeScore / float64(len(n.Board.Snakes)-1)
+			}
 
 			// Update score and visits atomically.
 			atomicAddFloat64(&n.Score, score)
