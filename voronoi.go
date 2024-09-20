@@ -389,7 +389,8 @@ func lengthEvaluation(board Board, context *EvaluationContext) []float64 {
 	return scores
 }
 
-// luckEvaluation checks if the snake's move relies on luck by inspecting the LuckMatrix.
+// luckEvaluation checks if the snake's move relies on luck for this branch.
+// luck means another snake could have moved into our head at the same time and we both died.
 func luckEvaluation(board Board, context *EvaluationContext) []float64 {
 	numSnakes := len(board.Snakes)
 	scores := make([]float64, numSnakes)
