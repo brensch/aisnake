@@ -19,19 +19,19 @@ var (
 	modules = []EvaluationModule{
 		{
 			EvalFunc: voronoiEvaluation,
-			Weight:   7,
+			Weight:   8,
 		},
 		{
 			EvalFunc: lengthEvaluation,
-			Weight:   9,
+			Weight:   5,
 		},
 		{
 			EvalFunc: luckEvaluation,
-			Weight:   7,
+			Weight:   5,
 		},
 		{
 			EvalFunc: trappedEvaluation,
-			Weight:   20,
+			Weight:   5,
 		},
 	}
 )
@@ -211,9 +211,13 @@ func isLegalMove(board Board, snakeIndex int, newHead Point, steps int) bool {
 }
 
 // evaluateBoard evaluates the board state and returns an array of scores for each snake.
-func evaluateBoard(node *Node, modules []EvaluationModule) []float64 {
+func evaluateBoard(node *Node, modules []EvaluationModule) ([]float64, [][]float64) {
 	numSnakes := len(node.Board.Snakes)
 	scores := make([]float64, numSnakes)
+	scoreBreakdown := make([][]float64, len(modules))
+	for i := range scoreBreakdown {
+		scoreBreakdown[i] = make([]float64, numSnakes)
+	}
 
 	// Create EvaluationContext and precompute data
 	context := &EvaluationContext{
@@ -231,12 +235,13 @@ func evaluateBoard(node *Node, modules []EvaluationModule) []float64 {
 	}
 
 	// For each module, get the scores, apply weight, and accumulate
-	for _, module := range modules {
+	for i, module := range modules {
 		moduleScores := module.EvalFunc(node.Board, context)
-		for i := 0; i < numSnakes; i++ {
+		scoreBreakdown[i] = moduleScores
+		for j := 0; j < numSnakes; j++ {
 			// fmt.Println(moduleScores)
-			weightedScore := (module.Weight / totalWeight) * moduleScores[i]
-			scores[i] += weightedScore
+			weightedScore := (module.Weight / totalWeight) * moduleScores[j]
+			scores[j] += weightedScore
 		}
 	}
 
@@ -286,7 +291,7 @@ func evaluateBoard(node *Node, modules []EvaluationModule) []float64 {
 		}
 	}
 
-	return scores
+	return scores, scoreBreakdown
 }
 
 // voronoiEvaluation evaluates the board based on Voronoi control.

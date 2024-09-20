@@ -458,11 +458,25 @@ func TestMCTSVisualizationJSON(t *testing.T) {
 		// 	Iterations:   math.MaxInt,
 		// },
 
+		// {
+		// 	Description:     "right gets trapped",
+		// 	InitialBoard:    `{"height":11,"width":11,"food":[{"X":1,"Y":7},{"X":6,"Y":8},{"X":5,"Y":4},{"X":6,"Y":6},{"X":1,"Y":4},{"X":4,"Y":2},{"X":5,"Y":5},{"X":9,"Y":10},{"X":9,"Y":9},{"X":9,"Y":8}],"hazards":[],"snakes":[{"id":"gs_dytFDvX4qKGTytgV9yRctBH9","name":"Gregory Megory","health":68,"body":[{"X":6,"Y":9},{"X":6,"Y":10},{"X":5,"Y":10},{"X":4,"Y":10},{"X":3,"Y":10},{"X":2,"Y":10},{"X":2,"Y":9},{"X":1,"Y":9},{"X":1,"Y":10},{"X":0,"Y":10},{"X":0,"Y":9},{"X":0,"Y":8},{"X":0,"Y":7},{"X":0,"Y":6},{"X":0,"Y":5},{"X":0,"Y":4},{"X":0,"Y":3},{"X":0,"Y":2},{"X":0,"Y":1},{"X":1,"Y":1},{"X":1,"Y":0},{"X":2,"Y":0},{"X":2,"Y":1},{"X":2,"Y":2}],"latency":"413","head":{"X":6,"Y":9},"shout":"This is a nice move."},{"id":"gs_bH8QtHgCxFdD3cgdPRy8MxfS","name":"Gregory-Degory","health":98,"body":[{"X":7,"Y":6},{"X":7,"Y":5},{"X":7,"Y":4},{"X":8,"Y":4},{"X":9,"Y":4},{"X":9,"Y":3},{"X":9,"Y":2},{"X":10,"Y":2},{"X":10,"Y":1},{"X":10,"Y":0},{"X":9,"Y":0},{"X":8,"Y":0},{"X":7,"Y":0},{"X":7,"Y":1},{"X":6,"Y":1},{"X":6,"Y":2},{"X":5,"Y":2},{"X":5,"Y":1},{"X":4,"Y":1},{"X":4,"Y":0},{"X":3,"Y":0},{"X":3,"Y":1},{"X":3,"Y":2},{"X":3,"Y":3},{"X":3,"Y":4},{"X":3,"Y":5},{"X":3,"Y":6},{"X":3,"Y":7},{"X":4,"Y":7},{"X":5,"Y":7}],"latency":"416","head":{"X":7,"Y":6},"shout":"This is a nice move."}]}`,
+		// 	Iterations:      math.MaxInt,
+		// 	AcceptableMoves: []string{"down", "left"},
+		// },
+
 		{
-			Description:  "right gets trapped",
-			InitialBoard: `{"height":11,"width":11,"food":[{"X":1,"Y":7},{"X":6,"Y":8},{"X":5,"Y":4},{"X":6,"Y":6},{"X":1,"Y":4},{"X":4,"Y":2},{"X":5,"Y":5},{"X":9,"Y":10},{"X":9,"Y":9},{"X":9,"Y":8}],"hazards":[],"snakes":[{"id":"gs_dytFDvX4qKGTytgV9yRctBH9","name":"Gregory Megory","health":68,"body":[{"X":6,"Y":9},{"X":6,"Y":10},{"X":5,"Y":10},{"X":4,"Y":10},{"X":3,"Y":10},{"X":2,"Y":10},{"X":2,"Y":9},{"X":1,"Y":9},{"X":1,"Y":10},{"X":0,"Y":10},{"X":0,"Y":9},{"X":0,"Y":8},{"X":0,"Y":7},{"X":0,"Y":6},{"X":0,"Y":5},{"X":0,"Y":4},{"X":0,"Y":3},{"X":0,"Y":2},{"X":0,"Y":1},{"X":1,"Y":1},{"X":1,"Y":0},{"X":2,"Y":0},{"X":2,"Y":1},{"X":2,"Y":2}],"latency":"413","head":{"X":6,"Y":9},"shout":"This is a nice move."},{"id":"gs_bH8QtHgCxFdD3cgdPRy8MxfS","name":"Gregory-Degory","health":98,"body":[{"X":7,"Y":6},{"X":7,"Y":5},{"X":7,"Y":4},{"X":8,"Y":4},{"X":9,"Y":4},{"X":9,"Y":3},{"X":9,"Y":2},{"X":10,"Y":2},{"X":10,"Y":1},{"X":10,"Y":0},{"X":9,"Y":0},{"X":8,"Y":0},{"X":7,"Y":0},{"X":7,"Y":1},{"X":6,"Y":1},{"X":6,"Y":2},{"X":5,"Y":2},{"X":5,"Y":1},{"X":4,"Y":1},{"X":4,"Y":0},{"X":3,"Y":0},{"X":3,"Y":1},{"X":3,"Y":2},{"X":3,"Y":3},{"X":3,"Y":4},{"X":3,"Y":5},{"X":3,"Y":6},{"X":3,"Y":7},{"X":4,"Y":7},{"X":5,"Y":7}],"latency":"416","head":{"X":7,"Y":6},"shout":"This is a nice move."}]}`,
+			Description:  "go towards centre and food",
+			InitialBoard: `{"height":11,"width":11,"food":[{"X":9,"Y":0},{"X":7,"Y":1},{"X":0,"Y":8},{"X":7,"Y":9},{"X":3,"Y":0}],"hazards":[],"snakes":[{"id":"gs_tSC8S3SvVJVgmHRc4rbqVTRM","name":"Gregory Megory","health":95,"body":[{"X":0,"Y":9},{"X":1,"Y":9},{"X":1,"Y":8},{"X":1,"Y":7},{"X":2,"Y":7},{"X":3,"Y":7},{"X":3,"Y":8},{"X":3,"Y":9},{"X":4,"Y":9}],"latency":"405","head":{"X":0,"Y":9},"shout":"This is a nice move."},{"id":"gs_RDbHMXCXbj3wHSM3JvjbWwXK","name":"Gregory-Degory","health":54,"body":[{"X":7,"Y":2},{"X":6,"Y":2},{"X":6,"Y":3},{"X":7,"Y":3},{"X":8,"Y":3},{"X":8,"Y":4},{"X":8,"Y":5},{"X":7,"Y":5},{"X":6,"Y":5},{"X":6,"Y":6},{"X":5,"Y":6}],"latency":"406","head":{"X":7,"Y":2},"shout":"This is a nice move."}]}`,
 			Iterations:   math.MaxInt,
 		},
+
+		// {
+		// 	Description:     "go towards center",
+		// 	InitialBoard:    `{"height":11,"width":11,"food":[{"X":4,"Y":6}],"hazards":[],"snakes":[{"id":"gs_bGX8TGTXQWyjvS9GDbgcfXkV","name":"Gregory Megory","health":92,"body":[{"X":6,"Y":2},{"X":5,"Y":2},{"X":5,"Y":1},{"X":5,"Y":0},{"X":4,"Y":0},{"X":3,"Y":0},{"X":2,"Y":0},{"X":1,"Y":0},{"X":0,"Y":0},{"X":0,"Y":1},{"X":0,"Y":2},{"X":0,"Y":3},{"X":1,"Y":3},{"X":2,"Y":3},{"X":3,"Y":3},{"X":3,"Y":4}],"latency":"410","head":{"X":6,"Y":2},"shout":"This is a nice move."},{"id":"gs_8WDxXjhSFpdxX76fVG4YHD37","name":"Gregory-Degory","health":95,"body":[{"X":3,"Y":7},{"X":3,"Y":8},{"X":2,"Y":8},{"X":1,"Y":8},{"X":0,"Y":8},{"X":0,"Y":9},{"X":0,"Y":10},{"X":1,"Y":10},{"X":2,"Y":10},{"X":3,"Y":10},{"X":4,"Y":10},{"X":5,"Y":10},{"X":6,"Y":10},{"X":7,"Y":10},{"X":7,"Y":9},{"X":6,"Y":9},{"X":6,"Y":8}],"latency":"400","head":{"X":3,"Y":7},"shout":"This is a nice move."}]}`,
+		// 	Iterations:      math.MaxInt,
+		// 	AcceptableMoves: []string{"up"},
+		// },
 	}
 
 	for _, tc := range testCases {

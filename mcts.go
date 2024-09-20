@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"math"
 	"sync"
@@ -10,15 +9,18 @@ import (
 	"unsafe"
 )
 
+const explorationValue = 1.2
+
 // Node represents a node in the MCTS tree.
 type Node struct {
-	Board      Board
-	SnakeIndex int // The index of the snake whose turn it is at this node.
-	Parent     *Node
-	Children   []*Node
-	Visits     int64
-	Score      float64      // Cumulative score from simulations.
-	MyScore    atomic.Value // Will store []float64
+	Board          Board
+	SnakeIndex     int // The index of the snake whose turn it is at this node.
+	Parent         *Node
+	Children       []*Node
+	Visits         int64
+	Score          float64      // Cumulative score from simulations.
+	MyScore        atomic.Value // Will store []float64
+	ScoreBreakdown [][]float64
 
 	UnexpandedMoves []Direction
 
@@ -260,13 +262,12 @@ func worker(ctx context.Context, rootNode *Node) {
 
 		// Simulation.
 		var scores []float64
+		var scoreBreakdown [][]float64
 		if atomic.LoadInt64(&node.Visits) == 0 {
 			// Evaluate from the perspective of the root snake.
-			scores = evaluateBoard(node, modules)
-			if len(scores) == 0 {
-				fmt.Println(visualizeBoard(node.Board))
-				panic(node)
-			}
+			scores, scoreBreakdown = evaluateBoard(node, modules)
+			node.ScoreBreakdown = scoreBreakdown
+
 			// Atomically store the initial evaluation score.
 			node.MyScore.Store(scores)
 			atomic.AddInt64(&node.Visits, 1)
@@ -364,7 +365,7 @@ func selectNode(ctx context.Context, rootNode *Node) *Node {
 
 		// Node is expanded and has children.
 		// Select the best child.
-		bestChildNode := bestChild(node, 1.41)
+		bestChildNode := bestChild(node, explorationValue)
 		if bestChildNode == nil {
 			// No valid child found.
 			return node

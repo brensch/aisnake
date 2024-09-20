@@ -307,8 +307,9 @@ func TestEvaluate(t *testing.T) {
 			var board Board
 			assert.NoError(t, json.Unmarshal([]byte(tc.InitialBoard), &board))
 
-			result := evaluateBoard(&Node{Board: board, LuckMatrix: make([]bool, len(board.Snakes))}, modules)
+			result, breakdown := evaluateBoard(&Node{Board: board, LuckMatrix: make([]bool, len(board.Snakes))}, modules)
 			t.Log(result)
+			t.Log(breakdown)
 		})
 	}
 }

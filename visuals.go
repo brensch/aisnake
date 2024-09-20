@@ -215,6 +215,8 @@ func VisualizeVoronoi(voronoi [][]int, snakes []Snake, options ...func(*boardOpt
 	return sb.String()
 }
 
+var evals = []string{"control", "length", "luck", "trap"}
+
 // visualizeNode generates the DOT representation of a single node, including its label, visits, score, board state, and controlled positions
 func visualizeNode(node *Node) string {
 	if node == nil {
@@ -248,6 +250,12 @@ func visualizeNode(node *Node) string {
 			luck = '🎲'
 		}
 		nodeLabel += fmt.Sprintf("%c: ◾%d 📏%d 🌟%.3f %c\n", 'A'+i, count, len(node.Board.Snakes[i].Body), scores[i], luck)
+		if len(node.ScoreBreakdown) <= i {
+			continue
+		}
+		for j := range evals {
+			nodeLabel += fmt.Sprintf("%s: %2f\n", evals[j], node.ScoreBreakdown[j][i])
+		}
 	}
 	// Add the board state visualization
 	boardVisualization := visualizeBoard(node.Board, WithNewlineCharacter("\n"))
