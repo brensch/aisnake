@@ -29,19 +29,24 @@ var (
 			EvalFunc: luckEvaluation,
 			Weight:   7,
 		},
+		{
+			EvalFunc: trappedEvaluation,
+			Weight:   10,
+		},
 	}
 )
 
 // EvaluationContext holds precomputed data for evaluation functions to avoid redundant computations.
 type EvaluationContext struct {
-	Voronoi    [][]int
-	LuckMatrix []bool
+	AllPaths     [][][]dijkstraNode
+	LongestPaths []int
+	LuckMatrix   []bool
 }
 
 // GenerateVoronoi generates a board ownership diagram based on independently computed shortest path maps for each snake.
-func GenerateVoronoi(board Board) [][]int {
+func GenerateVoronoi(board Board) ([][][]dijkstraNode, []int) {
 	allPaths := make([][][]dijkstraNode, len(board.Snakes))
-
+	longestPaths := make([]int, len(board.Snakes))
 	// Initialize distance maps for each snake
 	for index, snake := range board.Snakes {
 		allPaths[index] = make([][]dijkstraNode, board.Height)
@@ -51,19 +56,21 @@ func GenerateVoronoi(board Board) [][]int {
 				allPaths[index][y][x] = dijkstraNode{Point{x, y}, index, math.MaxInt32}
 			}
 		}
-		calculatePathsForSnake(&board, index, snake, allPaths[index])
+		longestPaths[index] = calculatePathsForSnake(&board, index, snake, allPaths[index])
 	}
 
-	return resolveOwnership(allPaths)
+	return allPaths, longestPaths
+	// return resolveOwnership(allPaths)
 }
 
 // calculatePathsForSnake calculates shortest paths from a single snake's head using Dijkstra's algorithm
-func calculatePathsForSnake(board *Board, snakeIndex int, snake Snake, paths [][]dijkstraNode) {
+func calculatePathsForSnake(board *Board, snakeIndex int, snake Snake, paths [][]dijkstraNode) int {
 	pq := &PriorityQueue{}
 	heap.Init(pq)
 	start := snake.Head
 	paths[start.Y][start.X].distance = 0
 	heap.Push(pq, dijkstraNode{start, snakeIndex, 0})
+	longestPath := -1
 
 	for pq.Len() > 0 {
 		// fmt.Println(snakeIndex)
@@ -78,9 +85,13 @@ func calculatePathsForSnake(board *Board, snakeIndex int, snake Snake, paths [][
 					paths[nextPoint.Y][nextPoint.X] = dijkstraNode{nextPoint, snakeIndex, newDistance}
 					heap.Push(pq, dijkstraNode{nextPoint, snakeIndex, newDistance})
 				}
+				if newDistance > longestPath {
+					longestPath = newDistance
+				}
 			}
 		}
 	}
+	return longestPath
 }
 
 func resolveOwnership(allPaths [][][]dijkstraNode) [][]int {
@@ -208,7 +219,9 @@ func evaluateBoard(node *Node, modules []EvaluationModule) []float64 {
 	context := &EvaluationContext{
 		LuckMatrix: node.LuckMatrix,
 	}
-	context.Voronoi = GenerateVoronoi(node.Board)
+	context.AllPaths, context.LongestPaths = GenerateVoronoi(node.Board)
+	// fmt.Println(VisualizeVoronoi(context.Voronoi, node.Board.Snakes))
+	// fmt.Println(visualizeBoard(node.Board))
 	// Precompute other data if necessary
 
 	// Calculate the sum of all weights for normalization.
@@ -284,9 +297,11 @@ func voronoiEvaluation(board Board, context *EvaluationContext) []float64 {
 	controlledCells := make([]float64, numSnakes)
 	unclaimedCells := 0.0
 
+	voronoi := resolveOwnership(context.AllPaths)
+
 	for y := 0; y < board.Height; y++ {
 		for x := 0; x < board.Width; x++ {
-			snakeIndex := context.Voronoi[y][x]
+			snakeIndex := voronoi[y][x]
 			if snakeIndex >= 0 && snakeIndex < numSnakes {
 				controlledCells[snakeIndex]++
 			} else {
@@ -315,6 +330,19 @@ func voronoiEvaluation(board Board, context *EvaluationContext) []float64 {
 
 		// Return the difference in controlled areas as a score.
 		scores[i] = (controlledCells[i] - opponentsControlledCells) / totalControlled
+	}
+
+	return scores
+}
+
+func trappedEvaluation(board Board, context *EvaluationContext) []float64 {
+	numSnakes := len(board.Snakes)
+	scores := make([]float64, numSnakes)
+
+	for i, snake := range board.Snakes {
+		if context.LongestPaths[i] < len(snake.Body) {
+			scores[i] = -1
+		}
 	}
 
 	return scores

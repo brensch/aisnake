@@ -231,7 +231,9 @@ func visualizeNode(node *Node) string {
 	// Using <br/> instead of \n to create HTML-based line breaks that D3 can interpret
 	nodeLabel := fmt.Sprintf("%s\nVisits: %d\nAvg Score: %.3f\nSnake moving: %c\n\n",
 		nodeID, node.Visits, node.Score/float64(node.Visits), 'A'+node.SnakeIndex)
-	voronoi := GenerateVoronoi(node.Board)
+	paths, _ := GenerateVoronoi(node.Board)
+	voronoi := resolveOwnership(paths)
+
 	controlledPositions := make([]int, len(node.Board.Snakes))
 	for _, row := range voronoi {
 		for _, owner := range row {

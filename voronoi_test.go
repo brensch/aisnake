@@ -210,9 +210,9 @@ func TestVoronoi(t *testing.T) {
 			err := json.Unmarshal([]byte(testCase.Board), &board)
 			assert.NoError(t, err)
 
-			voronoi := GenerateVoronoi(board)
+			paths, _ := GenerateVoronoi(board)
 
-			fmt.Println(VisualizeVoronoi(voronoi, board.Snakes))
+			fmt.Println(VisualizeVoronoi(resolveOwnership(paths), board.Snakes))
 			fmt.Println(visualizeBoard(board))
 
 			// assert.Equal(t, testCase.Expected, voronoi, "Voronoi diagram did not match expected for test case: %+v", testCase)
@@ -236,7 +236,7 @@ func BenchmarkGenerateVoronoi(b *testing.B) {
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		_ = GenerateVoronoi(board)
+		_, _ = GenerateVoronoi(board)
 	}
 }
 
@@ -279,9 +279,20 @@ func TestEvaluate(t *testing.T) {
 		// 	InitialBoard: `{"height":11,"width":11,"food":[{"x":0,"y":2},{"x":0,"y":4},{"x":7,"y":0},{"x":6,"y":10}],"hazards":null,"snakes":[{"id":"8d1de07d-92cf-4ac9-a23e-45aeb8bc14c1","name":"mcts","health":0,"body":[],"latency":"406","head":{"x":10,"y":5},"shout":"","customizations":{"color":"#888888","head":"default","tail":"default"}},{"id":"a6afe25e-c5fc-450a-b9f1-40f638fe8be0","name":"soba","health":86,"body":[{"x":7,"y":5},{"x":8,"y":5},{"x":9,"y":5},{"x":10,"y":5},{"x":10,"y":6},{"x":9,"y":6}],"latency":"401","head":{"x":7,"y":5},"shout":"","customizations":{"color":"#118645","head":"replit-mark","tail":"replit-notmark"}}]}`,
 		// 	SnakeIndex:   1,
 		// },
+		// {
+		// 	Description:  "should score loss as negative",
+		// 	InitialBoard: `{"height":11,"width":11,"food":[{"x":10,"y":0},{"x":10,"y":3},{"x":8,"y":1},{"x":9,"y":0},{"x":3,"y":1},{"x":4,"y":2},{"x":8,"y":4},{"x":3,"y":0},{"x":9,"y":5}],"hazards":null,"snakes":[{"id":"bbc27600-9763-4cce-954a-b3d6fa0d58de","name":"mcts","health":0,"body":[],"latency":"451","head":{"x":3,"y":9},"shout":"","customizations":{"color":"#888888","head":"default","tail":"default"}},{"id":"a34717ee-ee2f-472e-ba78-a99e446a310a","name":"soba","health":91,"body":[{"x":4,"y":7},{"x":5,"y":7},{"x":6,"y":7},{"x":7,"y":7},{"x":8,"y":7},{"x":9,"y":7},{"x":10,"y":7},{"x":10,"y":8},{"x":10,"y":9},{"x":10,"y":10},{"x":9,"y":10},{"x":9,"y":9},{"x":9,"y":8},{"x":8,"y":8},{"x":7,"y":8},{"x":6,"y":8},{"x":6,"y":9},{"x":5,"y":9},{"x":5,"y":8},{"x":4,"y":8},{"x":4,"y":9},{"x":3,"y":9}],"latency":"401","head":{"x":4,"y":7},"shout":"","customizations":{"color":"#118645","head":"replit-mark","tail":"replit-notmark"}}]}`,
+		// 	SnakeIndex:   0,
+		// },
+		// {
+		// 	Description:  "should score loss as negative",
+		// 	InitialBoard: `{"height":11,"width":11,"food":[{"x":1,"y":7},{"x":5,"y":4},{"x":6,"y":6},{"x":1,"y":4},{"x":4,"y":2},{"x":5,"y":5},{"x":9,"y":10},{"x":9,"y":9},{"x":9,"y":8}],"hazards":null,"snakes":[{"id":"gs_dytFDvX4qKGTytgV9yRctBH9","name":"Gregory Megory","health":100,"body":[{"x":6,"y":8},{"x":6,"y":9},{"x":6,"y":10},{"x":5,"y":10},{"x":4,"y":10},{"x":3,"y":10},{"x":2,"y":10},{"x":2,"y":9},{"x":1,"y":9},{"x":1,"y":10},{"x":0,"y":10},{"x":0,"y":9},{"x":0,"y":8},{"x":0,"y":7},{"x":0,"y":6},{"x":0,"y":5},{"x":0,"y":4},{"x":0,"y":3},{"x":0,"y":2},{"x":0,"y":1},{"x":1,"y":1},{"x":1,"y":0},{"x":2,"y":0},{"x":2,"y":1},{"x":2,"y":1}],"latency":"413","head":{"x":6,"y":8},"shout":"This is a nice move.","customizations":{"color":"","head":"","tail":""}},{"id":"gs_bH8QtHgCxFdD3cgdPRy8MxfS","name":"Gregory-Degory","health":98,"body":[{"x":7,"y":6},{"x":7,"y":5},{"x":7,"y":4},{"x":8,"y":4},{"x":9,"y":4},{"x":9,"y":3},{"x":9,"y":2},{"x":10,"y":2},{"x":10,"y":1},{"x":10,"y":0},{"x":9,"y":0},{"x":8,"y":0},{"x":7,"y":0},{"x":7,"y":1},{"x":6,"y":1},{"x":6,"y":2},{"x":5,"y":2},{"x":5,"y":1},{"x":4,"y":1},{"x":4,"y":0},{"x":3,"y":0},{"x":3,"y":1},{"x":3,"y":2},{"x":3,"y":3},{"x":3,"y":4},{"x":3,"y":5},{"x":3,"y":6},{"x":3,"y":7},{"x":4,"y":7},{"x":5,"y":7}],"latency":"416","head":{"x":7,"y":6},"shout":"This is a nice move.","customizations":{"color":"","head":"","tail":""}}]}`,
+		// 	SnakeIndex:   0,
+		// },
+
 		{
-			Description:  "should score loss as negative",
-			InitialBoard: `{"height":11,"width":11,"food":[{"x":10,"y":0},{"x":10,"y":3},{"x":8,"y":1},{"x":9,"y":0},{"x":3,"y":1},{"x":4,"y":2},{"x":8,"y":4},{"x":3,"y":0},{"x":9,"y":5}],"hazards":null,"snakes":[{"id":"bbc27600-9763-4cce-954a-b3d6fa0d58de","name":"mcts","health":0,"body":[],"latency":"451","head":{"x":3,"y":9},"shout":"","customizations":{"color":"#888888","head":"default","tail":"default"}},{"id":"a34717ee-ee2f-472e-ba78-a99e446a310a","name":"soba","health":91,"body":[{"x":4,"y":7},{"x":5,"y":7},{"x":6,"y":7},{"x":7,"y":7},{"x":8,"y":7},{"x":9,"y":7},{"x":10,"y":7},{"x":10,"y":8},{"x":10,"y":9},{"x":10,"y":10},{"x":9,"y":10},{"x":9,"y":9},{"x":9,"y":8},{"x":8,"y":8},{"x":7,"y":8},{"x":6,"y":8},{"x":6,"y":9},{"x":5,"y":9},{"x":5,"y":8},{"x":4,"y":8},{"x":4,"y":9},{"x":3,"y":9}],"latency":"401","head":{"x":4,"y":7},"shout":"","customizations":{"color":"#118645","head":"replit-mark","tail":"replit-notmark"}}]}`,
+			Description:  "trapped",
+			InitialBoard: `{"height":11,"width":11,"food":[{"x":1,"y":7},{"x":5,"y":4},{"x":6,"y":6},{"x":1,"y":4},{"x":4,"y":2},{"x":5,"y":5},{"x":9,"y":10},{"x":9,"y":8}],"hazards":null,"snakes":[{"id":"gs_dytFDvX4qKGTytgV9yRctBH9","name":"Gregory Megory","health":100,"body":[{"x":9,"y":9},{"x":8,"y":9},{"x":7,"y":9},{"x":6,"y":9},{"x":6,"y":10},{"x":5,"y":10},{"x":4,"y":10},{"x":3,"y":10},{"x":2,"y":10},{"x":2,"y":9},{"x":1,"y":9},{"x":1,"y":10},{"x":0,"y":10},{"x":0,"y":9},{"x":0,"y":8},{"x":0,"y":7},{"x":0,"y":6},{"x":0,"y":5},{"x":0,"y":4},{"x":0,"y":3},{"x":0,"y":2},{"x":0,"y":1},{"x":1,"y":1},{"x":1,"y":0},{"x":1,"y":0}],"latency":"413","head":{"x":9,"y":9},"shout":"This is a nice move.","customizations":{"color":"","head":"","tail":""}},{"id":"gs_bH8QtHgCxFdD3cgdPRy8MxfS","name":"Gregory-Degory","health":100,"body":[{"x":6,"y":8},{"x":7,"y":8},{"x":7,"y":7},{"x":7,"y":6},{"x":7,"y":5},{"x":7,"y":4},{"x":8,"y":4},{"x":9,"y":4},{"x":9,"y":3},{"x":9,"y":2},{"x":10,"y":2},{"x":10,"y":1},{"x":10,"y":0},{"x":9,"y":0},{"x":8,"y":0},{"x":7,"y":0},{"x":7,"y":1},{"x":6,"y":1},{"x":6,"y":2},{"x":5,"y":2},{"x":5,"y":1},{"x":4,"y":1},{"x":4,"y":0},{"x":3,"y":0},{"x":3,"y":1},{"x":3,"y":2},{"x":3,"y":3},{"x":3,"y":4},{"x":3,"y":5},{"x":3,"y":6},{"x":3,"y":6}],"latency":"416","head":{"x":6,"y":8},"shout":"This is a nice move.","customizations":{"color":"","head":"","tail":""}}]}`,
 			SnakeIndex:   0,
 		},
 	}
