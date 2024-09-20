@@ -26,6 +26,35 @@ type Node struct {
 	mutex sync.Mutex
 }
 
+// Visualise returns a string representation of the node's board state.
+func (n *Node) Visualise() string {
+	return visualizeNode(n)
+}
+
+// GetBoard returns the board associated with this node.
+func (n *Node) GetBoard() Board {
+	return n.Board
+}
+
+// GetVisits returns the number of visits to this node.
+func (n *Node) GetVisits() int64 {
+	return atomic.LoadInt64(&n.Visits)
+}
+
+// GetChildren returns the children of this node as a slice of GenericNode.
+func (n *Node) GetChildren() []GenericNode {
+	genericChildren := make([]GenericNode, len(n.Children))
+	for i, child := range n.Children {
+		genericChildren[i] = child
+	}
+	return genericChildren
+}
+
+// UCTer calculates the Upper Confidence Bound for Trees (UCT) for this node.
+func (n *Node) UCTer() float64 {
+	return n.UCT(1.41) // Assuming 1.41 as exploration constant
+}
+
 // NewNode initializes a new Node and generates possible moves.
 func NewNode(board Board, snakeIndex int, parent *Node) *Node {
 	node := &Node{

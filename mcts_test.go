@@ -460,13 +460,13 @@ func TestMCTSVisualizationJSON(t *testing.T) {
 
 			workers := runtime.NumCPU()
 			t.Log("using workers", workers)
-			// node := MCTS(ctx, "testid", rootBoard, tc.Iterations, workers, make(map[string]*Node))
-			node := MultiMCTS(ctx, "testid", rootBoard, tc.Iterations, workers, make(map[string]*MultiNode))
-			MultiDetermineBestMove(node, 0)
+			node := MCTS(ctx, "testid", rootBoard, tc.Iterations, workers, make(map[string]*Node))
+			// node := MultiMCTS(ctx, "testid", rootBoard, tc.Iterations, workers, make(map[string]*MultiNode))
+			// MultiDetermineBestMove(node, 0)
 			t.Log("made moves", node.Visits)
-			// bestMove := determineBestMove(node)
+			bestMove := determineBestMove(node)
 
-			// assert.Contains(t, tc.AcceptableMoves, bestMove, "snake made move it shouldn't have, moved %s", bestMove)
+			assert.Contains(t, tc.AcceptableMoves, bestMove, "snake made move it shouldn't have, moved %s", bestMove)
 
 			require.NotNil(t, node, "node is nil")
 

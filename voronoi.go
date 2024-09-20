@@ -211,10 +211,27 @@ func evaluateBoard(board Board, modules []EvaluationModule) []float64 {
 		}
 	}
 
+	// calculate snake deaths to save on calcs for all in each loop
+	snakeDeaths := make([]bool, numSnakes)
+	draw := true
+	for i := 0; i < numSnakes; i++ {
+		dead := isSnakeDead(board.Snakes[i])
+		snakeDeaths[i] = dead
+		if !dead {
+			draw = false
+		}
+	}
+
 	// Normalize scores between -1 and 1, handle special cases
 	for i := 0; i < numSnakes; i++ {
+		// if all snakes are dead, set score to 0 (draw)
+		if draw {
+			scores[i] = 0
+			continue
+		}
+
 		// If the snake is dead, set score to minimum
-		if isSnakeDead(board.Snakes[i]) {
+		if snakeDeaths[i] {
 			scores[i] = -1
 			continue
 		}
