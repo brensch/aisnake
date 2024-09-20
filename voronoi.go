@@ -19,15 +19,15 @@ var (
 	modules = []EvaluationModule{
 		{
 			EvalFunc: voronoiEvaluation,
-			Weight:   6,
+			Weight:   7,
 		},
 		{
 			EvalFunc: lengthEvaluation,
-			Weight:   6,
+			Weight:   9,
 		},
 		{
 			EvalFunc: luckEvaluation,
-			Weight:   8,
+			Weight:   7,
 		},
 	}
 )
