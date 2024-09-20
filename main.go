@@ -165,19 +165,19 @@ func handleMove(w http.ResponseWriter, r *http.Request) {
 	_ = gameState
 
 	reorderedBoard := reorderSnakes(game.Board, game.You.ID)
-	fmt.Println(visualizeBoard(reorderedBoard))
-	b, _ := json.Marshal(reorderedBoard)
-	fmt.Println(string(b))
+	// fmt.Println(visualizeBoard(reorderedBoard))
+	// b, _ := json.Marshal(reorderedBoard)
+	// fmt.Println(string(b))
 
 	// timeout to signify end of move
 	ctx, cancel := context.WithDeadline(context.Background(), start.Add(time.Duration(game.Game.Timeout-110)*time.Millisecond))
 	defer cancel()
 
 	workers := runtime.NumCPU()
-	// mctsResult := MCTS(ctx, game.Game.ID, reorderedBoard, math.MaxInt, workers, gameState)
-	// bestMove := determineBestMove(mctsResult)
-	mctsResult := MultiMCTS(ctx, game.Game.ID, reorderedBoard, math.MaxInt, workers, map[string]*MultiNode{})
-	bestMove := MultiDetermineBestMove(mctsResult, 0)
+	mctsResult := MCTS(ctx, game.Game.ID, reorderedBoard, math.MaxInt, workers, gameState)
+	bestMove := determineBestMove(mctsResult)
+	// mctsResult := MultiMCTS(ctx, game.Game.ID, reorderedBoard, math.MaxInt, workers, map[string]*MultiNode{})
+	// bestMove := MultiDetermineBestMove(mctsResult, 0)
 	response := map[string]string{
 		"move":  bestMove,
 		"shout": "This is a nice move.",
@@ -196,7 +196,7 @@ func handleMove(w http.ResponseWriter, r *http.Request) {
 	// reset this gamestate and load in new nodes
 	gameSaveStart := time.Now()
 	gameStates[game.Game.ID] = make(map[string]*Node)
-	// saveNodesAtDepth2(mctsResult, gameStates[game.Game.ID])
+	saveNodesAtDepth2(mctsResult, gameStates[game.Game.ID])
 	slog.Debug("finished saving game state", "duration", time.Since(gameSaveStart).Milliseconds())
 
 	// slog.Info("Visualized board", "board", visualizeBoard(game.Board))

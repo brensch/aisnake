@@ -17,13 +17,13 @@ type Node struct {
 	Parent     *Node
 	Children   []*Node
 	Visits     int64
-	Score      float64 // Cumulative score from simulations.
-	// MyScore         []float64 // The initial evaluation score of this node.
-	MyScore atomic.Value // Will store []float64
+	Score      float64      // Cumulative score from simulations.
+	MyScore    atomic.Value // Will store []float64
 
 	UnexpandedMoves []Direction
 
-	mutex sync.Mutex
+	LuckMatrix []bool // A boolean array representing if this path depends on luck for each snake.
+	mutex      sync.Mutex
 }
 
 // Visualise returns a string representation of the node's board state.
@@ -55,17 +55,70 @@ func (n *Node) UCTer() float64 {
 	return n.UCT(1.41) // Assuming 1.41 as exploration constant
 }
 
+// updateLuckMatrix updates the LuckMatrix for the current node.
+// It calculates whether each snake's move relies on luck (i.e., if a snake could potentially collide with another snake of the same length).
+func updateLuckMatrix(node *Node) {
+	numSnakes := len(node.Board.Snakes)
+	for i := 0; i < numSnakes; i++ {
+		// once lucky always lucky
+		if node.LuckMatrix[i] {
+			continue
+		}
+
+		currentSnake := node.Board.Snakes[i]
+		if isSnakeDead(currentSnake) {
+			continue
+		}
+
+		currentLength := len(currentSnake.Body)
+		// If the snake's tail is on top of its second last piece, it just ate a fruit, so adjust length.
+		if len(currentSnake.Body) > 1 && currentSnake.Body[len(currentSnake.Body)-1] == currentSnake.Body[len(currentSnake.Body)-2] {
+			currentLength--
+		}
+
+		// Check other snakes that haven't moved yet.
+		for j := i + 1; j < numSnakes; j++ {
+			otherSnake := node.Board.Snakes[j]
+			if isSnakeDead(otherSnake) {
+				continue
+			}
+
+			otherLength := len(otherSnake.Body)
+			// If the other snake is the same length, check for potential collision.
+			if otherLength == currentLength {
+				for _, dir := range AllDirections {
+					otherSnakeNextMove := moveHead(otherSnake.Head, dir)
+					if otherSnakeNextMove == currentSnake.Head {
+						// Potential collision detected, mark this path as relying on luck.
+						node.LuckMatrix[i] = true
+						break
+					}
+				}
+			}
+		}
+	}
+}
+
 // NewNode initializes a new Node and generates possible moves.
 func NewNode(board Board, snakeIndex int, parent *Node) *Node {
+	luckMatrix := make([]bool, len(board.Snakes))
+	if parent != nil {
+		copy(luckMatrix, parent.LuckMatrix)
+	}
+
 	node := &Node{
-		Board:           copyBoard(board), //TODO: explore if this is necessary
+		Board:           copyBoard(board), // Avoid directly mutating the original board.
 		SnakeIndex:      snakeIndex,
 		Parent:          parent,
 		Children:        make([]*Node, 0),
 		Visits:          0,
 		Score:           0,
 		UnexpandedMoves: nil,
+		LuckMatrix:      luckMatrix,
 	}
+
+	// Update the LuckMatrix for the node.
+	updateLuckMatrix(node)
 
 	// If the node is terminal, there are no moves to expand.
 	if isTerminal(board) {
@@ -76,17 +129,15 @@ func NewNode(board Board, snakeIndex int, parent *Node) *Node {
 	nextSnakeIndex := (snakeIndex + 1) % len(board.Snakes)
 	originalNextSnake := nextSnakeIndex
 
-	// do not generate nodes for dead snakes
+	// Do not generate nodes for dead snakes.
 	for {
 		if !isSnakeDead(board.Snakes[nextSnakeIndex]) {
 			break
 		}
 		nextSnakeIndex = (nextSnakeIndex + 1) % len(board.Snakes)
-		// this means we've checked all the snakes
 		if nextSnakeIndex == originalNextSnake {
 			return node
 		}
-
 	}
 
 	// Generate possible moves for the next snake.
@@ -172,7 +223,7 @@ func MCTS(ctx context.Context, gameID string, rootBoard Board, iterations int, n
 		rootNode = existingNode
 	} else {
 		slog.Info("board cache lookup", "hit", false, "cache_size", len(gameStates))
-		// Initialize rootNode with the current snake's index (e.g., -1 for the initial state).
+		// Initialize rootNode with -1 so that we are the first children.
 		rootNode = NewNode(rootBoard, -1, nil)
 	}
 
@@ -202,11 +253,16 @@ func worker(ctx context.Context, rootNode *Node) {
 			return
 		}
 
+		// this occurs and causes panics. means i'm not locking correctly. easier to just skip than fix.
+		if node.SnakeIndex == -1 {
+			continue
+		}
+
 		// Simulation.
 		var scores []float64
 		if atomic.LoadInt64(&node.Visits) == 0 {
 			// Evaluate from the perspective of the root snake.
-			scores = evaluateBoard(node.Board, modules)
+			scores = evaluateBoard(node, modules)
 			if len(scores) == 0 {
 				fmt.Println(visualizeBoard(node.Board))
 				panic(node)

@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"sort"
@@ -220,10 +221,16 @@ func visualizeNode(node *Node) string {
 		return ""
 	}
 
+	scoresInterface := node.MyScore.Load()
+	scores := make([]float64, len(node.Board.Snakes))
+	if scoresInterface != nil {
+		scores = scoresInterface.([]float64)
+	}
+
 	nodeID := fmt.Sprintf("Node_%p", node)
 	// Using <br/> instead of \n to create HTML-based line breaks that D3 can interpret
-	nodeLabel := fmt.Sprintf("%s\nVisits: %d\nAvg Score: %.3f\nMy Score: %+v\nSnake moving: %c\n\n",
-		nodeID, node.Visits, node.Score/float64(node.Visits), node.MyScore, 'A'+node.SnakeIndex)
+	nodeLabel := fmt.Sprintf("%s\nVisits: %d\nAvg Score: %.3f\nSnake moving: %c\n\n",
+		nodeID, node.Visits, node.Score/float64(node.Visits), 'A'+node.SnakeIndex)
 	voronoi := GenerateVoronoi(node.Board)
 	controlledPositions := make([]int, len(node.Board.Snakes))
 	for _, row := range voronoi {
@@ -234,7 +241,11 @@ func visualizeNode(node *Node) string {
 		}
 	}
 	for i, count := range controlledPositions {
-		nodeLabel += fmt.Sprintf("Snake %c: %d cells, %d len\n", 'A'+i, count, len(node.Board.Snakes[i].Body))
+		luck := '.'
+		if node.LuckMatrix[i] {
+			luck = '🎲'
+		}
+		nodeLabel += fmt.Sprintf("%c: ◾%d 📏%d 🌟%.3f %c\n", 'A'+i, count, len(node.Board.Snakes[i].Body), scores[i], luck)
 	}
 	// Add the board state visualization
 	boardVisualization := visualizeBoard(node.Board, WithNewlineCharacter("\n"))
@@ -361,5 +372,19 @@ func traverseAndBuildTree(node GenericNode, treeNode *TreeNode) {
 		// if i == 0 {
 		traverseAndBuildTree(child, childNode)
 		// }
+	}
+}
+
+func visualisePQ(grid [][]dijkstraNode) {
+	for y := len(grid) - 1; y >= 0; y-- { // Start from the last row
+		for x := range grid[y] {
+			node := grid[y][x]
+			if node.distance == math.MaxInt32 { // Assuming unvisited nodes have max distance
+				fmt.Print("  - -  ") // Unvisited node
+			} else {
+				fmt.Printf(" %- 2d,%-2d ", node.snakeIndex, node.distance)
+			}
+		}
+		fmt.Println()
 	}
 }

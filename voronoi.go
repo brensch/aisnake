@@ -25,70 +25,95 @@ var (
 			EvalFunc: lengthEvaluation,
 			Weight:   6,
 		},
+		{
+			EvalFunc: luckEvaluation,
+			Weight:   8,
+		},
 	}
 )
 
 // EvaluationContext holds precomputed data for evaluation functions to avoid redundant computations.
 type EvaluationContext struct {
-	Voronoi [][]int
+	Voronoi    [][]int
+	LuckMatrix []bool
 }
 
-// GenerateVoronoi generates a board ownership diagram based on a shortest path algorithm
+// GenerateVoronoi generates a board ownership diagram based on independently computed shortest path maps for each snake.
 func GenerateVoronoi(board Board) [][]int {
-	// Track the best path (shortest distance) to each position
-	bestPaths := make([][]dijkstraNode, board.Height)
-	for i := range bestPaths {
-		bestPaths[i] = make([]dijkstraNode, board.Width)
-		for j := range bestPaths[i] {
-			bestPaths[i][j] = dijkstraNode{Point{-1, -1}, -1, math.MaxInt32}
+	allPaths := make([][][]dijkstraNode, len(board.Snakes))
+
+	// Initialize distance maps for each snake
+	for index, snake := range board.Snakes {
+		allPaths[index] = make([][]dijkstraNode, board.Height)
+		for y := range allPaths[index] {
+			allPaths[index][y] = make([]dijkstraNode, board.Width)
+			for x := range allPaths[index][y] {
+				allPaths[index][y][x] = dijkstraNode{Point{x, y}, index, math.MaxInt32}
+			}
 		}
+		calculatePathsForSnake(&board, index, snake, allPaths[index])
 	}
 
-	// Priority queue (min-heap) to process nodes based on distance
+	return resolveOwnership(allPaths)
+}
+
+// calculatePathsForSnake calculates shortest paths from a single snake's head using Dijkstra's algorithm
+func calculatePathsForSnake(board *Board, snakeIndex int, snake Snake, paths [][]dijkstraNode) {
 	pq := &PriorityQueue{}
 	heap.Init(pq)
+	start := snake.Head
+	paths[start.Y][start.X].distance = 0
+	heap.Push(pq, dijkstraNode{start, snakeIndex, 0})
 
-	// Initialize the priority queue with the heads of all snakes
-	for k, snake := range board.Snakes {
-		if snake.Health > 0 && len(snake.Body) > 0 { // Skip dead or empty snakes
-			head := snake.Head
-			heap.Push(pq, dijkstraNode{head, k, 0})
-			bestPaths[head.Y][head.X] = dijkstraNode{head, k, 0}
-		}
-	}
-
-	// Process nodes in the priority queue
 	for pq.Len() > 0 {
-		node := heap.Pop(pq).(dijkstraNode)
-		currentPoint := node.point
+		// fmt.Println(snakeIndex)
+		// visualisePQ(paths)
+		current := heap.Pop(pq).(dijkstraNode)
 
-		// Get legal moves for the current point
 		for _, direction := range AllDirections {
-			newPoint := moveHead(currentPoint, direction)
-
-			// Ensure new point is within bounds
-			if newPoint.X >= 0 && newPoint.X < board.Width && newPoint.Y >= 0 && newPoint.Y < board.Height {
-				// Check if the move is legal for the snake at snakeIndex
-				if isLegalMove(board, node.snakeIndex, newPoint, node.distance) {
-					// Compute the new distance to reach this point
-					newDistance := node.distance + 1
-
-					// Check the best path to this point
-					bestNode := bestPaths[newPoint.Y][newPoint.X]
-					if newDistance < bestNode.distance {
-						// Found a shorter path; update best path
-						bestPaths[newPoint.Y][newPoint.X] = dijkstraNode{newPoint, node.snakeIndex, newDistance}
-						heap.Push(pq, dijkstraNode{newPoint, node.snakeIndex, newDistance})
-					} else if newDistance == bestNode.distance && bestNode.snakeIndex != node.snakeIndex {
-						// Tie detected; assign to no one
-						bestPaths[newPoint.Y][newPoint.X].snakeIndex = -1
-					}
+			nextPoint := moveHead(current.point, direction)
+			if isLegalMove(*board, snakeIndex, nextPoint, current.distance+1) {
+				newDistance := current.distance + 1
+				if newDistance < paths[nextPoint.Y][nextPoint.X].distance {
+					paths[nextPoint.Y][nextPoint.X] = dijkstraNode{nextPoint, snakeIndex, newDistance}
+					heap.Push(pq, dijkstraNode{nextPoint, snakeIndex, newDistance})
 				}
 			}
 		}
 	}
+}
 
-	return dijkstraToResult(bestPaths)
+func resolveOwnership(allPaths [][][]dijkstraNode) [][]int {
+	height := len(allPaths[0])
+	width := len(allPaths[0][0])
+	ownership := make([][]int, height)
+	for y := 0; y < height; y++ {
+		ownership[y] = make([]int, width)
+		for x := 0; x < width; x++ {
+			owner := -1
+			minDistance := math.MaxInt32
+			tie := false // Flag to detect ties
+
+			// Check all snakes for the shortest path to this cell
+			for i, paths := range allPaths {
+				if paths[y][x].distance < minDistance {
+					minDistance = paths[y][x].distance
+					owner = i
+					tie = false // New shortest path found, no tie
+				} else if paths[y][x].distance == minDistance {
+					tie = true // A tie is found
+				}
+			}
+
+			// If there was a tie, resolve it or leave the cell unclaimed
+			if tie {
+				owner = -1 // No snake claims the cell in the case of a tie
+			}
+
+			ownership[y][x] = owner
+		}
+	}
+	return ownership
 }
 
 // dijkstraNode represents a node in the Dijkstra algorithm
@@ -174,26 +199,16 @@ func isLegalMove(board Board, snakeIndex int, newHead Point, steps int) bool {
 	return true
 }
 
-// dijkstraToResult converts the bestPaths grid to a simple snake ownership grid (used for debugging)
-func dijkstraToResult(bestPaths [][]dijkstraNode) [][]int {
-	result := make([][]int, len(bestPaths))
-	for i := range result {
-		result[i] = make([]int, len(bestPaths[i]))
-		for j := range result[i] {
-			result[i][j] = bestPaths[i][j].snakeIndex
-		}
-	}
-	return result
-}
-
 // evaluateBoard evaluates the board state and returns an array of scores for each snake.
-func evaluateBoard(board Board, modules []EvaluationModule) []float64 {
-	numSnakes := len(board.Snakes)
+func evaluateBoard(node *Node, modules []EvaluationModule) []float64 {
+	numSnakes := len(node.Board.Snakes)
 	scores := make([]float64, numSnakes)
 
 	// Create EvaluationContext and precompute data
-	context := &EvaluationContext{}
-	context.Voronoi = GenerateVoronoi(board)
+	context := &EvaluationContext{
+		LuckMatrix: node.LuckMatrix,
+	}
+	context.Voronoi = GenerateVoronoi(node.Board)
 	// Precompute other data if necessary
 
 	// Calculate the sum of all weights for normalization.
@@ -204,7 +219,7 @@ func evaluateBoard(board Board, modules []EvaluationModule) []float64 {
 
 	// For each module, get the scores, apply weight, and accumulate
 	for _, module := range modules {
-		moduleScores := module.EvalFunc(board, context)
+		moduleScores := module.EvalFunc(node.Board, context)
 		for i := 0; i < numSnakes; i++ {
 			weightedScore := (module.Weight / totalWeight) * moduleScores[i]
 			scores[i] += weightedScore
@@ -215,7 +230,7 @@ func evaluateBoard(board Board, modules []EvaluationModule) []float64 {
 	snakeDeaths := make([]bool, numSnakes)
 	draw := true
 	for i := 0; i < numSnakes; i++ {
-		dead := isSnakeDead(board.Snakes[i])
+		dead := isSnakeDead(node.Board.Snakes[i])
 		snakeDeaths[i] = dead
 		if !dead {
 			draw = false
@@ -239,7 +254,7 @@ func evaluateBoard(board Board, modules []EvaluationModule) []float64 {
 		// Check if all opponents are dead
 		aliveOpponents := 0
 		for j := 0; j < numSnakes; j++ {
-			if j != i && !isSnakeDead(board.Snakes[j]) {
+			if j != i && !isSnakeDead(node.Board.Snakes[j]) {
 				aliveOpponents++
 			}
 		}
@@ -369,6 +384,21 @@ func lengthEvaluation(board Board, context *EvaluationContext) []float64 {
 		}
 
 		scores[i] = lengthBonus
+	}
+
+	return scores
+}
+
+// luckEvaluation checks if the snake's move relies on luck by inspecting the LuckMatrix.
+func luckEvaluation(board Board, context *EvaluationContext) []float64 {
+	numSnakes := len(board.Snakes)
+	scores := make([]float64, numSnakes)
+
+	for i := 0; i < numSnakes; i++ {
+		// If the snake relies on luck, apply a negative score.
+		if context.LuckMatrix[i] {
+			scores[i] = -.9
+		}
 	}
 
 	return scores
