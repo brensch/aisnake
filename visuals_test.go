@@ -98,10 +98,10 @@ func TestVisualizeVoronoi(t *testing.T) {
 	}
 
 	// Generate the Voronoi diagram
-	voronoi, _ := GenerateVoronoi(board)
+	voronoi := GenerateVoronoi(board)
 
 	// Generate the visualization
-	output := VisualizeVoronoi(resolveOwnership(voronoi), board.Snakes)
+	output := VisualizeVoronoi(voronoi, board.Snakes)
 
 	// Define the expected output
 	expectedOutput := `. B B B B 

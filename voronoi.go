@@ -2,7 +2,6 @@ package main
 
 import (
 	"container/heap"
-	"math"
 )
 
 // EvaluationFunc defines the function signature for evaluation modules.
@@ -29,102 +28,128 @@ var (
 			EvalFunc: luckEvaluation,
 			Weight:   15,
 		},
-		{
-			EvalFunc: trappedEvaluation,
-			Weight:   15,
-		},
+		// {
+		// 	EvalFunc: trappedEvaluation,
+		// 	Weight:   15,
+		// },
 	}
 )
 
 // EvaluationContext holds precomputed data for evaluation functions to avoid redundant computations.
 type EvaluationContext struct {
-	AllPaths     [][][]dijkstraNode
-	LongestPaths []int
-	LuckMatrix   []bool
+	// AllPaths [][][]dijkstraNode
+	Voronoi [][]int
+	// LongestPaths []int //TODO: might add this back for trapped snakes
+	LuckMatrix []bool
 }
 
-// GenerateVoronoi generates a board ownership diagram based on independently computed shortest path maps for each snake.
-func GenerateVoronoi(board Board) ([][][]dijkstraNode, []int) {
-	allPaths := make([][][]dijkstraNode, len(board.Snakes))
-	longestPaths := make([]int, len(board.Snakes))
-	// Initialize distance maps for each snake
-	for index, snake := range board.Snakes {
-		allPaths[index] = make([][]dijkstraNode, board.Height)
-		for y := range allPaths[index] {
-			allPaths[index][y] = make([]dijkstraNode, board.Width)
-			for x := range allPaths[index][y] {
-				allPaths[index][y][x] = dijkstraNode{Point{x, y}, index, math.MaxInt32}
-			}
-		}
-		longestPaths[index] = calculatePathsForSnake(&board, index, snake, allPaths[index])
+// isLegalMove checks if a move to a new point is legal for the snake.
+func isLegalMove(board Board, snakeIndex int, newHead Point, steps int) bool {
+	snake := board.Snakes[snakeIndex]
+
+	// Check if the new head is within the board boundaries
+	if newHead.X < 0 || newHead.X >= board.Width || newHead.Y < 0 || newHead.Y >= board.Height {
+		return false
 	}
 
-	return allPaths, longestPaths
-	// return resolveOwnership(allPaths)
+	// Check for collisions with other snakes
+	for i := range board.Snakes {
+		otherSnake := board.Snakes[i]
+
+		// Don't consider dead snakes
+		if len(otherSnake.Body) == 0 || otherSnake.Health == 0 {
+			continue
+		}
+
+		// Determine tail removal based on steps
+		stepsToRemove := steps
+		if snakeIndex < i {
+			stepsToRemove++
+		}
+
+		if stepsToRemove < len(otherSnake.Body) {
+			otherSnake.Body = otherSnake.Body[0 : len(otherSnake.Body)-stepsToRemove]
+		} else {
+			otherSnake.Body = []Point{}
+		}
+
+		// Check for collisions
+		for _, segment := range otherSnake.Body {
+			if newHead == segment {
+				return false
+			}
+		}
+
+		// Head-to-head collision check
+		if newHead == otherSnake.Head && len(otherSnake.Body) >= len(snake.Body) {
+			return false
+		}
+	}
+
+	return true
 }
 
-// calculatePathsForSnake calculates shortest paths from a single snake's head using Dijkstra's algorithm
-func calculatePathsForSnake(board *Board, snakeIndex int, snake Snake, paths [][]dijkstraNode) int {
+// GenerateVoronoi generates a board ownership diagram based on a shortest path algorithm.
+func GenerateVoronoi(board Board) [][]int {
+	bestPaths := make([][]dijkstraNode, board.Height)
+	for i := range bestPaths {
+		bestPaths[i] = make([]dijkstraNode, board.Width)
+		for j := range bestPaths[i] {
+			bestPaths[i][j] = dijkstraNode{Point{-1, -1}, -1, -1} // Initialize as unassigned
+		}
+	}
+
 	pq := &PriorityQueue{}
 	heap.Init(pq)
-	start := snake.Head
-	paths[start.Y][start.X].distance = 0
-	heap.Push(pq, dijkstraNode{start, snakeIndex, 0})
-	longestPath := -1
 
+	// Initialize the priority queue with all snake heads
+	for k, snake := range board.Snakes {
+		if snake.Health > 0 && len(snake.Body) > 0 {
+			head := snake.Head
+			heap.Push(pq, dijkstraNode{head, k, 0})
+			bestPaths[head.Y][head.X] = dijkstraNode{head, k, 0} // Track snake ownership
+		}
+	}
+
+	// Process the priority queue
 	for pq.Len() > 0 {
-		// fmt.Println(snakeIndex)
-		// visualisePQ(paths)
-		current := heap.Pop(pq).(dijkstraNode)
+		node := heap.Pop(pq).(dijkstraNode)
+		currentPoint := node.point
 
+		// Explore in all directions
 		for _, direction := range AllDirections {
-			nextPoint := moveHead(current.point, direction)
-			if isLegalMove(*board, snakeIndex, nextPoint, current.distance+1) {
-				newDistance := current.distance + 1
-				if newDistance < paths[nextPoint.Y][nextPoint.X].distance {
-					paths[nextPoint.Y][nextPoint.X] = dijkstraNode{nextPoint, snakeIndex, newDistance}
-					heap.Push(pq, dijkstraNode{nextPoint, snakeIndex, newDistance})
-				}
-				if newDistance > longestPath {
-					longestPath = newDistance
+			newPoint := moveHead(currentPoint, direction)
+
+			// Ensure the new point is within bounds and legal for this snake
+			if newPoint.X >= 0 && newPoint.X < board.Width && newPoint.Y >= 0 && newPoint.Y < board.Height &&
+				isLegalMove(board, node.snakeIndex, newPoint, node.distance+1) {
+
+				newDistance := node.distance + 1
+				bestNode := bestPaths[newPoint.Y][newPoint.X]
+
+				// Update if the new path is better
+				if bestNode.snakeIndex == -1 || newDistance < bestNode.distance {
+					bestPaths[newPoint.Y][newPoint.X] = dijkstraNode{newPoint, node.snakeIndex, newDistance}
+					heap.Push(pq, dijkstraNode{newPoint, node.snakeIndex, newDistance})
 				}
 			}
 		}
 	}
-	return longestPath
+
+	// Convert the result to a simple snake ownership grid
+	return dijkstraToResult(bestPaths)
 }
 
-func resolveOwnership(allPaths [][][]dijkstraNode) [][]int {
-	height := len(allPaths[0])
-	width := len(allPaths[0][0])
-	ownership := make([][]int, height)
-	for y := 0; y < height; y++ {
-		ownership[y] = make([]int, width)
-		for x := 0; x < width; x++ {
-			owner := -1
-			minDistance := math.MaxInt32
-			tie := false // Flag to detect ties
-
-			// Check all snakes for the shortest path to this cell
-			for i, paths := range allPaths {
-				if paths[y][x].distance < minDistance {
-					minDistance = paths[y][x].distance
-					owner = i
-					tie = false // New shortest path found, no tie
-				} else if paths[y][x].distance == minDistance {
-					tie = true // A tie is found
-				}
-			}
-
-			// If there was a tie, resolve it or leave the cell unclaimed
-			if tie {
-				owner = -1 // No snake claims the cell in the case of a tie
-			}
-
-			ownership[y][x] = owner
+// Converts the bestPaths grid to a simple snake ownership grid
+func dijkstraToResult(bestPaths [][]dijkstraNode) [][]int {
+	result := make([][]int, len(bestPaths))
+	for i := range result {
+		result[i] = make([]int, len(bestPaths[i]))
+		for j := range result[i] {
+			result[i][j] = bestPaths[i][j].snakeIndex
 		}
 	}
-	return ownership
+	return result
 }
 
 // dijkstraNode represents a node in the Dijkstra algorithm
@@ -161,55 +186,6 @@ func (pq *PriorityQueue) Pop() interface{} {
 	return item
 }
 
-// isLegalMove checks if a move to a new point is legal for the snake.
-func isLegalMove(board Board, snakeIndex int, newHead Point, steps int) bool {
-	snake := board.Snakes[snakeIndex]
-
-	// Check if the new head is within the board boundaries
-	if newHead.X < 0 || newHead.X >= board.Width || newHead.Y < 0 || newHead.Y >= board.Height {
-		return false
-	}
-
-	// Check for collisions with other snakes
-	for i := range board.Snakes {
-		otherSnake := board.Snakes[i]
-
-		// Don't consider dead snakes
-		if len(otherSnake.Body) == 0 || otherSnake.Health == 0 {
-			continue
-		}
-
-		// Determine how much of the tail is to be removed based on steps
-		stepsToRemove := steps
-		if snakeIndex < i {
-			stepsToRemove++ // Since the other snake moves after this one, remove one extra
-		}
-
-		// Ensure we do not remove more segments than the snake has
-		if stepsToRemove < len(otherSnake.Body) {
-			otherSnake.Body = otherSnake.Body[0 : len(otherSnake.Body)-stepsToRemove]
-		} else {
-			// If the steps exceed the length of the snake, treat it as having no body
-			otherSnake.Body = []Point{}
-		}
-
-		// Check for collisions with the snake's body
-		for _, segment := range otherSnake.Body {
-			if newHead == segment {
-				return false
-			}
-		}
-
-		// Check for head-to-head collisions where the other snake is longer or equal
-		if newHead == otherSnake.Head && len(otherSnake.Body) >= len(snake.Body) {
-			return false
-		}
-	}
-
-	// If no collision, the move is legal
-	return true
-}
-
 // evaluateBoard evaluates the board state and returns an array of scores for each snake.
 func evaluateBoard(node *Node, modules []EvaluationModule) ([]float64, [][]float64) {
 	numSnakes := len(node.Board.Snakes)
@@ -222,8 +198,8 @@ func evaluateBoard(node *Node, modules []EvaluationModule) ([]float64, [][]float
 	// Create EvaluationContext and precompute data
 	context := &EvaluationContext{
 		LuckMatrix: node.LuckMatrix,
+		Voronoi:    GenerateVoronoi(node.Board),
 	}
-	context.AllPaths, context.LongestPaths = GenerateVoronoi(node.Board)
 	// fmt.Println(VisualizeVoronoi(context.Voronoi, node.Board.Snakes))
 	// fmt.Println(visualizeBoard(node.Board))
 	// Precompute other data if necessary
@@ -299,15 +275,15 @@ func voronoiEvaluation(board Board, context *EvaluationContext) []float64 {
 	numSnakes := len(board.Snakes)
 	scores := make([]float64, numSnakes)
 
+	voronoiOwnership := context.Voronoi
+
 	// Count the number of cells each snake controls in the Voronoi diagram.
 	controlledCells := make([]float64, numSnakes)
 	unclaimedCells := 0.0
 
-	voronoi := resolveOwnership(context.AllPaths)
-
 	for y := 0; y < board.Height; y++ {
 		for x := 0; x < board.Width; x++ {
-			snakeIndex := voronoi[y][x]
+			snakeIndex := voronoiOwnership[y][x]
 			if snakeIndex >= 0 && snakeIndex < numSnakes {
 				controlledCells[snakeIndex]++
 			} else {
@@ -341,18 +317,19 @@ func voronoiEvaluation(board Board, context *EvaluationContext) []float64 {
 	return scores
 }
 
-func trappedEvaluation(board Board, context *EvaluationContext) []float64 {
-	numSnakes := len(board.Snakes)
-	scores := make([]float64, numSnakes)
+// TODO: maybe add back
+// func trappedEvaluation(board Board, context *EvaluationContext) []float64 {
+// 	numSnakes := len(board.Snakes)
+// 	scores := make([]float64, numSnakes)
 
-	for i, snake := range board.Snakes {
-		if context.LongestPaths[i] < len(snake.Body) {
-			scores[i] = -1
-		}
-	}
+// 	for i, snake := range board.Snakes {
+// 		if context.LongestPaths[i] < len(snake.Body) {
+// 			scores[i] = -1
+// 		}
+// 	}
 
-	return scores
-}
+// 	return scores
+// }
 
 // lengthEvaluation evaluates the board based on the length of each snake compared to opponents.
 func lengthEvaluation(board Board, context *EvaluationContext) []float64 {

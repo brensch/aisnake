@@ -215,7 +215,7 @@ func VisualizeVoronoi(voronoi [][]int, snakes []Snake, options ...func(*boardOpt
 	return sb.String()
 }
 
-var evals = []string{"control", "length", "luck", "trap"}
+var evals = []string{"control", "length", "luck"}
 
 // visualizeNode generates the DOT representation of a single node, including its label, visits, score, board state, and controlled positions
 func visualizeNode(node *Node) string {
@@ -233,8 +233,8 @@ func visualizeNode(node *Node) string {
 	// Using <br/> instead of \n to create HTML-based line breaks that D3 can interpret
 	nodeLabel := fmt.Sprintf("%s\nVisits: %d\nAvg Score: %.3f\nSnake moving: %c\n\n",
 		nodeID, node.Visits, node.Score/float64(node.Visits), 'A'+node.SnakeIndex)
-	paths, _ := GenerateVoronoi(node.Board)
-	voronoi := resolveOwnership(paths)
+	voronoi := GenerateVoronoi(node.Board)
+	// voronoi := resolveOwnership(paths)
 
 	controlledPositions := make([]int, len(node.Board.Snakes))
 	for _, row := range voronoi {
@@ -250,7 +250,7 @@ func visualizeNode(node *Node) string {
 			luck = '🎲'
 		}
 		nodeLabel += fmt.Sprintf("%c: ◾%d 📏%d 🌟%.3f %c\n", 'A'+i, count, len(node.Board.Snakes[i].Body), scores[i], luck)
-		if len(node.ScoreBreakdown) <= i {
+		if len(node.ScoreBreakdown) == 0 {
 			continue
 		}
 		for j := range evals {

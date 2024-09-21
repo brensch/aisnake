@@ -210,9 +210,9 @@ func TestVoronoi(t *testing.T) {
 			err := json.Unmarshal([]byte(testCase.Board), &board)
 			assert.NoError(t, err)
 
-			paths, _ := GenerateVoronoi(board)
+			paths := GenerateVoronoi(board)
 
-			fmt.Println(VisualizeVoronoi(resolveOwnership(paths), board.Snakes))
+			fmt.Println(VisualizeVoronoi(paths, board.Snakes))
 			fmt.Println(visualizeBoard(board))
 
 			// assert.Equal(t, testCase.Expected, voronoi, "Voronoi diagram did not match expected for test case: %+v", testCase)
@@ -236,7 +236,7 @@ func BenchmarkGenerateVoronoi(b *testing.B) {
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		_, _ = GenerateVoronoi(board)
+		_ = GenerateVoronoi(board)
 	}
 }
 
