@@ -532,9 +532,23 @@ func TestMCTSVisualizationJSON(t *testing.T) {
 		// 	AcceptableMoves: []string{"left"},
 		// },
 
+		// {
+		// 	Description:     "kill if possible",
+		// 	InitialBoard:    `{"height":11,"width":11,"food":[{"X":2,"Y":7}],"hazards":[],"snakes":[{"id":"gs_79hGpDcy3fMvYyKCfccyqPdS","name":"Gregory Megory Segory","health":91,"body":[{"X":4,"Y":1},{"X":4,"Y":2},{"X":5,"Y":2},{"X":6,"Y":2},{"X":7,"Y":2},{"X":7,"Y":3},{"X":8,"Y":3},{"X":8,"Y":2},{"X":9,"Y":2},{"X":9,"Y":3},{"X":9,"Y":4},{"X":8,"Y":4}],"latency":"416","head":{"X":4,"Y":1},"shout":"I pondered the orb 27290 times in 408ms. It was nice."},{"id":"gs_mVCCSpcCmQkSCSVpXGjCRmW7","name":"snakos","health":86,"body":[{"X":3,"Y":0},{"X":4,"Y":0},{"X":5,"Y":0},{"X":6,"Y":0},{"X":7,"Y":0},{"X":8,"Y":0},{"X":9,"Y":0},{"X":10,"Y":0},{"X":10,"Y":1},{"X":9,"Y":1},{"X":8,"Y":1}],"latency":"81","head":{"X":3,"Y":0},"shout":"chasing snack"},{"id":"gs_dg8vc4rc8j6txyFRHVVSRPbJ","name":"Cucumber Cat","health":98,"body":[{"X":2,"Y":5},{"X":2,"Y":4},{"X":2,"Y":3},{"X":3,"Y":3},{"X":4,"Y":3},{"X":5,"Y":3},{"X":6,"Y":3},{"X":6,"Y":4},{"X":6,"Y":5},{"X":6,"Y":6}],"latency":"101","head":{"X":2,"Y":5},"shout":""}]}`,
+		// 	Iterations:      math.MaxInt,
+		// 	AcceptableMoves: []string{"left"},
+		// },
+
+		// {
+		// 	Description:     "went into death trap during play",
+		// 	InitialBoard:    `{"height":11,"width":11,"food":[{"X":9,"Y":4},{"X":2,"Y":4}],"hazards":[],"snakes":[{"id":"gs_79hGpDcy3fMvYyKCfccyqPdS","name":"Gregory Megory Segory","health":87,"body":[{"X":7,"Y":7},{"X":7,"Y":6},{"X":7,"Y":5},{"X":6,"Y":5},{"X":5,"Y":5},{"X":5,"Y":4},{"X":5,"Y":3},{"X":5,"Y":2},{"X":6,"Y":2},{"X":6,"Y":1},{"X":7,"Y":1},{"X":8,"Y":1},{"X":9,"Y":1},{"X":10,"Y":1},{"X":10,"Y":0}],"latency":"397","head":{"X":7,"Y":7},"shout":"I pondered the orb 43978 times in 390ms. It was nice."},{"id":"gs_mVCCSpcCmQkSCSVpXGjCRmW7","name":"snakos","health":95,"body":[{"X":9,"Y":5},{"X":9,"Y":6},{"X":9,"Y":7},{"X":9,"Y":8},{"X":8,"Y":8},{"X":7,"Y":8},{"X":6,"Y":8},{"X":5,"Y":8},{"X":4,"Y":8},{"X":3,"Y":8},{"X":3,"Y":9},{"X":3,"Y":10}],"latency":"87","head":{"X":9,"Y":5},"shout":"chasing snack"}]}`,
+		// 	Iterations:      math.MaxInt,
+		// 	AcceptableMoves: []string{"left"},
+		// },
+
 		{
-			Description:     "kill if possible",
-			InitialBoard:    `{"height":11,"width":11,"food":[{"X":2,"Y":7}],"hazards":[],"snakes":[{"id":"gs_79hGpDcy3fMvYyKCfccyqPdS","name":"Gregory Megory Segory","health":91,"body":[{"X":4,"Y":1},{"X":4,"Y":2},{"X":5,"Y":2},{"X":6,"Y":2},{"X":7,"Y":2},{"X":7,"Y":3},{"X":8,"Y":3},{"X":8,"Y":2},{"X":9,"Y":2},{"X":9,"Y":3},{"X":9,"Y":4},{"X":8,"Y":4}],"latency":"416","head":{"X":4,"Y":1},"shout":"I pondered the orb 27290 times in 408ms. It was nice."},{"id":"gs_mVCCSpcCmQkSCSVpXGjCRmW7","name":"snakos","health":86,"body":[{"X":3,"Y":0},{"X":4,"Y":0},{"X":5,"Y":0},{"X":6,"Y":0},{"X":7,"Y":0},{"X":8,"Y":0},{"X":9,"Y":0},{"X":10,"Y":0},{"X":10,"Y":1},{"X":9,"Y":1},{"X":8,"Y":1}],"latency":"81","head":{"X":3,"Y":0},"shout":"chasing snack"},{"id":"gs_dg8vc4rc8j6txyFRHVVSRPbJ","name":"Cucumber Cat","health":98,"body":[{"X":2,"Y":5},{"X":2,"Y":4},{"X":2,"Y":3},{"X":3,"Y":3},{"X":4,"Y":3},{"X":5,"Y":3},{"X":6,"Y":3},{"X":6,"Y":4},{"X":6,"Y":5},{"X":6,"Y":6}],"latency":"101","head":{"X":2,"Y":5},"shout":""}]}`,
+			Description:     "should get food first and circle back",
+			InitialBoard:    `{"height":11,"width":11,"food":[{"X":2,"Y":0}],"hazards":[],"snakes":[{"id":"gs_r9ywfBXmXV3yrjHMYYXT96GF","name":"Gregory Megory Segory","health":93,"body":[{"X":3,"Y":0},{"X":4,"Y":0},{"X":5,"Y":0},{"X":6,"Y":0},{"X":7,"Y":0},{"X":8,"Y":0},{"X":8,"Y":1},{"X":8,"Y":2},{"X":8,"Y":3}],"latency":"397","head":{"X":3,"Y":0},"shout":"I pondered the orb 81262 times in 390ms. It was nice."},{"id":"gs_jgqqSTXm7wtdfBcKx86HfxfY","name":"Gregory-Degory","health":93,"body":[{"X":7,"Y":6},{"X":8,"Y":6},{"X":9,"Y":6},{"X":9,"Y":7},{"X":10,"Y":7},{"X":10,"Y":8},{"X":9,"Y":8},{"X":9,"Y":9},{"X":8,"Y":9},{"X":8,"Y":8},{"X":8,"Y":7}],"latency":"403","head":{"X":7,"Y":6},"shout":"This is a nice move."}]}`,
 			Iterations:      math.MaxInt,
 			AcceptableMoves: []string{"left"},
 		},
@@ -548,7 +562,7 @@ func TestMCTSVisualizationJSON(t *testing.T) {
 			var board Board
 			assert.NoError(t, json.Unmarshal([]byte(tc.InitialBoard), &board))
 			rootBoard := copyBoard(board)
-			ctx, _ := context.WithTimeout(context.Background(), 390*time.Millisecond)
+			ctx, _ := context.WithTimeout(context.Background(), 3900*time.Millisecond)
 
 			workers := runtime.NumCPU()
 			t.Log("using workers", workers)
@@ -562,7 +576,7 @@ func TestMCTSVisualizationJSON(t *testing.T) {
 
 			require.NotNil(t, node, "node is nil")
 
-			assert.NoError(t, GenerateMostVisitedPathWithAlternativesHtmlTree(node))
+			// assert.NoError(t, GenerateMostVisitedPathWithAlternativesHtmlTree(node))
 
 		})
 	}

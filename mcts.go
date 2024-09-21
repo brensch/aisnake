@@ -9,7 +9,7 @@ import (
 	"unsafe"
 )
 
-const explorationValue = 1.2
+const explorationValue = 1.5
 
 // Node represents a node in the MCTS tree.
 type Node struct {
@@ -313,19 +313,22 @@ func worker(ctx context.Context, rootNode *Node) {
 			if n.SnakeIndex == -1 {
 				break
 			}
-			// the score is the current snake's score, minus the other snakes averaged by 3.
-			score := float64(0)
 
-			for i, snakeScore := range scores {
-				if i == n.SnakeIndex {
-					score += snakeScore
-					continue
-				}
-				score -= snakeScore / float64(len(n.Board.Snakes)-1)
-			}
+			// TODO: think about if this is the play
+			// the score is the current snake's score, minus the other snakes averaged by 3.
+			// score := float64(0)
+
+			// for i, snakeScore := range scores {
+			// 	if i == n.SnakeIndex {
+			// 		score += snakeScore
+			// 		continue
+			// 	}
+			// 	score -= snakeScore / float64(len(n.Board.Snakes)-1)
+			// }
+			// atomicAddFloat64(&n.Score, score)
 
 			// Update score and visits atomically.
-			atomicAddFloat64(&n.Score, score)
+			atomicAddFloat64(&n.Score, scores[n.SnakeIndex])
 			n = n.Parent
 		}
 	}
