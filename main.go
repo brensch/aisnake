@@ -165,9 +165,9 @@ func handleMove(w http.ResponseWriter, r *http.Request) {
 	_ = gameState
 
 	reorderedBoard := reorderSnakes(game.Board, game.You.ID)
-	// fmt.Println(visualizeBoard(reorderedBoard))
-	// b, _ := json.Marshal(reorderedBoard)
-	// fmt.Println(string(b))
+	fmt.Println(visualizeBoard(reorderedBoard))
+	b, _ := json.Marshal(reorderedBoard)
+	fmt.Println(string(b))
 
 	// timeout to signify end of move
 	ctx, cancel := context.WithDeadline(context.Background(), start.Add(time.Duration(game.Game.Timeout-110)*time.Millisecond))
@@ -190,7 +190,7 @@ func handleMove(w http.ResponseWriter, r *http.Request) {
 		"move", bestMove,
 		"duration_ms", time.Since(start).Milliseconds(),
 		"depth", mctsResult.Visits,
-		"board", reorderedBoard,
+		// "board", reorderedBoard,
 	)
 
 	// reset this gamestate and load in new nodes
@@ -288,30 +288,30 @@ func handleEnd(w http.ResponseWriter, r *http.Request) {
 	}
 	delete(gameMetaRegistry, game.Game.ID)
 
-	outcome, description := describeGameOutcome(game)
-
-	// TODO: only works for duels
-	ranks, err := GetCompetitionResults()
-	if err != nil {
-		slog.Error("failed to get ranks", "error", err)
-	}
-
-	var ranksEmbeds []EmbedField
-	inline := false
-	for _, rank := range ranks {
-		ranksEmbeds = append(ranksEmbeds, EmbedField{
-			Name:   fmt.Sprintf("%s rating", rank.Name),
-			Value:  fmt.Sprintf("%d [%d]", rank.Score, rank.Rank),
-			Inline: inline,
-		})
-		inline = true
-	}
-
-	gameDuration := end.Sub(gameMeta.start)
-
-	slog.Info("Game ended", "game", game, "ranks", ranks, "duration_ms", gameDuration.Milliseconds())
-
 	go func() {
+
+		outcome, description := describeGameOutcome(game)
+
+		// TODO: only works for duels
+		ranks, err := GetCompetitionResults()
+		if err != nil {
+			slog.Error("failed to get ranks", "error", err)
+		}
+
+		var ranksEmbeds []EmbedField
+		inline := false
+		for _, rank := range ranks {
+			ranksEmbeds = append(ranksEmbeds, EmbedField{
+				Name:   fmt.Sprintf("%s rating", rank.Name),
+				Value:  fmt.Sprintf("%d [%d]", rank.Score, rank.Rank),
+				Inline: inline,
+			})
+			inline = true
+		}
+
+		gameDuration := end.Sub(gameMeta.start)
+
+		slog.Info("Game ended", "game", game, "ranks", ranks, "duration_ms", gameDuration.Milliseconds())
 
 		err = downloadAndUploadFile(context.Background(), game.Game.ID)
 		if err != nil {

@@ -271,6 +271,10 @@ func generateSafeMoves(board Board, snakeIndex int) []Direction {
 		foundCollision := false
 		for i, snake := range board.Snakes {
 
+			if len(snake.Body) == 0 {
+				continue
+			}
+
 			lengthToCheck := len(snake.Body)
 			if i > snakeIndex {
 				lengthToCheck--
