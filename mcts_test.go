@@ -518,11 +518,18 @@ func TestMCTSVisualizationJSON(t *testing.T) {
 		// 	Iterations:   math.MaxInt,
 		// },
 
+		// {
+		// 	Description:     "down spells certain doom",
+		// 	InitialBoard:    `{"hazards":[],"food":[{"x":0,"y":9},{"y":1,"x":3},{"x":1,"y":6}],"snakes":[{"id":"gs_VkyKpYK7pGJPj3GC6kKFKT6W","name":"Gregory Megory Segory","customizations":{"head":"replit-mark","tail":"replit-notmark","color":"#00ff00"},"body":[{"x":8,"y":6},{"y":6,"x":7},{"y":6,"x":6},{"y":5,"x":6},{"y":5,"x":5},{"x":5,"y":4},{"x":4,"y":4},{"y":3,"x":4},{"y":3,"x":3},{"x":3,"y":2},{"x":4,"y":2},{"x":5,"y":2},{"y":3,"x":5},{"y":3,"x":6},{"x":6,"y":4},{"x":7,"y":4}],"head":{"x":8,"y":6},"health":91,"latency":"403","shout":"This is a nice move."},{"shout":"This is a nice move.","health":22,"head":{"x":8,"y":4},"body":[{"y":4,"x":8},{"x":9,"y":4},{"x":10,"y":4},{"y":5,"x":10},{"y":6,"x":10},{"y":7,"x":10},{"y":7,"x":9},{"x":9,"y":8},{"y":9,"x":9},{"x":10,"y":9}],"id":"gs_qbf3jK3ypfGppxvMqBVCyy6Y","customizations":{"head":"replit-mark","color":"#00ff00","tail":"replit-notmark"},"name":"Gregory-Degory","latency":"412"}],"height":11,"width":11}`,
+		// 	Iterations:      math.MaxInt,
+		// 	AcceptableMoves: []string{"up"},
+		// },
+
 		{
-			Description:     "down spells certain doom",
-			InitialBoard:    `{"hazards":[],"food":[{"x":0,"y":9},{"y":1,"x":3},{"x":1,"y":6}],"snakes":[{"id":"gs_VkyKpYK7pGJPj3GC6kKFKT6W","name":"Gregory Megory Segory","customizations":{"head":"replit-mark","tail":"replit-notmark","color":"#00ff00"},"body":[{"x":8,"y":6},{"y":6,"x":7},{"y":6,"x":6},{"y":5,"x":6},{"y":5,"x":5},{"x":5,"y":4},{"x":4,"y":4},{"y":3,"x":4},{"y":3,"x":3},{"x":3,"y":2},{"x":4,"y":2},{"x":5,"y":2},{"y":3,"x":5},{"y":3,"x":6},{"x":6,"y":4},{"x":7,"y":4}],"head":{"x":8,"y":6},"health":91,"latency":"403","shout":"This is a nice move."},{"shout":"This is a nice move.","health":22,"head":{"x":8,"y":4},"body":[{"y":4,"x":8},{"x":9,"y":4},{"x":10,"y":4},{"y":5,"x":10},{"y":6,"x":10},{"y":7,"x":10},{"y":7,"x":9},{"x":9,"y":8},{"y":9,"x":9},{"x":10,"y":9}],"id":"gs_qbf3jK3ypfGppxvMqBVCyy6Y","customizations":{"head":"replit-mark","color":"#00ff00","tail":"replit-notmark"},"name":"Gregory-Degory","latency":"412"}],"height":11,"width":11}`,
+			Description:     "don't go to square involving luck",
+			InitialBoard:    `{"height":11,"width":11,"food":[{"X":5,"Y":5}],"hazards":[],"snakes":[{"id":"gs_dHrgRqRKFCyCqvrcMmm6phtc","name":"Gregory Megory Segory","health":95,"body":[{"X":5,"Y":6},{"X":5,"Y":7},{"X":5,"Y":8},{"X":4,"Y":8}],"latency":"405","head":{"X":5,"Y":6},"shout":"I pondered the orb 25417 times in 397ms. It was nice."},{"id":"gs_j6wPcvyQGVFcwGMyxyXtkDMf","name":"snakos","health":95,"body":[{"X":6,"Y":5},{"X":6,"Y":4},{"X":7,"Y":4},{"X":8,"Y":4}],"latency":"83","head":{"X":6,"Y":5},"shout":"chasing snack"},{"id":"gs_3dgPCMCR4YDF4GXRXXHpXcGY","name":"Cucumber Cat","health":95,"body":[{"X":2,"Y":5},{"X":2,"Y":6},{"X":1,"Y":6},{"X":1,"Y":5}],"latency":"153","head":{"X":2,"Y":5},"shout":""},{"id":"gs_hhbqBPy9rW38DdmPwkHCCQv6","name":"Hungry Bot","health":95,"body":[{"X":5,"Y":4},{"X":5,"Y":3},{"X":5,"Y":2},{"X":4,"Y":2}],"latency":"1","head":{"X":5,"Y":4},"shout":""}]}`,
 			Iterations:      math.MaxInt,
-			AcceptableMoves: []string{"up"},
+			AcceptableMoves: []string{"left"},
 		},
 	}
 

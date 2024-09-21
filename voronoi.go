@@ -398,7 +398,7 @@ func luckEvaluation(board Board, context *EvaluationContext) []float64 {
 	for i := 0; i < numSnakes; i++ {
 		// If the snake relies on luck, apply a negative score.
 		if context.LuckMatrix[i] {
-			scores[i] = -.9
+			scores[i] = -4
 		}
 	}
 
