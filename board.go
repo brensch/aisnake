@@ -276,7 +276,7 @@ func generateSafeMoves(board Board, snakeIndex int) []Direction {
 			}
 
 			lengthToCheck := len(snake.Body)
-			if i > snakeIndex {
+			if i >= snakeIndex {
 				lengthToCheck--
 			}
 
