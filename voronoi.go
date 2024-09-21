@@ -347,38 +347,108 @@ func voronoiEvaluation(board Board, context *EvaluationContext) []float64 {
 
 const minLengthScore = -4
 
-// lengthEvaluation evaluates the board based on the length of each snake compared to opponents.
-func lengthEvaluation(board Board, context *EvaluationContext) []float64 {
-	numSnakes := len(board.Snakes)
-	scores := make([]float64, numSnakes)
+// // lengthEvaluation evaluates the board based on the length of each snake compared to opponents.
+// func lengthEvaluation(board Board, context *EvaluationContext) []float64 {
+// 	numSnakes := len(board.Snakes)
+// 	scores := make([]float64, numSnakes)
 
-	// Determine the length of the longest snake
-	maxLength := 0
+// 	// Determine the length of the longest snake
+// 	maxLength := 0
+// 	for _, snake := range board.Snakes {
+// 		if !isSnakeDead(snake) {
+// 			snakeLength := len(snake.Body)
+// 			if snakeLength > maxLength {
+// 				maxLength = snakeLength
+// 			}
+// 		}
+// 	}
+
+// 	// Evaluate each snake's length compared to the longest snake
+// 	for i, snake := range board.Snakes {
+// 		if isSnakeDead(snake) {
+// 			scores[i] = minLengthScore // Heavy penalty for dead snakes
+// 			continue
+// 		}
+
+// 		snakeLength := len(snake.Body)
+// 		if snakeLength == maxLength {
+// 			// Longest snake gets a score of 1
+// 			scores[i] = 1.0
+// 		} else {
+// 			// Shorter snakes get a proportionate penalty, capped at -2
+// 			lengthDiff := maxLength - snakeLength
+// 			scores[i] = calculateProportionatePenalty(lengthDiff, maxLength)
+// 		}
+// 	}
+
+// 	return scores
+// }
+
+func lengthEvaluation(board Board, context *EvaluationContext) []float64 {
+	// Initialize a slice to store the scores for each snake.
+	scores := make([]float64, len(board.Snakes))
+
+	// Find the longest snake's length.
+	longestLength := 0
 	for _, snake := range board.Snakes {
 		if !isSnakeDead(snake) {
 			snakeLength := len(snake.Body)
-			if snakeLength > maxLength {
-				maxLength = snakeLength
+			if snakeLength > longestLength {
+				longestLength = snakeLength
 			}
 		}
 	}
 
-	// Evaluate each snake's length compared to the longest snake
+	// Now compare each snake to the longest one.
 	for i, snake := range board.Snakes {
 		if isSnakeDead(snake) {
-			scores[i] = minLengthScore // Heavy penalty for dead snakes
+			// Dead snakes get no score.
+			scores[i] = -1.0
 			continue
 		}
 
 		snakeLength := len(snake.Body)
-		if snakeLength == maxLength {
-			// Longest snake gets a score of 1
-			scores[i] = 1.0
-		} else {
-			// Shorter snakes get a proportionate penalty, capped at -2
-			lengthDiff := maxLength - snakeLength
-			scores[i] = calculateProportionatePenalty(lengthDiff, maxLength)
+		lengthDifference := snakeLength - longestLength
+
+		// Calculate length bonus/penalty for this snake.
+		lengthBonus := 0.0
+		if lengthDifference > 0 {
+			// If this snake is longer, calculate bonus.
+			if lengthDifference == 1 {
+				lengthBonus = 0.5
+			} else if float64(snakeLength) > 1.1*float64(longestLength) {
+				// Cap bonus at 1.0 for being 10% longer.
+				lengthBonus = 1.0
+			} else {
+				// Scale between 0.5 and 1.0 as the length difference increases up to 10% longer.
+				extraLengthRatio := float64(snakeLength) / float64(longestLength)
+				lengthBonus = 0.5 + 0.5*((extraLengthRatio-1.0)/0.1)
+			}
+		} else if lengthDifference < 0 {
+			// If this snake is shorter, calculate penalty.
+			if lengthDifference == -1 {
+				lengthBonus = -0.1
+			} else {
+				// Scale penalty down to -1.0 for being 60% or less of the longest snake's length.
+				minLength := 0.6 * float64(longestLength)
+				if float64(snakeLength) <= minLength {
+					lengthBonus = -1.0
+				} else {
+					// Scale between -0.1 and -1.0 as the snake gets closer to 60% of the longest snake's length.
+					lengthBonus = -0.1 + 0.9*((float64(longestLength)-float64(snakeLength))/(float64(longestLength)*0.4))
+				}
+			}
 		}
+
+		// Ensure the result is between -1 and 1.
+		if lengthBonus > 1.0 {
+			lengthBonus = 1.0
+		} else if lengthBonus < -1.0 {
+			lengthBonus = -1.0
+		}
+
+		// Assign the score for this snake.
+		scores[i] = lengthBonus
 	}
 
 	return scores
