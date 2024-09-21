@@ -93,74 +93,11 @@ func isLegalMove(board Board, snakeIndex int, newHead Point, steps int) bool {
 	return true
 }
 
-// GenerateVoronoi generates a board ownership diagram based on a shortest path algorithm.
-func GenerateVoronoi(board Board) [][]int {
-	bestPaths := make([][]dijkstraNode, board.Height)
-	for i := range bestPaths {
-		bestPaths[i] = make([]dijkstraNode, board.Width)
-		for j := range bestPaths[i] {
-			bestPaths[i][j] = dijkstraNode{Point{-1, -1}, -1, -1} // Initialize as unassigned
-		}
-	}
-
-	pq := &PriorityQueue{}
-	heap.Init(pq)
-
-	// Initialize the priority queue with all snake heads
-	for k, snake := range board.Snakes {
-		if snake.Health > 0 && len(snake.Body) > 0 {
-			head := snake.Head
-			heap.Push(pq, dijkstraNode{head, k, 0})
-			bestPaths[head.Y][head.X] = dijkstraNode{head, k, 0} // Track snake ownership
-		}
-	}
-
-	// Process the priority queue
-	for pq.Len() > 0 {
-		node := heap.Pop(pq).(dijkstraNode)
-		currentPoint := node.point
-
-		// Explore in all directions
-		for _, direction := range AllDirections {
-			newPoint := moveHead(currentPoint, direction)
-
-			// Ensure the new point is within bounds and legal for this snake
-			if newPoint.X >= 0 && newPoint.X < board.Width && newPoint.Y >= 0 && newPoint.Y < board.Height &&
-				isLegalMove(board, node.snakeIndex, newPoint, node.distance+1) {
-
-				newDistance := node.distance + 1
-				bestNode := bestPaths[newPoint.Y][newPoint.X]
-
-				// Update if the new path is better
-				if bestNode.snakeIndex == -1 || newDistance < bestNode.distance {
-					bestPaths[newPoint.Y][newPoint.X] = dijkstraNode{newPoint, node.snakeIndex, newDistance}
-					heap.Push(pq, dijkstraNode{newPoint, node.snakeIndex, newDistance})
-				}
-			}
-		}
-	}
-
-	// Convert the result to a simple snake ownership grid
-	return dijkstraToResult(bestPaths)
-}
-
-// Converts the bestPaths grid to a simple snake ownership grid
-func dijkstraToResult(bestPaths [][]dijkstraNode) [][]int {
-	result := make([][]int, len(bestPaths))
-	for i := range result {
-		result[i] = make([]int, len(bestPaths[i]))
-		for j := range result[i] {
-			result[i][j] = bestPaths[i][j].snakeIndex
-		}
-	}
-	return result
-}
-
-// dijkstraNode represents a node in the Dijkstra algorithm
 type dijkstraNode struct {
-	point      Point
-	snakeIndex int
-	distance   int // Number of moves from the snake's head
+	point       Point
+	snakeIndex  int
+	distance    int // Number of moves from the snake's head
+	snakeLength int // Length of the snake
 }
 
 // Priority queue for Dijkstra's algorithm
@@ -170,7 +107,10 @@ type PriorityQueue []dijkstraNode
 func (pq PriorityQueue) Len() int { return len(pq) }
 
 func (pq PriorityQueue) Less(i, j int) bool {
-	// Priority based on distance only
+	// Priority based on distance first, and snake length for tie-breaking
+	if pq[i].distance == pq[j].distance {
+		return pq[i].snakeLength > pq[j].snakeLength
+	}
 	return pq[i].distance < pq[j].distance
 }
 
@@ -188,6 +128,76 @@ func (pq *PriorityQueue) Pop() interface{} {
 	item := old[n-1]
 	*pq = old[0 : n-1]
 	return item
+}
+
+// GenerateVoronoi generates a board ownership diagram based on a shortest path algorithm
+// note, voronoi will
+func GenerateVoronoi(board Board) [][]int {
+	// Track the best path (shortest distance and longest snake) to each position
+	bestPaths := make([][]dijkstraNode, board.Height)
+	for i := range bestPaths {
+		bestPaths[i] = make([]dijkstraNode, board.Width)
+		for j := range bestPaths[i] {
+			bestPaths[i][j] = dijkstraNode{Point{-1, -1}, -1, -1, -1} // Initialize all positions as unassigned
+		}
+	}
+
+	// Priority queue (min-heap) to process nodes based on distance
+	pq := &PriorityQueue{}
+	heap.Init(pq)
+
+	// Initialize the priority queue with the heads of all snakes
+	for k, snake := range board.Snakes {
+		if snake.Health > 0 && len(snake.Body) > 0 { // Skip dead or empty snakes
+			head := snake.Head
+			heap.Push(pq, dijkstraNode{head, k, 0, len(snake.Body)})
+			bestPaths[head.Y][head.X] = dijkstraNode{head, k, 0, len(snake.Body)} // Record snake index, distance, and snake length
+		}
+	}
+
+	// Process nodes in the priority queue
+	for pq.Len() > 0 {
+		node := heap.Pop(pq).(dijkstraNode)
+		currentPoint := node.point
+
+		// Get legal moves for the current point
+		for _, direction := range AllDirections {
+			newPoint := moveHead(currentPoint, direction)
+
+			// Ensure new point is within bounds
+			if newPoint.X >= 0 && newPoint.X < board.Width && newPoint.Y >= 0 && newPoint.Y < board.Height {
+				// Check if the move is legal for the snake at snakeIndex
+				if isLegalMove(board, node.snakeIndex, newPoint, node.distance) {
+					// Compute the new distance to reach this point
+					newDistance := node.distance + 1
+
+					// Check if this path is better (shorter distance or same distance but longer snake)
+					bestNode := bestPaths[newPoint.Y][newPoint.X]
+					if bestNode.snakeIndex == -1 || newDistance < bestNode.distance ||
+						(newDistance == bestNode.distance && node.snakeLength > bestNode.snakeLength) {
+
+						// Update with the better path
+						bestPaths[newPoint.Y][newPoint.X] = dijkstraNode{newPoint, node.snakeIndex, newDistance, node.snakeLength}
+						heap.Push(pq, dijkstraNode{newPoint, node.snakeIndex, newDistance, node.snakeLength})
+					}
+				}
+			}
+		}
+	}
+
+	return dijkstraToResult(bestPaths)
+}
+
+// dijkstraToResult converts the bestPaths grid to a simple snake ownership grid (used for debugging)
+func dijkstraToResult(bestPaths [][]dijkstraNode) [][]int {
+	result := make([][]int, len(bestPaths))
+	for i := range result {
+		result[i] = make([]int, len(bestPaths[i]))
+		for j := range result[i] {
+			result[i][j] = bestPaths[i][j].snakeIndex
+		}
+	}
+	return result
 }
 
 // evaluateBoard evaluates the board state and returns an array of scores for each snake.
