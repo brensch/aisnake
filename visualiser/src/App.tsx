@@ -497,15 +497,17 @@ const Sidebar: React.FC = () => {
           width: 11,
           food: data.Data.Food,
           hazards: data.Data.Hazards,
-          snakes: data.Data.Snakes.map((snake: any) => ({
-            id: snake.ID,
-            name: snake.Name,
-            health: snake.Health,
-            body: snake.Body,
-            latency: snake.Latency,
-            head: snake.Body[0],
-            shout: snake.Shout,
-          })),
+          snakes: data.Data.Snakes.filter((snake: any) => !snake.Death).map(
+            (snake: any) => ({
+              id: snake.ID,
+              name: snake.Name,
+              health: snake.Health,
+              body: snake.Body,
+              latency: snake.Latency,
+              head: snake.Body[0],
+              shout: snake.Shout,
+            }),
+          ),
         }
         setBoard(boardData)
         socket.close()

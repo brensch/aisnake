@@ -484,9 +484,16 @@ func TestMCTSVisualizationJSON(t *testing.T) {
 		// 	Iterations:   math.MaxInt,
 		// },
 
+		// {
+		// 	Description:     "don't draw if we will die",
+		// 	InitialBoard:    `{"height":11,"width":11,"food":[{"x":5,"y":5},{"x":5,"y":8}],"hazards":[],"snakes":[{"id":"c5d6cb73-35a3-4ac4-b6b4-c0d16d5a5305","name":"1","health":87,"body":[{"x":4,"y":5},{"x":4,"y":4},{"x":3,"y":4},{"x":3,"y":3}],"latency":"396","head":{"x":4,"y":5},"shout":"","customizations":{"color":"#00ff00","head":"replit-mark","tail":"replit-notmark"}},{"id":"3b574e0c-b722-4e26-9e7a-88cf8ec1fb59","name":"3","health":96,"body":[{"x":7,"y":8},{"x":7,"y":9},{"x":7,"y":10},{"x":8,"y":10},{"x":9,"y":10}],"latency":"397","head":{"x":7,"y":8},"shout":"","customizations":{"color":"#00ff00","head":"replit-mark","tail":"replit-notmark"}},{"id":"0a051562-5828-409f-8845-07f667ab34a1","name":"4","health":87,"body":[{"x":6,"y":5},{"x":6,"y":4},{"x":7,"y":4},{"x":7,"y":3}],"latency":"396","head":{"x":6,"y":5},"shout":"","customizations":{"color":"#00ff00","head":"replit-mark","tail":"replit-notmark"}},{"id":"55c21559-a517-4e2b-a3c3-7a8fab4ccc3b","name":"2","health":96,"body":[{"x":3,"y":8},{"x":3,"y":9},{"x":3,"y":10},{"x":2,"y":10},{"x":1,"y":10}],"latency":"397","head":{"x":3,"y":8},"shout":"","customizations":{"color":"#00ff00","head":"replit-mark","tail":"replit-notmark"}}]}`,
+		// 	Iterations:      math.MaxInt,
+		// 	AcceptableMoves: []string{"left", "up"},
+		// },
+
 		{
-			Description:     "don't draw if we will die",
-			InitialBoard:    `{"height":11,"width":11,"food":[{"x":5,"y":5},{"x":5,"y":8}],"hazards":[],"snakes":[{"id":"c5d6cb73-35a3-4ac4-b6b4-c0d16d5a5305","name":"1","health":87,"body":[{"x":4,"y":5},{"x":4,"y":4},{"x":3,"y":4},{"x":3,"y":3}],"latency":"396","head":{"x":4,"y":5},"shout":"","customizations":{"color":"#00ff00","head":"replit-mark","tail":"replit-notmark"}},{"id":"3b574e0c-b722-4e26-9e7a-88cf8ec1fb59","name":"3","health":96,"body":[{"x":7,"y":8},{"x":7,"y":9},{"x":7,"y":10},{"x":8,"y":10},{"x":9,"y":10}],"latency":"397","head":{"x":7,"y":8},"shout":"","customizations":{"color":"#00ff00","head":"replit-mark","tail":"replit-notmark"}},{"id":"0a051562-5828-409f-8845-07f667ab34a1","name":"4","health":87,"body":[{"x":6,"y":5},{"x":6,"y":4},{"x":7,"y":4},{"x":7,"y":3}],"latency":"396","head":{"x":6,"y":5},"shout":"","customizations":{"color":"#00ff00","head":"replit-mark","tail":"replit-notmark"}},{"id":"55c21559-a517-4e2b-a3c3-7a8fab4ccc3b","name":"2","health":96,"body":[{"x":3,"y":8},{"x":3,"y":9},{"x":3,"y":10},{"x":2,"y":10},{"x":1,"y":10}],"latency":"397","head":{"x":3,"y":8},"shout":"","customizations":{"color":"#00ff00","head":"replit-mark","tail":"replit-notmark"}}]}`,
+			Description:     "eat while we can",
+			InitialBoard:    `{"height":11,"width":11,"food":[{"X":1,"Y":8}],"hazards":[],"snakes":[{"id":"gs_hfVHhxWbRGt9CRhTcRDmj3gK","name":"Gregory Megory","health":44,"body":[{"X":3,"Y":7},{"X":3,"Y":6},{"X":3,"Y":5},{"X":4,"Y":5}],"latency":"407","head":{"X":3,"Y":7},"shout":"This is a nice move."},{"id":"gs_WHhqc4yCwf6jDPTDJ6dPWPhQ","name":"Hungry Bot","health":96,"body":[{"X":3,"Y":1},{"X":4,"Y":1},{"X":5,"Y":1},{"X":6,"Y":1},{"X":7,"Y":1},{"X":7,"Y":0},{"X":6,"Y":0},{"X":5,"Y":0},{"X":4,"Y":0},{"X":3,"Y":0},{"X":2,"Y":0},{"X":2,"Y":1},{"X":1,"Y":1}],"latency":"1","head":{"X":3,"Y":1},"shout":""},{"id":"gs_YDdpvYgmSCbXcqhBSfByfxMG","name":"Loopy Bot","health":42,"body":[{"X":8,"Y":4},{"X":8,"Y":5},{"X":9,"Y":5}],"latency":"1","head":{"X":8,"Y":4},"shout":""}]}`,
 			Iterations:      math.MaxInt,
 			AcceptableMoves: []string{"left", "up"},
 		},
@@ -500,7 +507,7 @@ func TestMCTSVisualizationJSON(t *testing.T) {
 			var board Board
 			assert.NoError(t, json.Unmarshal([]byte(tc.InitialBoard), &board))
 			rootBoard := copyBoard(board)
-			ctx, _ := context.WithTimeout(context.Background(), 1500*time.Millisecond)
+			ctx, _ := context.WithTimeout(context.Background(), 400*time.Millisecond)
 
 			workers := runtime.NumCPU()
 			t.Log("using workers", workers)

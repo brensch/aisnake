@@ -216,6 +216,16 @@ func bestChild(node *Node, explorationParam float64) *Node {
 
 // MCTS performs the Monte Carlo Tree Search with concurrency.
 func MCTS(ctx context.Context, gameID string, rootBoard Board, iterations int, numWorkers int, gameStates map[string]*Node) *Node {
+	// delete ded snek just in case they don't
+	var aliveSnakes []Snake
+	for _, snake := range rootBoard.Snakes {
+		if isSnakeDead(snake) {
+			continue
+		}
+		aliveSnakes = append(aliveSnakes, snake)
+	}
+	rootBoard.Snakes = aliveSnakes
+
 	// Generate the hash for the current board state.
 	boardKey := boardHash(rootBoard)
 	var rootNode *Node
