@@ -78,8 +78,7 @@ func resolveCollisions(board *Board, snakeIndex int, newHead Point) {
 			// Check for head-to-head collision
 			if newHead == board.Snakes[i].Head {
 				// Kill the shorter snake; if equal length, both die
-				// we truncated the snake at snakeindex, so add 1 to it
-				usLength := len(board.Snakes[snakeIndex].Body) + 1
+				usLength := len(board.Snakes[snakeIndex].Body)
 				if len(board.Snakes[i].Body) == usLength {
 					deadSnakes[snakeIndex] = true
 					deadSnakes[i] = true

@@ -361,3 +361,29 @@ func TestGenerateSafeMovesFromBoard(t *testing.T) {
 		})
 	}
 }
+
+func TestApplyMoveJSON(t *testing.T) {
+	testCases := []struct {
+		Description  string
+		InitialBoard string
+		SnakeIndex   int
+		Move         Direction
+	}{
+		{
+			Description:  "Single snake moves up and loses health",
+			InitialBoard: `{"height":11,"width":11,"food":[{"x":2,"y":7}],"hazards":null,"snakes":[{"id":"gs_79hGpDcy3fMvYyKCfccyqPdS","name":"Gregory Megory Segory","health":90,"body":[{"x":3,"y":1},{"x":4,"y":1},{"x":4,"y":2},{"x":5,"y":2},{"x":6,"y":2},{"x":7,"y":2},{"x":7,"y":3},{"x":8,"y":3},{"x":8,"y":2},{"x":9,"y":2},{"x":9,"y":3},{"x":9,"y":4}],"latency":"416","head":{"x":3,"y":1},"shout":"I pondered the orb 27290 times in 408ms. It was nice.","customizations":{"color":"","head":"","tail":""}},{"id":"gs_mVCCSpcCmQkSCSVpXGjCRmW7","name":"snakos","health":86,"body":[{"x":3,"y":0},{"x":4,"y":0},{"x":5,"y":0},{"x":6,"y":0},{"x":7,"y":0},{"x":8,"y":0},{"x":9,"y":0},{"x":10,"y":0},{"x":10,"y":1},{"x":9,"y":1},{"x":8,"y":1}],"latency":"81","head":{"x":3,"y":0},"shout":"chasing snack","customizations":{"color":"","head":"","tail":""}},{"id":"gs_dg8vc4rc8j6txyFRHVVSRPbJ","name":"Cucumber Cat","health":98,"body":[{"x":2,"y":5},{"x":2,"y":4},{"x":2,"y":3},{"x":3,"y":3},{"x":4,"y":3},{"x":5,"y":3},{"x":6,"y":3},{"x":6,"y":4},{"x":6,"y":5},{"x":6,"y":6}],"latency":"101","head":{"x":2,"y":5},"shout":"","customizations":{"color":"","head":"","tail":""}}]}`,
+			Move:         Up,
+			SnakeIndex:   1,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.Description, func(t *testing.T) {
+			var board Board
+			err := json.Unmarshal([]byte(tc.InitialBoard), &board)
+			assert.NoError(t, err)
+			applyMove(&board, tc.SnakeIndex, tc.Move)
+			fmt.Println(visualizeBoard(board))
+		})
+	}
+}

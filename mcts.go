@@ -15,6 +15,7 @@ const explorationValue = 1.2
 type Node struct {
 	Board          Board
 	SnakeIndex     int // The index of the snake whose turn it is at this node.
+	NextSnakeIndex int // if a snake has died this will not just be the next snake in turn
 	Parent         *Node
 	Children       []*Node
 	Visits         int64
@@ -102,15 +103,20 @@ func updateLuckMatrix(node *Node) {
 }
 
 // NewNode initializes a new Node and generates possible moves.
-func NewNode(board Board, snakeIndex int, parent *Node) *Node {
+func NewNode(board Board, parent *Node) *Node {
 	luckMatrix := make([]bool, len(board.Snakes))
 	if parent != nil {
 		copy(luckMatrix, parent.LuckMatrix)
 	}
 
+	nextSnakeIndex := -1
+	if parent != nil {
+		nextSnakeIndex = parent.NextSnakeIndex
+	}
+
 	node := &Node{
 		Board:           copyBoard(board), // Avoid directly mutating the original board.
-		SnakeIndex:      snakeIndex,
+		SnakeIndex:      nextSnakeIndex,
 		Parent:          parent,
 		Children:        make([]*Node, 0),
 		Visits:          0,
@@ -128,17 +134,13 @@ func NewNode(board Board, snakeIndex int, parent *Node) *Node {
 	}
 
 	// Compute the next snake's index.
-	nextSnakeIndex := (snakeIndex + 1) % len(board.Snakes)
-	originalNextSnake := nextSnakeIndex
+	// originalNextSnake := nextSnakeIndex
 
 	// Do not generate nodes for dead snakes.
 	for {
+		nextSnakeIndex = (nextSnakeIndex + 1) % len(board.Snakes)
 		if !isSnakeDead(board.Snakes[nextSnakeIndex]) {
 			break
-		}
-		nextSnakeIndex = (nextSnakeIndex + 1) % len(board.Snakes)
-		if nextSnakeIndex == originalNextSnake {
-			return node
 		}
 	}
 
@@ -150,6 +152,7 @@ func NewNode(board Board, snakeIndex int, parent *Node) *Node {
 	}
 
 	node.UnexpandedMoves = moves
+	node.NextSnakeIndex = nextSnakeIndex
 	return node
 }
 
@@ -237,7 +240,7 @@ func MCTS(ctx context.Context, log *slog.Logger, gameID string, rootBoard Board,
 	} else {
 		log.Info("board cache lookup", "hit", false, "cache_size", len(gameStates))
 		// Initialize rootNode with -1 so that we are the first children.
-		rootNode = NewNode(rootBoard, -1, nil)
+		rootNode = NewNode(rootBoard, nil)
 	}
 
 	for i := 0; i < numWorkers; i++ {
@@ -351,10 +354,9 @@ func selectNode(ctx context.Context, rootNode *Node) *Node {
 
 			// Create child node.
 			newBoard := copyBoard(node.Board)
-			nextSnakeIndex := (node.SnakeIndex + 1) % len(node.Board.Snakes)
-			applyMove(&newBoard, nextSnakeIndex, move)
+			applyMove(&newBoard, node.NextSnakeIndex, move)
 
-			child := NewNode(newBoard, nextSnakeIndex, node)
+			child := NewNode(newBoard, node)
 
 			// Append the child to node.Children.
 			node.mutex.Lock()
