@@ -159,15 +159,18 @@ func handleMove(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	log := slog.With("game_id", game.Game.ID, "turn", game.Turn)
+
 	latency, err := strconv.Atoi(game.You.Latency)
-	if err != nil {
-		slog.Error("latency not an int", "error", err.Error())
+	// sends "" on first move
+	if game.You.Latency != "" && err != nil {
+		log.Error("latency not an int", "error", err.Error())
 	}
 
 	allowedThinkingTime := game.Game.Timeout - lagBufferMS
 
 	if latency == game.Game.Timeout {
-		slog.Error("timed out on last move", "latency", latency)
+		log.Error("timed out on last move", "latency", latency)
 		// double the buffer if we timed out last turn
 		allowedThinkingTime = allowedThinkingTime - lagBufferMS
 	}
@@ -175,10 +178,9 @@ func handleMove(w http.ResponseWriter, r *http.Request) {
 	// get the nodemap for this game
 	gameState, ok := gameStates[game.Game.ID]
 	if !ok {
-		slog.Error("failed to find gamestate. probably reset during a game.")
+		log.Error("failed to find gamestate. probably reset during a game.")
 		gameState = make(map[string]*Node)
 	}
-	_ = gameState
 
 	reorderedBoard := reorderSnakes(game.Board, game.You.ID)
 	// fmt.Println(visualizeBoard(reorderedBoard))
@@ -190,30 +192,28 @@ func handleMove(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 
 	workers := runtime.NumCPU()
-	mctsResult := MCTS(ctx, game.Game.ID, reorderedBoard, math.MaxInt, workers, gameState)
+	mctsResult := MCTS(ctx, log, game.Game.ID, reorderedBoard, math.MaxInt, workers, gameState)
 	bestMove := determineBestMove(mctsResult)
 	// mctsResult := MultiMCTS(ctx, game.Game.ID, reorderedBoard, math.MaxInt, workers, map[string]*MultiNode{})
 	// bestMove := MultiDetermineBestMove(mctsResult, 0)
 	response := map[string]string{
 		"move":  bestMove,
-		"shout": "This is a nice move.",
+		"shout": fmt.Sprintf("I pondered the orb %d times in %dms. It was nice.", mctsResult.Visits, time.Since(start).Milliseconds()),
 	}
 	writeJSON(w, response)
 
-	slog.Info("Move processed",
-		"game_id", game.Game.ID,
-		"snake_id", game.You.ID,
+	log.Info("Move processed",
+		"game", game,
 		"move", bestMove,
 		"duration_ms", time.Since(start).Milliseconds(),
 		"depth", mctsResult.Visits,
-		"board", reorderedBoard,
 	)
 
 	// reset this gamestate and load in new nodes
 	gameSaveStart := time.Now()
 	gameStates[game.Game.ID] = make(map[string]*Node)
 	saveNodesAtDepth2(mctsResult, gameStates[game.Game.ID])
-	slog.Debug("finished saving game state", "duration", time.Since(gameSaveStart).Milliseconds())
+	log.Debug("finished saving game state", "duration", time.Since(gameSaveStart).Milliseconds())
 
 	// slog.Info("Visualized board", "board", visualizeBoard(game.Board))
 	// fmt.Println(visualizeBoard(reorderedBoard))

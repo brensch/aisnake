@@ -10,8 +10,9 @@ import (
 
 // Define a custom handler for Google Cloud logging
 type GoogleCloudHandler struct {
-	writer *os.File
-	level  slog.Level
+	writer     *os.File
+	level      slog.Level
+	extraAttrs map[string]interface{} // Store additional attributes
 }
 
 // NewGoogleCloudHandler creates a new handler for Google Cloud
@@ -27,16 +28,21 @@ func (h *GoogleCloudHandler) Enabled(_ context.Context, level slog.Level) bool {
 	return level >= h.level
 }
 
-// Handle writes the log entry in JSON format for Google Cloud
+// Modify Handle to merge attributes
 func (h *GoogleCloudHandler) Handle(_ context.Context, r slog.Record) error {
 	severity := convertToSeverity(r.Level)
 
-	// Collect attributes as a map
+	// Collect attributes from the record
 	attrs := map[string]interface{}{}
 	r.Attrs(func(attr slog.Attr) bool {
 		attrs[attr.Key] = attr.Value.Any()
 		return true
 	})
+
+	// Merge any extra attributes (from WithAttrs) with the current ones
+	for k, v := range h.extraAttrs {
+		attrs[k] = v
+	}
 
 	// Structure the log entry for Google Cloud
 	logEntry := map[string]interface{}{
@@ -58,14 +64,14 @@ func (h *GoogleCloudHandler) Handle(_ context.Context, r slog.Record) error {
 	return nil
 }
 
-// WithAttrs returns a new handler with additional attributes
+// Modify WithAttrs to store attributes in the handler
 func (h *GoogleCloudHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
-	// Add the new attributes to the current handler and return it
-	newHandler := *h // Create a shallow copy
+	newHandler := *h
+	if newHandler.extraAttrs == nil {
+		newHandler.extraAttrs = map[string]interface{}{}
+	}
 	for _, attr := range attrs {
-		newHandler.Handle(context.Background(), slog.Record{
-			Message: attr.Key,
-		})
+		newHandler.extraAttrs[attr.Key] = attr.Value.Any()
 	}
 	return &newHandler
 }

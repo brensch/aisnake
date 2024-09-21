@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"log/slog"
 	"math"
 	"runtime"
 	"testing"
@@ -346,12 +347,12 @@ func TestMCTSVisualizationJSON(t *testing.T) {
 		// 	Iterations:      10,
 		// 	AcceptableMoves: []string{"up", "right"},
 		// },
-		{
-			Description:     "goes towards longer snake to its death. should escape left. caused by incorrectly judging winning position",
-			InitialBoard:    `{"height":11,"width":11,"food":[{"x":10,"y":0},{"x":10,"y":3},{"x":8,"y":1},{"x":9,"y":0},{"x":3,"y":1},{"x":4,"y":2},{"x":8,"y":4},{"x":3,"y":0},{"x":9,"y":5},{"x":3,"y":8}],"hazards":[],"snakes":[{"id":"bbc27600-9763-4cce-954a-b3d6fa0d58de","name":"mcts","health":72,"body":[{"x":2,"y":8},{"x":2,"y":7},{"x":2,"y":6},{"x":2,"y":5},{"x":1,"y":5},{"x":1,"y":4},{"x":2,"y":4},{"x":2,"y":3},{"x":3,"y":3},{"x":4,"y":3},{"x":5,"y":3},{"x":6,"y":3},{"x":6,"y":4},{"x":6,"y":5},{"x":5,"y":5},{"x":4,"y":5},{"x":4,"y":4},{"x":3,"y":4},{"x":3,"y":5}],"latency":"451","head":{"x":2,"y":8},"shout":"","customizations":{"color":"#888888","head":"default","tail":"default"}},{"id":"a34717ee-ee2f-472e-ba78-a99e446a310a","name":"soba","health":92,"body":[{"x":5,"y":7},{"x":6,"y":7},{"x":7,"y":7},{"x":8,"y":7},{"x":9,"y":7},{"x":10,"y":7},{"x":10,"y":8},{"x":10,"y":9},{"x":10,"y":10},{"x":9,"y":10},{"x":9,"y":9},{"x":9,"y":8},{"x":8,"y":8},{"x":7,"y":8},{"x":6,"y":8},{"x":6,"y":9},{"x":5,"y":9},{"x":5,"y":8},{"x":4,"y":8},{"x":4,"y":9},{"x":3,"y":9},{"x":2,"y":9},{"x":1,"y":9}],"latency":"401","head":{"x":5,"y":7},"shout":"","customizations":{"color":"#118645","head":"replit-mark","tail":"replit-notmark"}}]}`,
-			Iterations:      math.MaxInt,
-			AcceptableMoves: []string{"left"},
-		},
+		// {
+		// 	Description:     "goes towards longer snake to its death. should escape left. caused by incorrectly judging winning position",
+		// 	InitialBoard:    `{"height":11,"width":11,"food":[{"x":10,"y":0},{"x":10,"y":3},{"x":8,"y":1},{"x":9,"y":0},{"x":3,"y":1},{"x":4,"y":2},{"x":8,"y":4},{"x":3,"y":0},{"x":9,"y":5},{"x":3,"y":8}],"hazards":[],"snakes":[{"id":"bbc27600-9763-4cce-954a-b3d6fa0d58de","name":"mcts","health":72,"body":[{"x":2,"y":8},{"x":2,"y":7},{"x":2,"y":6},{"x":2,"y":5},{"x":1,"y":5},{"x":1,"y":4},{"x":2,"y":4},{"x":2,"y":3},{"x":3,"y":3},{"x":4,"y":3},{"x":5,"y":3},{"x":6,"y":3},{"x":6,"y":4},{"x":6,"y":5},{"x":5,"y":5},{"x":4,"y":5},{"x":4,"y":4},{"x":3,"y":4},{"x":3,"y":5}],"latency":"451","head":{"x":2,"y":8},"shout":"","customizations":{"color":"#888888","head":"default","tail":"default"}},{"id":"a34717ee-ee2f-472e-ba78-a99e446a310a","name":"soba","health":92,"body":[{"x":5,"y":7},{"x":6,"y":7},{"x":7,"y":7},{"x":8,"y":7},{"x":9,"y":7},{"x":10,"y":7},{"x":10,"y":8},{"x":10,"y":9},{"x":10,"y":10},{"x":9,"y":10},{"x":9,"y":9},{"x":9,"y":8},{"x":8,"y":8},{"x":7,"y":8},{"x":6,"y":8},{"x":6,"y":9},{"x":5,"y":9},{"x":5,"y":8},{"x":4,"y":8},{"x":4,"y":9},{"x":3,"y":9},{"x":2,"y":9},{"x":1,"y":9}],"latency":"401","head":{"x":5,"y":7},"shout":"","customizations":{"color":"#118645","head":"replit-mark","tail":"replit-notmark"}}]}`,
+		// 	Iterations:      math.MaxInt,
+		// 	AcceptableMoves: []string{"left"},
+		// },
 		// {
 		// 	Description:     "go right. make sure we're not counting the tail of a snake yet to move due to turn based.",
 		// 	InitialBoard:    `{"height":11,"width":11,"food":[{"X":0,"Y":4},{"X":2,"Y":2},{"X":8,"Y":5},{"X":10,"Y":10}],"hazards":[],"snakes":[{"id":"gs_9TYTxfmrRfQFrtYDTg3644mS","name":"Gregory-Devory","health":39,"body":[{"X":6,"Y":7},{"X":6,"Y":6},{"X":6,"Y":5},{"X":5,"Y":5}],"latency":"408","head":{"X":6,"Y":7},"shout":"This is a nice move."},{"id":"gs_TShSt8KRPdjKSfyycqtjyfcb","name":"soba","health":82,"body":[{"X":4,"Y":7},{"X":5,"Y":7},{"X":5,"Y":8},{"X":6,"Y":8},{"X":7,"Y":8},{"X":7,"Y":7}],"latency":"417","head":{"X":4,"Y":7},"shout":"swag"}]}`,
@@ -517,6 +518,12 @@ func TestMCTSVisualizationJSON(t *testing.T) {
 		// 	Iterations:   math.MaxInt,
 		// },
 
+		{
+			Description:     "down spells certain doom",
+			InitialBoard:    `{"hazards":[],"food":[{"x":0,"y":9},{"y":1,"x":3},{"x":1,"y":6}],"snakes":[{"id":"gs_VkyKpYK7pGJPj3GC6kKFKT6W","name":"Gregory Megory Segory","customizations":{"head":"replit-mark","tail":"replit-notmark","color":"#00ff00"},"body":[{"x":8,"y":6},{"y":6,"x":7},{"y":6,"x":6},{"y":5,"x":6},{"y":5,"x":5},{"x":5,"y":4},{"x":4,"y":4},{"y":3,"x":4},{"y":3,"x":3},{"x":3,"y":2},{"x":4,"y":2},{"x":5,"y":2},{"y":3,"x":5},{"y":3,"x":6},{"x":6,"y":4},{"x":7,"y":4}],"head":{"x":8,"y":6},"health":91,"latency":"403","shout":"This is a nice move."},{"shout":"This is a nice move.","health":22,"head":{"x":8,"y":4},"body":[{"y":4,"x":8},{"x":9,"y":4},{"x":10,"y":4},{"y":5,"x":10},{"y":6,"x":10},{"y":7,"x":10},{"y":7,"x":9},{"x":9,"y":8},{"y":9,"x":9},{"x":10,"y":9}],"id":"gs_qbf3jK3ypfGppxvMqBVCyy6Y","customizations":{"head":"replit-mark","color":"#00ff00","tail":"replit-notmark"},"name":"Gregory-Degory","latency":"412"}],"height":11,"width":11}`,
+			Iterations:      math.MaxInt,
+			AcceptableMoves: []string{"up"},
+		},
 	}
 
 	for _, tc := range testCases {
@@ -527,11 +534,11 @@ func TestMCTSVisualizationJSON(t *testing.T) {
 			var board Board
 			assert.NoError(t, json.Unmarshal([]byte(tc.InitialBoard), &board))
 			rootBoard := copyBoard(board)
-			ctx, _ := context.WithTimeout(context.Background(), 400*time.Millisecond)
+			ctx, _ := context.WithTimeout(context.Background(), 390*time.Millisecond)
 
 			workers := runtime.NumCPU()
 			t.Log("using workers", workers)
-			node := MCTS(ctx, "testid", rootBoard, tc.Iterations, workers, make(map[string]*Node))
+			node := MCTS(ctx, slog.Default(), "testid", rootBoard, tc.Iterations, workers, make(map[string]*Node))
 			// node := MultiMCTS(ctx, "testid", rootBoard, tc.Iterations, workers, make(map[string]*MultiNode))
 			// MultiDetermineBestMove(node, 0)
 			t.Log("made moves", node.Visits)

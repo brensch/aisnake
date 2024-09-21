@@ -215,7 +215,8 @@ func bestChild(node *Node, explorationParam float64) *Node {
 }
 
 // MCTS performs the Monte Carlo Tree Search with concurrency.
-func MCTS(ctx context.Context, gameID string, rootBoard Board, iterations int, numWorkers int, gameStates map[string]*Node) *Node {
+func MCTS(ctx context.Context, log *slog.Logger, gameID string, rootBoard Board, iterations int, numWorkers int, gameStates map[string]*Node) *Node {
+	log.Debug("starting mcts")
 	// delete ded snek just in case they don't
 	var aliveSnakes []Snake
 	for _, snake := range rootBoard.Snakes {
@@ -231,10 +232,10 @@ func MCTS(ctx context.Context, gameID string, rootBoard Board, iterations int, n
 	var rootNode *Node
 	// If the board state is already known, use the existing node.
 	if existingNode, ok := gameStates[boardKey]; ok {
-		slog.Info("board cache lookup", "hit", true, "cache_size", len(gameStates), "visits", existingNode.Visits)
+		log.Info("board cache lookup", "hit", true, "cache_size", len(gameStates), "visits", existingNode.Visits)
 		rootNode = existingNode
 	} else {
-		slog.Info("board cache lookup", "hit", false, "cache_size", len(gameStates))
+		log.Info("board cache lookup", "hit", false, "cache_size", len(gameStates))
 		// Initialize rootNode with -1 so that we are the first children.
 		rootNode = NewNode(rootBoard, -1, nil)
 	}
