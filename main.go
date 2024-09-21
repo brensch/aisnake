@@ -28,10 +28,8 @@ type GameMeta struct {
 var (
 	gameMetaRegistry = make(map[string]GameMeta)         // this is needed since final game states don't necessarily have all snakes
 	gameStates       = make(map[string]map[string]*Node) // Global map to store known game states
-	// TODO: make this non global
-	webhookURL   string = ""
-	tidbytSecret string = ""
-	loc          *time.Location
+
+	loc *time.Location
 )
 
 const lagBufferMS = 110
@@ -86,21 +84,21 @@ func main() {
 
 	// Retrieve Discord webhook URL from Google Secret Manager
 	secretName := "projects/680796481131/secrets/discord_webhook/versions/latest"
-	webhookURL, err = getSecret(secretName)
+	webhookURL, err := getSecret(secretName)
 	if err != nil {
 		slog.Error("Failed to retrieve Discord webhook secret", "error", err.Error())
 	}
 
 	tidBytSecretName := "projects/680796481131/secrets/tidbyt/versions/latest"
-	tidbytSecret, err = getSecret(tidBytSecretName)
+	tidbytSecret, err := getSecret(tidBytSecretName)
 	if err != nil {
 		slog.Error("Failed to retrieve tidbyt webhook secret", "error", err.Error())
 	}
 
 	http.HandleFunc("/", handleIndex)
-	http.HandleFunc("/start", handleStart)
+	http.HandleFunc("/start", handleStart(webhookURL))
 	http.HandleFunc("/move", handleMove)
-	http.HandleFunc("/end", handleEnd)
+	http.HandleFunc("/end", handleEnd(tidbytSecret, webhookURL))
 
 	slog.Debug("Starting BattleSnake on port", "port", port)
 	log.Fatal(http.ListenAndServe(":"+port, nil))
@@ -118,36 +116,38 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, response)
 }
 
-func handleStart(w http.ResponseWriter, r *http.Request) {
-	var game BattleSnakeGame
-	if err := json.NewDecoder(r.Body).Decode(&game); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	// add a map for this game
-	gameStates[game.Game.ID] = make(map[string]*Node)
-	var otherSnakes []string
-	foundPaul := false
-	for _, snake := range game.Board.Snakes {
-		if snake.Name == game.You.Name {
-			continue
+func handleStart(webhookURL string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var game BattleSnakeGame
+		if err := json.NewDecoder(r.Body).Decode(&game); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
 		}
-		if snake.Name == "Cucumber Cat" {
-			foundPaul = true
-		}
-		otherSnakes = append(otherSnakes, snake.Name)
-	}
-	if foundPaul {
-		sendDiscordWebhook(webhookURL, fmt.Sprintf("Paul Alert: https://play.battlesnake.com/game/%s", game.Game.ID), []Embed{})
-	}
-	gameMetaRegistry[game.Game.ID] = GameMeta{
-		otherSnakes: otherSnakes,
-		start:       time.Now(),
-	}
-	slog.Info("Game started", "game_id", game.Game.ID, "you", game.You, "other_snakes", otherSnakes)
 
-	writeJSON(w, map[string]string{})
+		// add a map for this game
+		gameStates[game.Game.ID] = make(map[string]*Node)
+		var otherSnakes []string
+		foundPaul := false
+		for _, snake := range game.Board.Snakes {
+			if snake.Name == game.You.Name {
+				continue
+			}
+			if snake.Name == "Cucumber Cat" {
+				foundPaul = true
+			}
+			otherSnakes = append(otherSnakes, snake.Name)
+		}
+		if foundPaul {
+			sendDiscordWebhook(webhookURL, fmt.Sprintf("Paul Alert: https://play.battlesnake.com/game/%s", game.Game.ID), []Embed{})
+		}
+		gameMetaRegistry[game.Game.ID] = GameMeta{
+			otherSnakes: otherSnakes,
+			start:       time.Now(),
+		}
+		slog.Info("Game started", "game_id", game.Game.ID, "you", game.You, "other_snakes", otherSnakes)
+
+		writeJSON(w, map[string]string{})
+	}
 }
 
 func handleMove(w http.ResponseWriter, r *http.Request) {
@@ -284,96 +284,98 @@ func determineMoveDirection(head, nextHead Point) string {
 	return "up"
 }
 
-func handleEnd(w http.ResponseWriter, r *http.Request) {
-	end := time.Now()
-	var game BattleSnakeGame
-	if err := json.NewDecoder(r.Body).Decode(&game); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	// tidy the cache
-	delete(gameStates, game.Game.ID)
-
-	gameMeta, ok := gameMetaRegistry[game.Game.ID]
-	if !ok {
-		gameMeta = GameMeta{
-			otherSnakes: []string{"server reset during game"},
-			start:       time.Now(),
-		}
-	}
-	delete(gameMetaRegistry, game.Game.ID)
-
-	go func() {
-
-		outcome, description := describeGameOutcome(game)
-
-		// TODO: only works for duels
-		ranks, err := GetCompetitionResults()
-		if err != nil {
-			slog.Error("failed to get ranks", "error", err)
+func handleEnd(tidBytSecret, webhookURL string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		end := time.Now()
+		var game BattleSnakeGame
+		if err := json.NewDecoder(r.Body).Decode(&game); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
 		}
 
-		var ranksEmbeds []EmbedField
-		inline := false
-		for _, rank := range ranks {
-			ranksEmbeds = append(ranksEmbeds, EmbedField{
-				Name:   fmt.Sprintf("%s rating", rank.Name),
-				Value:  fmt.Sprintf("%d [%d]", rank.Score, rank.Rank),
-				Inline: inline,
-			})
-			inline = true
+		// tidy the cache
+		delete(gameStates, game.Game.ID)
+
+		gameMeta, ok := gameMetaRegistry[game.Game.ID]
+		if !ok {
+			gameMeta = GameMeta{
+				otherSnakes: []string{"server reset during game"},
+				start:       time.Now(),
+			}
 		}
+		delete(gameMetaRegistry, game.Game.ID)
 
-		gameDuration := end.Sub(gameMeta.start)
+		go func() {
 
-		slog.Info("Game ended", "game", game, "ranks", ranks, "duration_ms", gameDuration.Milliseconds())
+			outcome, description := describeGameOutcome(game)
 
-		err = downloadAndUploadFile(context.Background(), game.Game.ID)
-		if err != nil {
-			sendDiscordWebhook(webhookURL, fmt.Sprintf("%s | %s", description, strings.Join(gameMeta.otherSnakes, ", ")), []Embed{})
-		} else {
-			sendDiscordWebhook(
-				webhookURL,
-				"",
-				[]Embed{
-					{
-						Title:       strings.Join(gameMeta.otherSnakes, ", "),
-						Description: description,
-						Image: &Image{
-							URL: fmt.Sprintf("https://storage.googleapis.com/gregorywebp/%s.gif", game.Game.ID),
-						},
-						Color: getColorForOutcome(outcome),
-						URL:   fmt.Sprintf("https://play.battlesnake.com/game/%s", game.Game.ID),
-						Fields: append([]EmbedField{
-							{
-								Name:   "turns",
-								Value:  fmt.Sprint(game.Turn),
-								Inline: true,
+			// TODO: only works for duels
+			ranks, err := GetCompetitionResults()
+			if err != nil {
+				slog.Error("failed to get ranks", "error", err)
+			}
+
+			var ranksEmbeds []EmbedField
+			inline := false
+			for _, rank := range ranks {
+				ranksEmbeds = append(ranksEmbeds, EmbedField{
+					Name:   fmt.Sprintf("%s rating", rank.Name),
+					Value:  fmt.Sprintf("%d [%d]", rank.Score, rank.Rank),
+					Inline: inline,
+				})
+				inline = true
+			}
+
+			gameDuration := end.Sub(gameMeta.start)
+
+			slog.Info("Game ended", "game", game, "ranks", ranks, "duration_ms", gameDuration.Milliseconds())
+
+			err = downloadAndUploadFile(context.Background(), game.Game.ID)
+			if err != nil {
+				sendDiscordWebhook(webhookURL, fmt.Sprintf("%s | %s", description, strings.Join(gameMeta.otherSnakes, ", ")), []Embed{})
+			} else {
+				sendDiscordWebhook(
+					webhookURL,
+					"",
+					[]Embed{
+						{
+							Title:       strings.Join(gameMeta.otherSnakes, ", "),
+							Description: description,
+							Image: &Image{
+								URL: fmt.Sprintf("https://storage.googleapis.com/gregorywebp/%s.gif", game.Game.ID),
 							},
-							{
-								Name:   "latency",
-								Value:  game.You.Latency,
-								Inline: true,
+							Color: getColorForOutcome(outcome),
+							URL:   fmt.Sprintf("https://play.battlesnake.com/game/%s", game.Game.ID),
+							Fields: append([]EmbedField{
+								{
+									Name:   "turns",
+									Value:  fmt.Sprint(game.Turn),
+									Inline: true,
+								},
+								{
+									Name:   "latency",
+									Value:  game.You.Latency,
+									Inline: true,
+								},
+								{
+									Name:   "game duration",
+									Value:  fmt.Sprint(gameDuration.String()),
+									Inline: true,
+								},
+							}, ranksEmbeds...),
+							Footer: &Footer{
+								Text: time.Now().In(loc).Format(time.RFC3339),
 							},
-							{
-								Name:   "game duration",
-								Value:  fmt.Sprint(gameDuration.String()),
-								Inline: true,
-							},
-						}, ranksEmbeds...),
-						Footer: &Footer{
-							Text: time.Now().In(loc).Format(time.RFC3339),
 						},
 					},
-				},
-			)
-		}
+				)
+			}
 
-		RetrieveGameRenderAndSendToTidbyt(game.Game.ID)
-	}()
+			RetrieveGameRenderAndSendToTidbyt(tidBytSecret, game.Game.ID)
+		}()
 
-	writeJSON(w, map[string]string{})
+		writeJSON(w, map[string]string{})
+	}
 }
 
 func writeJSON(w http.ResponseWriter, v interface{}) {
