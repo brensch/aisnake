@@ -559,9 +559,10 @@ func TestMCTSVisualizationJSON(t *testing.T) {
 		// },
 
 		{
-			Description:  "placeholder",
-			InitialBoard: `{"height":11,"width":11,"food":[{"X":1,"Y":0}],"hazards":[],"snakes":[{"id":"gs_7GtxF4g8K7MMkSrGwdt8K3bR","name":"Gregory Megory Segory","health":87,"body":[{"X":4,"Y":10},{"X":5,"Y":10},{"X":6,"Y":10},{"X":6,"Y":9},{"X":5,"Y":9},{"X":5,"Y":8},{"X":6,"Y":8},{"X":6,"Y":7},{"X":5,"Y":7},{"X":4,"Y":7},{"X":3,"Y":7},{"X":2,"Y":7}],"latency":"406","head":{"X":4,"Y":10},"shout":"I pondered the orb 32081 times in 398ms. It was nice."},{"id":"gs_GC6Vv4fkk9K6MddcKDvrykSQ","name":"Gregory-Degory","health":98,"body":[{"X":9,"Y":3},{"X":10,"Y":3},{"X":10,"Y":4},{"X":9,"Y":4},{"X":8,"Y":4},{"X":7,"Y":4},{"X":7,"Y":5},{"X":6,"Y":5},{"X":5,"Y":5},{"X":4,"Y":5},{"X":4,"Y":4},{"X":3,"Y":4},{"X":3,"Y":3}],"latency":"399","head":{"X":9,"Y":3},"shout":"This is a nice move."}]}`,
-			Iterations:   math.MaxInt,
+			Description:     "placeholder",
+			InitialBoard:    `{"height":11,"width":11,"food":[{"X":1,"Y":0}],"hazards":[],"snakes":[{"id":"gs_7GtxF4g8K7MMkSrGwdt8K3bR","name":"Gregory Megory Segory","health":87,"body":[{"X":4,"Y":10},{"X":5,"Y":10},{"X":6,"Y":10},{"X":6,"Y":9},{"X":5,"Y":9},{"X":5,"Y":8},{"X":6,"Y":8},{"X":6,"Y":7},{"X":5,"Y":7},{"X":4,"Y":7},{"X":3,"Y":7},{"X":2,"Y":7}],"latency":"406","head":{"X":4,"Y":10},"shout":"I pondered the orb 32081 times in 398ms. It was nice."},{"id":"gs_GC6Vv4fkk9K6MddcKDvrykSQ","name":"Gregory-Degory","health":98,"body":[{"X":9,"Y":3},{"X":10,"Y":3},{"X":10,"Y":4},{"X":9,"Y":4},{"X":8,"Y":4},{"X":7,"Y":4},{"X":7,"Y":5},{"X":6,"Y":5},{"X":5,"Y":5},{"X":4,"Y":5},{"X":4,"Y":4},{"X":3,"Y":4},{"X":3,"Y":3}],"latency":"399","head":{"X":9,"Y":3},"shout":"This is a nice move."}]}`,
+			Iterations:      math.MaxInt,
+			AcceptableMoves: []string{"down"},
 		},
 	}
 

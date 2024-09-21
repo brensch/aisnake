@@ -304,8 +304,8 @@ func worker(ctx context.Context, rootNode *Node) {
 
 		// Backpropagation.
 		n := node.Parent
-		levels := 0
-		decayFactor := 0.8 // A decay factor less than 1 to reduce impact with distance
+		// levels := 0
+		// decayFactor := 0.8 // A decay factor less than 1 to reduce impact with distance
 		for n != nil {
 			if ctx.Err() != nil {
 				return
@@ -329,11 +329,10 @@ func worker(ctx context.Context, rootNode *Node) {
 			// }
 			// atomicAddFloat64(&n.Score, score)
 
-			// Update score and visits atomically, with a decay applied based on distance from leaf node.
-			adjustedScore := scores[n.SnakeIndex] * math.Pow(decayFactor, float64(levels))
-			atomicAddFloat64(&n.Score, adjustedScore)
+			// Update score and visits atomically
+			atomicAddFloat64(&n.Score, scores[n.SnakeIndex])
 
-			levels++
+			// levels++
 			n = n.Parent
 		}
 	}

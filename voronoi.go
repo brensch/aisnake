@@ -18,7 +18,7 @@ var (
 	modules = []EvaluationModule{
 		{
 			EvalFunc: voronoiEvaluation,
-			Weight:   20,
+			Weight:   40,
 		},
 		{
 			EvalFunc: lengthEvaluation,
@@ -30,7 +30,7 @@ var (
 		},
 		{
 			EvalFunc: otherSnakeEvaluation,
-			Weight:   15,
+			Weight:   5,
 		},
 		// {
 		// 	EvalFunc: trappedEvaluation,
