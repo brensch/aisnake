@@ -18,11 +18,11 @@ var (
 	modules = []EvaluationModule{
 		{
 			EvalFunc: voronoiEvaluation,
-			Weight:   5,
+			Weight:   15,
 		},
 		{
 			EvalFunc: lengthEvaluation,
-			Weight:   7,
+			Weight:   30,
 		},
 		{
 			EvalFunc: luckEvaluation,
@@ -242,7 +242,7 @@ func evaluateBoard(node *Node, modules []EvaluationModule) ([]float64, [][]float
 
 		// If the snake is dead, set score to minimum
 		if snakeDeaths[i] {
-			scores[i] = -1
+			scores[i] = -4
 			continue
 		}
 
@@ -255,16 +255,16 @@ func evaluateBoard(node *Node, modules []EvaluationModule) ([]float64, [][]float
 		}
 		if aliveOpponents == 0 {
 			// All opponents are dead, set score to maximum
-			scores[i] = 1
+			scores[i] = 4
 			continue
 		}
 
-		// Otherwise, normalize score between -1 and 1
-		if scores[i] > 1 {
-			scores[i] = 1
-		} else if scores[i] < -1 {
-			scores[i] = -1
-		}
+		// // Otherwise, normalize score between -1 and 1
+		// if scores[i] > 1 {
+		// 	scores[i] = 1
+		// } else if scores[i] < -1 {
+		// 	scores[i] = -1
+		// }
 	}
 
 	return scores, scoreBreakdown
@@ -331,77 +331,62 @@ func voronoiEvaluation(board Board, context *EvaluationContext) []float64 {
 // 	return scores
 // }
 
+const minLengthScore = -4
+
 // lengthEvaluation evaluates the board based on the length of each snake compared to opponents.
 func lengthEvaluation(board Board, context *EvaluationContext) []float64 {
 	numSnakes := len(board.Snakes)
 	scores := make([]float64, numSnakes)
 
-	for i, rootSnake := range board.Snakes {
-		if isSnakeDead(rootSnake) {
-			scores[i] = -2
+	// Determine the length of the longest snake
+	maxLength := 0
+	for _, snake := range board.Snakes {
+		if !isSnakeDead(snake) {
+			snakeLength := len(snake.Body)
+			if snakeLength > maxLength {
+				maxLength = snakeLength
+			}
+		}
+	}
+
+	// Evaluate each snake's length compared to the longest snake
+	for i, snake := range board.Snakes {
+		if isSnakeDead(snake) {
+			scores[i] = minLengthScore // Heavy penalty for dead snakes
 			continue
 		}
 
-		rootLength := len(rootSnake.Body)
-		scores[i] = calculateLengthScore(rootLength, board.Snakes, i)
+		snakeLength := len(snake.Body)
+		if snakeLength == maxLength {
+			// Longest snake gets a score of 1
+			scores[i] = 1.0
+		} else {
+			// Shorter snakes get a proportionate penalty, capped at -2
+			lengthDiff := maxLength - snakeLength
+			scores[i] = calculateProportionatePenalty(lengthDiff, maxLength)
+		}
 	}
 
 	return scores
 }
 
-// calculateLengthScore computes the score based on length comparison.
-func calculateLengthScore(rootLength int, snakes []Snake, rootIdx int) float64 {
-	score := 0.0
-
-	for j, opponent := range snakes {
-		if j == rootIdx || isSnakeDead(opponent) {
-			continue
-		}
-
-		opponentLength := len(opponent.Body)
-		lengthDiff := rootLength - opponentLength
-
-		switch {
-		case lengthDiff == 1:
-			score += 0.5
-		case lengthDiff > 1:
-			score += lengthBonus(rootLength, opponentLength)
-		case lengthDiff == -1:
-			score -= 0.1
-		default:
-			score += lengthPenalty(rootLength, opponentLength)
-		}
+// calculateProportionatePenalty returns a negative score proportional to how far behind
+// the snake is compared to the longest snake, with a minimum of -2.
+func calculateProportionatePenalty(lengthDiff, maxLength int) float64 {
+	if lengthDiff <= 0 {
+		return 1.0 // Should not happen, as the longest snake is handled earlier
 	}
 
-	return clamp(score, -1.0, 1.0)
-}
+	// Calculate proportionate penalty: Linear scaling from 0 to -2
+	// Use the length difference as a ratio of maxLength for scaling
+	penalty := minLengthScore * (float64(lengthDiff) / float64(maxLength))
 
-// lengthBonus computes the bonus for being longer than the opponent.
-func lengthBonus(rootLength, opponentLength int) float64 {
-	ratio := float64(rootLength) / float64(opponentLength)
-	if ratio > 1.1 {
-		return 1.0
+	// Ensure that the penalty doesn't go below -2
+	if penalty < minLengthScore {
+		penalty = minLengthScore
 	}
-	return 0.5 + 0.5*((ratio-1.0)/0.1)
-}
 
-// lengthPenalty computes the penalty for being shorter than the opponent.
-func lengthPenalty(rootLength, opponentLength int) float64 {
-	minLength := 0.6 * float64(opponentLength)
-	if float64(rootLength) <= minLength {
-		return -1.0
-	}
-	return -0.1 - 0.9*((float64(opponentLength)-float64(rootLength))/(float64(opponentLength)*0.4))
-}
-
-// clamp ensures the score stays within the allowed range.
-func clamp(value, min, max float64) float64 {
-	if value > max {
-		return max
-	} else if value < min {
-		return min
-	}
-	return value
+	return penalty
 }
 
 // luckEvaluation checks if the snake's move relies on luck for this branch.

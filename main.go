@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"runtime"
+	"strconv"
 	"strings"
 	"time"
 
@@ -32,6 +33,8 @@ var (
 	tidbytSecret string = ""
 	loc          *time.Location
 )
+
+const lagBufferMS = 110
 
 func getSecret(secretName string) (string, error) {
 	ctx := context.Background()
@@ -156,6 +159,19 @@ func handleMove(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	latency, err := strconv.Atoi(game.You.Latency)
+	if err != nil {
+		slog.Error("latency not an int", "error", err.Error())
+	}
+
+	allowedThinkingTime := game.Game.Timeout - lagBufferMS
+
+	if latency == game.Game.Timeout {
+		slog.Error("timed out on last move", "latency", latency)
+		// double the buffer if we timed out last turn
+		allowedThinkingTime = allowedThinkingTime - lagBufferMS
+	}
+
 	// get the nodemap for this game
 	gameState, ok := gameStates[game.Game.ID]
 	if !ok {
@@ -165,12 +181,12 @@ func handleMove(w http.ResponseWriter, r *http.Request) {
 	_ = gameState
 
 	reorderedBoard := reorderSnakes(game.Board, game.You.ID)
-	fmt.Println(visualizeBoard(reorderedBoard))
-	b, _ := json.Marshal(reorderedBoard)
-	fmt.Println(string(b))
+	// fmt.Println(visualizeBoard(reorderedBoard))
+	// b, _ := json.Marshal(reorderedBoard)
+	// fmt.Println(string(b))
 
 	// timeout to signify end of move
-	ctx, cancel := context.WithDeadline(context.Background(), start.Add(time.Duration(game.Game.Timeout-110)*time.Millisecond))
+	ctx, cancel := context.WithDeadline(context.Background(), start.Add(time.Duration(allowedThinkingTime)*time.Millisecond))
 	defer cancel()
 
 	workers := runtime.NumCPU()
@@ -190,7 +206,7 @@ func handleMove(w http.ResponseWriter, r *http.Request) {
 		"move", bestMove,
 		"duration_ms", time.Since(start).Milliseconds(),
 		"depth", mctsResult.Visits,
-		// "board", reorderedBoard,
+		"board", reorderedBoard,
 	)
 
 	// reset this gamestate and load in new nodes
