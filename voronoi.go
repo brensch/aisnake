@@ -18,7 +18,7 @@ var (
 	modules = []EvaluationModule{
 		{
 			EvalFunc: voronoiEvaluation,
-			Weight:   15,
+			Weight:   20,
 		},
 		{
 			EvalFunc: lengthEvaluation,

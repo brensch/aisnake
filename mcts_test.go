@@ -470,6 +470,13 @@ func TestMCTSVisualizationJSON(t *testing.T) {
 		// 	AcceptableMoves: []string{"left"},
 		// },
 		// {
+		// 	Description:     "don't die to collision on food",
+		// 	InitialBoard:    `{"height":11,"width":11,"food":[{"X":6,"Y":2},{"X":6,"Y":1},{"X":1,"Y":0}],"hazards":[],"snakes":[{"id":"gs_3p9D6KTyxMFfWkj9YrKpbdY3","name":"Gregory Megory Segory","health":89,"body":[{"X":7,"Y":2},{"X":7,"Y":3},{"X":8,"Y":3},{"X":9,"Y":3},{"X":9,"Y":4},{"X":10,"Y":4},{"X":10,"Y":5},{"X":10,"Y":6},{"X":9,"Y":6},{"X":9,"Y":7},{"X":10,"Y":7},{"X":10,"Y":8},{"X":9,"Y":8},{"X":8,"Y":8},{"X":7,"Y":8},{"X":7,"Y":7}],"latency":"400","head":{"X":7,"Y":2},"shout":"I pondered the orb 37275 times in 391ms. It was nice."},{"id":"gs_JRcfgHfvxqMK3k9qw9QCYQ6f","name":"Gregory-Degory","health":98,"body":[{"X":6,"Y":3},{"X":6,"Y":4},{"X":6,"Y":5},{"X":5,"Y":5},{"X":5,"Y":4},{"X":4,"Y":4},{"X":3,"Y":4},{"X":3,"Y":5},{"X":2,"Y":5},{"X":2,"Y":6},{"X":2,"Y":7},{"X":1,"Y":7},{"X":1,"Y":6},{"X":0,"Y":6},{"X":0,"Y":5},{"X":0,"Y":4},{"X":0,"Y":3}],"latency":"406","head":{"X":6,"Y":3},"shout":"This is a nice move."}]}`,
+		// 	Iterations:      math.MaxInt,
+		// 	AcceptableMoves: []string{"down"},
+		// },
+
+		// {
 		// 	Description:  "don't move into trap",
 		// 	InitialBoard: `{"height":11,"width":11,"food":[{"x":10,"y":2},{"x":5,"y":5},{"x":9,"y":1}],"hazards":[],"snakes":[{"id":"38241f5a-33f2-426c-a754-abf0d779521a","name":"mcts","health":86,"body":[{"x":7,"y":1},{"x":6,"y":1},{"x":5,"y":1}],"latency":"401","head":{"x":7,"y":1},"shout":"","customizations":{"color":"#888888","head":"default","tail":"default"}},{"id":"4898c918-def5-48a1-95cd-b38e58b66f2d","name":"soba","health":92,"body":[{"x":4,"y":2},{"x":4,"y":1},{"x":3,"y":1},{"x":2,"y":1}],"latency":"401","head":{"x":4,"y":2},"shout":"","customizations":{"color":"#118645","head":"replit-mark","tail":"replit-notmark"}}]}`,
 		// 	Iterations:   math.MaxInt,
@@ -553,7 +560,7 @@ func TestMCTSVisualizationJSON(t *testing.T) {
 
 		{
 			Description:  "placeholder",
-			InitialBoard: `{"height":11,"width":11,"food":[{"X":6,"Y":2},{"X":6,"Y":1},{"X":1,"Y":0}],"hazards":[],"snakes":[{"id":"gs_3p9D6KTyxMFfWkj9YrKpbdY3","name":"Gregory Megory Segory","health":89,"body":[{"X":7,"Y":2},{"X":7,"Y":3},{"X":8,"Y":3},{"X":9,"Y":3},{"X":9,"Y":4},{"X":10,"Y":4},{"X":10,"Y":5},{"X":10,"Y":6},{"X":9,"Y":6},{"X":9,"Y":7},{"X":10,"Y":7},{"X":10,"Y":8},{"X":9,"Y":8},{"X":8,"Y":8},{"X":7,"Y":8},{"X":7,"Y":7}],"latency":"400","head":{"X":7,"Y":2},"shout":"I pondered the orb 37275 times in 391ms. It was nice."},{"id":"gs_JRcfgHfvxqMK3k9qw9QCYQ6f","name":"Gregory-Degory","health":98,"body":[{"X":6,"Y":3},{"X":6,"Y":4},{"X":6,"Y":5},{"X":5,"Y":5},{"X":5,"Y":4},{"X":4,"Y":4},{"X":3,"Y":4},{"X":3,"Y":5},{"X":2,"Y":5},{"X":2,"Y":6},{"X":2,"Y":7},{"X":1,"Y":7},{"X":1,"Y":6},{"X":0,"Y":6},{"X":0,"Y":5},{"X":0,"Y":4},{"X":0,"Y":3}],"latency":"406","head":{"X":6,"Y":3},"shout":"This is a nice move."}]}`,
+			InitialBoard: `{"height":11,"width":11,"food":[{"X":1,"Y":0}],"hazards":[],"snakes":[{"id":"gs_7GtxF4g8K7MMkSrGwdt8K3bR","name":"Gregory Megory Segory","health":87,"body":[{"X":4,"Y":10},{"X":5,"Y":10},{"X":6,"Y":10},{"X":6,"Y":9},{"X":5,"Y":9},{"X":5,"Y":8},{"X":6,"Y":8},{"X":6,"Y":7},{"X":5,"Y":7},{"X":4,"Y":7},{"X":3,"Y":7},{"X":2,"Y":7}],"latency":"406","head":{"X":4,"Y":10},"shout":"I pondered the orb 32081 times in 398ms. It was nice."},{"id":"gs_GC6Vv4fkk9K6MddcKDvrykSQ","name":"Gregory-Degory","health":98,"body":[{"X":9,"Y":3},{"X":10,"Y":3},{"X":10,"Y":4},{"X":9,"Y":4},{"X":8,"Y":4},{"X":7,"Y":4},{"X":7,"Y":5},{"X":6,"Y":5},{"X":5,"Y":5},{"X":4,"Y":5},{"X":4,"Y":4},{"X":3,"Y":4},{"X":3,"Y":3}],"latency":"399","head":{"X":9,"Y":3},"shout":"This is a nice move."}]}`,
 			Iterations:   math.MaxInt,
 		},
 	}
@@ -566,7 +573,7 @@ func TestMCTSVisualizationJSON(t *testing.T) {
 			var board Board
 			assert.NoError(t, json.Unmarshal([]byte(tc.InitialBoard), &board))
 			rootBoard := copyBoard(board)
-			ctx, _ := context.WithTimeout(context.Background(), 390*time.Millisecond)
+			ctx, _ := context.WithTimeout(context.Background(), 1000*time.Millisecond)
 
 			workers := runtime.NumCPU()
 			t.Log("using workers", workers)
