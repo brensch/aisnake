@@ -437,6 +437,39 @@ func TestMCTSVisualizationJSON(t *testing.T) {
 		// 	AcceptableMoves: []string{"left", "down"},
 		// },
 		// {
+		// 	Description:     "can escape if we go down",
+		// 	InitialBoard:    `{"hazards":[],"food":[{"x":0,"y":9},{"y":1,"x":3},{"x":1,"y":6}],"snakes":[{"id":"gs_VkyKpYK7pGJPj3GC6kKFKT6W","name":"Gregory Megory Segory","customizations":{"head":"replit-mark","tail":"replit-notmark","color":"#00ff00"},"body":[{"x":8,"y":6},{"y":6,"x":7},{"y":6,"x":6},{"y":5,"x":6},{"y":5,"x":5},{"x":5,"y":4},{"x":4,"y":4},{"y":3,"x":4},{"y":3,"x":3},{"x":3,"y":2},{"x":4,"y":2},{"x":5,"y":2},{"y":3,"x":5},{"y":3,"x":6},{"x":6,"y":4},{"x":7,"y":4}],"head":{"x":8,"y":6},"health":91,"latency":"403","shout":"This is a nice move."},{"shout":"This is a nice move.","health":22,"head":{"x":8,"y":4},"body":[{"y":4,"x":8},{"x":9,"y":4},{"x":10,"y":4},{"y":5,"x":10},{"y":6,"x":10},{"y":7,"x":10},{"y":7,"x":9},{"x":9,"y":8},{"y":9,"x":9},{"x":10,"y":9}],"id":"gs_qbf3jK3ypfGppxvMqBVCyy6Y","customizations":{"head":"replit-mark","color":"#00ff00","tail":"replit-notmark"},"name":"Gregory-Degory","latency":"412"}],"height":11,"width":11}`,
+		// 	Iterations:      math.MaxInt,
+		// 	AcceptableMoves: []string{"up", "down"},
+		// },
+
+		// {
+		// 	Description:     "don't go to square involving luck",
+		// 	InitialBoard:    `{"height":11,"width":11,"food":[{"X":5,"Y":5}],"hazards":[],"snakes":[{"id":"gs_dHrgRqRKFCyCqvrcMmm6phtc","name":"Gregory Megory Segory","health":95,"body":[{"X":5,"Y":6},{"X":5,"Y":7},{"X":5,"Y":8},{"X":4,"Y":8}],"latency":"405","head":{"X":5,"Y":6},"shout":"I pondered the orb 25417 times in 397ms. It was nice."},{"id":"gs_j6wPcvyQGVFcwGMyxyXtkDMf","name":"snakos","health":95,"body":[{"X":6,"Y":5},{"X":6,"Y":4},{"X":7,"Y":4},{"X":8,"Y":4}],"latency":"83","head":{"X":6,"Y":5},"shout":"chasing snack"},{"id":"gs_3dgPCMCR4YDF4GXRXXHpXcGY","name":"Cucumber Cat","health":95,"body":[{"X":2,"Y":5},{"X":2,"Y":6},{"X":1,"Y":6},{"X":1,"Y":5}],"latency":"153","head":{"X":2,"Y":5},"shout":""},{"id":"gs_hhbqBPy9rW38DdmPwkHCCQv6","name":"Hungry Bot","health":95,"body":[{"X":5,"Y":4},{"X":5,"Y":3},{"X":5,"Y":2},{"X":4,"Y":2}],"latency":"1","head":{"X":5,"Y":4},"shout":""}]}`,
+		// 	Iterations:      math.MaxInt,
+		// 	AcceptableMoves: []string{"left"},
+		// },
+
+		// {
+		// 	Description:     "went into death trap during play",
+		// 	InitialBoard:    `{"height":11,"width":11,"food":[{"X":9,"Y":4},{"X":2,"Y":4}],"hazards":[],"snakes":[{"id":"gs_79hGpDcy3fMvYyKCfccyqPdS","name":"Gregory Megory Segory","health":87,"body":[{"X":7,"Y":7},{"X":7,"Y":6},{"X":7,"Y":5},{"X":6,"Y":5},{"X":5,"Y":5},{"X":5,"Y":4},{"X":5,"Y":3},{"X":5,"Y":2},{"X":6,"Y":2},{"X":6,"Y":1},{"X":7,"Y":1},{"X":8,"Y":1},{"X":9,"Y":1},{"X":10,"Y":1},{"X":10,"Y":0}],"latency":"397","head":{"X":7,"Y":7},"shout":"I pondered the orb 43978 times in 390ms. It was nice."},{"id":"gs_mVCCSpcCmQkSCSVpXGjCRmW7","name":"snakos","health":95,"body":[{"X":9,"Y":5},{"X":9,"Y":6},{"X":9,"Y":7},{"X":9,"Y":8},{"X":8,"Y":8},{"X":7,"Y":8},{"X":6,"Y":8},{"X":5,"Y":8},{"X":4,"Y":8},{"X":3,"Y":8},{"X":3,"Y":9},{"X":3,"Y":10}],"latency":"87","head":{"X":9,"Y":5},"shout":"chasing snack"}]}`,
+		// 	Iterations:      math.MaxInt,
+		// 	AcceptableMoves: []string{"left"},
+		// },
+
+		// {
+		// 	Description:     "should get food first and circle back",
+		// 	InitialBoard:    `{"height":11,"width":11,"food":[{"X":2,"Y":0}],"hazards":[],"snakes":[{"id":"gs_r9ywfBXmXV3yrjHMYYXT96GF","name":"Gregory Megory Segory","health":93,"body":[{"X":3,"Y":0},{"X":4,"Y":0},{"X":5,"Y":0},{"X":6,"Y":0},{"X":7,"Y":0},{"X":8,"Y":0},{"X":8,"Y":1},{"X":8,"Y":2},{"X":8,"Y":3}],"latency":"397","head":{"X":3,"Y":0},"shout":"I pondered the orb 81262 times in 390ms. It was nice."},{"id":"gs_jgqqSTXm7wtdfBcKx86HfxfY","name":"Gregory-Degory","health":93,"body":[{"X":7,"Y":6},{"X":8,"Y":6},{"X":9,"Y":6},{"X":9,"Y":7},{"X":10,"Y":7},{"X":10,"Y":8},{"X":9,"Y":8},{"X":9,"Y":9},{"X":8,"Y":9},{"X":8,"Y":8},{"X":8,"Y":7}],"latency":"403","head":{"X":7,"Y":6},"shout":"This is a nice move."}]}`,
+		// 	Iterations:      math.MaxInt,
+		// 	AcceptableMoves: []string{"left"},
+		// },
+		// {
+		// 	Description:     "kill if possible - contentious since kill may lead to us dying",
+		// 	InitialBoard:    `{"height":11,"width":11,"food":[{"X":2,"Y":7}],"hazards":[],"snakes":[{"id":"gs_79hGpDcy3fMvYyKCfccyqPdS","name":"Gregory Megory Segory","health":91,"body":[{"X":4,"Y":1},{"X":4,"Y":2},{"X":5,"Y":2},{"X":6,"Y":2},{"X":7,"Y":2},{"X":7,"Y":3},{"X":8,"Y":3},{"X":8,"Y":2},{"X":9,"Y":2},{"X":9,"Y":3},{"X":9,"Y":4},{"X":8,"Y":4}],"latency":"416","head":{"X":4,"Y":1},"shout":"I pondered the orb 27290 times in 408ms. It was nice."},{"id":"gs_mVCCSpcCmQkSCSVpXGjCRmW7","name":"snakos","health":86,"body":[{"X":3,"Y":0},{"X":4,"Y":0},{"X":5,"Y":0},{"X":6,"Y":0},{"X":7,"Y":0},{"X":8,"Y":0},{"X":9,"Y":0},{"X":10,"Y":0},{"X":10,"Y":1},{"X":9,"Y":1},{"X":8,"Y":1}],"latency":"81","head":{"X":3,"Y":0},"shout":"chasing snack"},{"id":"gs_dg8vc4rc8j6txyFRHVVSRPbJ","name":"Cucumber Cat","health":98,"body":[{"X":2,"Y":5},{"X":2,"Y":4},{"X":2,"Y":3},{"X":3,"Y":3},{"X":4,"Y":3},{"X":5,"Y":3},{"X":6,"Y":3},{"X":6,"Y":4},{"X":6,"Y":5},{"X":6,"Y":6}],"latency":"101","head":{"X":2,"Y":5},"shout":""}]}`,
+		// 	Iterations:      math.MaxInt,
+		// 	AcceptableMoves: []string{"left"},
+		// },
+		// {
 		// 	Description:  "don't move into trap",
 		// 	InitialBoard: `{"height":11,"width":11,"food":[{"x":10,"y":2},{"x":5,"y":5},{"x":9,"y":1}],"hazards":[],"snakes":[{"id":"38241f5a-33f2-426c-a754-abf0d779521a","name":"mcts","health":86,"body":[{"x":7,"y":1},{"x":6,"y":1},{"x":5,"y":1}],"latency":"401","head":{"x":7,"y":1},"shout":"","customizations":{"color":"#888888","head":"default","tail":"default"}},{"id":"4898c918-def5-48a1-95cd-b38e58b66f2d","name":"soba","health":92,"body":[{"x":4,"y":2},{"x":4,"y":1},{"x":3,"y":1},{"x":2,"y":1}],"latency":"401","head":{"x":4,"y":2},"shout":"","customizations":{"color":"#118645","head":"replit-mark","tail":"replit-notmark"}}]}`,
 		// 	Iterations:   math.MaxInt,
@@ -518,39 +551,10 @@ func TestMCTSVisualizationJSON(t *testing.T) {
 		// 	Iterations:   math.MaxInt,
 		// },
 
-		// {
-		// 	Description:     "down spells certain doom",
-		// 	InitialBoard:    `{"hazards":[],"food":[{"x":0,"y":9},{"y":1,"x":3},{"x":1,"y":6}],"snakes":[{"id":"gs_VkyKpYK7pGJPj3GC6kKFKT6W","name":"Gregory Megory Segory","customizations":{"head":"replit-mark","tail":"replit-notmark","color":"#00ff00"},"body":[{"x":8,"y":6},{"y":6,"x":7},{"y":6,"x":6},{"y":5,"x":6},{"y":5,"x":5},{"x":5,"y":4},{"x":4,"y":4},{"y":3,"x":4},{"y":3,"x":3},{"x":3,"y":2},{"x":4,"y":2},{"x":5,"y":2},{"y":3,"x":5},{"y":3,"x":6},{"x":6,"y":4},{"x":7,"y":4}],"head":{"x":8,"y":6},"health":91,"latency":"403","shout":"This is a nice move."},{"shout":"This is a nice move.","health":22,"head":{"x":8,"y":4},"body":[{"y":4,"x":8},{"x":9,"y":4},{"x":10,"y":4},{"y":5,"x":10},{"y":6,"x":10},{"y":7,"x":10},{"y":7,"x":9},{"x":9,"y":8},{"y":9,"x":9},{"x":10,"y":9}],"id":"gs_qbf3jK3ypfGppxvMqBVCyy6Y","customizations":{"head":"replit-mark","color":"#00ff00","tail":"replit-notmark"},"name":"Gregory-Degory","latency":"412"}],"height":11,"width":11}`,
-		// 	Iterations:      math.MaxInt,
-		// 	AcceptableMoves: []string{"up"},
-		// },
-
-		// {
-		// 	Description:     "don't go to square involving luck",
-		// 	InitialBoard:    `{"height":11,"width":11,"food":[{"X":5,"Y":5}],"hazards":[],"snakes":[{"id":"gs_dHrgRqRKFCyCqvrcMmm6phtc","name":"Gregory Megory Segory","health":95,"body":[{"X":5,"Y":6},{"X":5,"Y":7},{"X":5,"Y":8},{"X":4,"Y":8}],"latency":"405","head":{"X":5,"Y":6},"shout":"I pondered the orb 25417 times in 397ms. It was nice."},{"id":"gs_j6wPcvyQGVFcwGMyxyXtkDMf","name":"snakos","health":95,"body":[{"X":6,"Y":5},{"X":6,"Y":4},{"X":7,"Y":4},{"X":8,"Y":4}],"latency":"83","head":{"X":6,"Y":5},"shout":"chasing snack"},{"id":"gs_3dgPCMCR4YDF4GXRXXHpXcGY","name":"Cucumber Cat","health":95,"body":[{"X":2,"Y":5},{"X":2,"Y":6},{"X":1,"Y":6},{"X":1,"Y":5}],"latency":"153","head":{"X":2,"Y":5},"shout":""},{"id":"gs_hhbqBPy9rW38DdmPwkHCCQv6","name":"Hungry Bot","health":95,"body":[{"X":5,"Y":4},{"X":5,"Y":3},{"X":5,"Y":2},{"X":4,"Y":2}],"latency":"1","head":{"X":5,"Y":4},"shout":""}]}`,
-		// 	Iterations:      math.MaxInt,
-		// 	AcceptableMoves: []string{"left"},
-		// },
-
-		// {
-		// 	Description:     "kill if possible",
-		// 	InitialBoard:    `{"height":11,"width":11,"food":[{"X":2,"Y":7}],"hazards":[],"snakes":[{"id":"gs_79hGpDcy3fMvYyKCfccyqPdS","name":"Gregory Megory Segory","health":91,"body":[{"X":4,"Y":1},{"X":4,"Y":2},{"X":5,"Y":2},{"X":6,"Y":2},{"X":7,"Y":2},{"X":7,"Y":3},{"X":8,"Y":3},{"X":8,"Y":2},{"X":9,"Y":2},{"X":9,"Y":3},{"X":9,"Y":4},{"X":8,"Y":4}],"latency":"416","head":{"X":4,"Y":1},"shout":"I pondered the orb 27290 times in 408ms. It was nice."},{"id":"gs_mVCCSpcCmQkSCSVpXGjCRmW7","name":"snakos","health":86,"body":[{"X":3,"Y":0},{"X":4,"Y":0},{"X":5,"Y":0},{"X":6,"Y":0},{"X":7,"Y":0},{"X":8,"Y":0},{"X":9,"Y":0},{"X":10,"Y":0},{"X":10,"Y":1},{"X":9,"Y":1},{"X":8,"Y":1}],"latency":"81","head":{"X":3,"Y":0},"shout":"chasing snack"},{"id":"gs_dg8vc4rc8j6txyFRHVVSRPbJ","name":"Cucumber Cat","health":98,"body":[{"X":2,"Y":5},{"X":2,"Y":4},{"X":2,"Y":3},{"X":3,"Y":3},{"X":4,"Y":3},{"X":5,"Y":3},{"X":6,"Y":3},{"X":6,"Y":4},{"X":6,"Y":5},{"X":6,"Y":6}],"latency":"101","head":{"X":2,"Y":5},"shout":""}]}`,
-		// 	Iterations:      math.MaxInt,
-		// 	AcceptableMoves: []string{"left"},
-		// },
-
-		// {
-		// 	Description:     "went into death trap during play",
-		// 	InitialBoard:    `{"height":11,"width":11,"food":[{"X":9,"Y":4},{"X":2,"Y":4}],"hazards":[],"snakes":[{"id":"gs_79hGpDcy3fMvYyKCfccyqPdS","name":"Gregory Megory Segory","health":87,"body":[{"X":7,"Y":7},{"X":7,"Y":6},{"X":7,"Y":5},{"X":6,"Y":5},{"X":5,"Y":5},{"X":5,"Y":4},{"X":5,"Y":3},{"X":5,"Y":2},{"X":6,"Y":2},{"X":6,"Y":1},{"X":7,"Y":1},{"X":8,"Y":1},{"X":9,"Y":1},{"X":10,"Y":1},{"X":10,"Y":0}],"latency":"397","head":{"X":7,"Y":7},"shout":"I pondered the orb 43978 times in 390ms. It was nice."},{"id":"gs_mVCCSpcCmQkSCSVpXGjCRmW7","name":"snakos","health":95,"body":[{"X":9,"Y":5},{"X":9,"Y":6},{"X":9,"Y":7},{"X":9,"Y":8},{"X":8,"Y":8},{"X":7,"Y":8},{"X":6,"Y":8},{"X":5,"Y":8},{"X":4,"Y":8},{"X":3,"Y":8},{"X":3,"Y":9},{"X":3,"Y":10}],"latency":"87","head":{"X":9,"Y":5},"shout":"chasing snack"}]}`,
-		// 	Iterations:      math.MaxInt,
-		// 	AcceptableMoves: []string{"left"},
-		// },
-
 		{
-			Description:     "should get food first and circle back",
-			InitialBoard:    `{"height":11,"width":11,"food":[{"X":2,"Y":0}],"hazards":[],"snakes":[{"id":"gs_r9ywfBXmXV3yrjHMYYXT96GF","name":"Gregory Megory Segory","health":93,"body":[{"X":3,"Y":0},{"X":4,"Y":0},{"X":5,"Y":0},{"X":6,"Y":0},{"X":7,"Y":0},{"X":8,"Y":0},{"X":8,"Y":1},{"X":8,"Y":2},{"X":8,"Y":3}],"latency":"397","head":{"X":3,"Y":0},"shout":"I pondered the orb 81262 times in 390ms. It was nice."},{"id":"gs_jgqqSTXm7wtdfBcKx86HfxfY","name":"Gregory-Degory","health":93,"body":[{"X":7,"Y":6},{"X":8,"Y":6},{"X":9,"Y":6},{"X":9,"Y":7},{"X":10,"Y":7},{"X":10,"Y":8},{"X":9,"Y":8},{"X":9,"Y":9},{"X":8,"Y":9},{"X":8,"Y":8},{"X":8,"Y":7}],"latency":"403","head":{"X":7,"Y":6},"shout":"This is a nice move."}]}`,
-			Iterations:      math.MaxInt,
-			AcceptableMoves: []string{"left"},
+			Description:  "placeholder",
+			InitialBoard: `{"height":11,"width":11,"food":[{"X":6,"Y":2},{"X":6,"Y":1},{"X":1,"Y":0}],"hazards":[],"snakes":[{"id":"gs_3p9D6KTyxMFfWkj9YrKpbdY3","name":"Gregory Megory Segory","health":89,"body":[{"X":7,"Y":2},{"X":7,"Y":3},{"X":8,"Y":3},{"X":9,"Y":3},{"X":9,"Y":4},{"X":10,"Y":4},{"X":10,"Y":5},{"X":10,"Y":6},{"X":9,"Y":6},{"X":9,"Y":7},{"X":10,"Y":7},{"X":10,"Y":8},{"X":9,"Y":8},{"X":8,"Y":8},{"X":7,"Y":8},{"X":7,"Y":7}],"latency":"400","head":{"X":7,"Y":2},"shout":"I pondered the orb 37275 times in 391ms. It was nice."},{"id":"gs_JRcfgHfvxqMK3k9qw9QCYQ6f","name":"Gregory-Degory","health":98,"body":[{"X":6,"Y":3},{"X":6,"Y":4},{"X":6,"Y":5},{"X":5,"Y":5},{"X":5,"Y":4},{"X":4,"Y":4},{"X":3,"Y":4},{"X":3,"Y":5},{"X":2,"Y":5},{"X":2,"Y":6},{"X":2,"Y":7},{"X":1,"Y":7},{"X":1,"Y":6},{"X":0,"Y":6},{"X":0,"Y":5},{"X":0,"Y":4},{"X":0,"Y":3}],"latency":"406","head":{"X":6,"Y":3},"shout":"This is a nice move."}]}`,
+			Iterations:   math.MaxInt,
 		},
 	}
 
@@ -562,7 +566,7 @@ func TestMCTSVisualizationJSON(t *testing.T) {
 			var board Board
 			assert.NoError(t, json.Unmarshal([]byte(tc.InitialBoard), &board))
 			rootBoard := copyBoard(board)
-			ctx, _ := context.WithTimeout(context.Background(), 3900*time.Millisecond)
+			ctx, _ := context.WithTimeout(context.Background(), 390*time.Millisecond)
 
 			workers := runtime.NumCPU()
 			t.Log("using workers", workers)
@@ -576,7 +580,7 @@ func TestMCTSVisualizationJSON(t *testing.T) {
 
 			require.NotNil(t, node, "node is nil")
 
-			// assert.NoError(t, GenerateMostVisitedPathWithAlternativesHtmlTree(node))
+			assert.NoError(t, GenerateMostVisitedPathWithAlternativesHtmlTree(node))
 
 		})
 	}

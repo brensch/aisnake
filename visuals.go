@@ -215,7 +215,7 @@ func VisualizeVoronoi(voronoi [][]int, snakes []Snake, options ...func(*boardOpt
 	return sb.String()
 }
 
-var evals = []string{"control", "length", "luck"}
+var evals = []string{"control", "length", "luck", "others"}
 
 // visualizeNode generates the DOT representation of a single node, including its label, visits, score, board state, and controlled positions
 func visualizeNode(node *Node) string {

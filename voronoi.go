@@ -28,6 +28,10 @@ var (
 			EvalFunc: luckEvaluation,
 			Weight:   15,
 		},
+		{
+			EvalFunc: otherSnakeEvaluation,
+			Weight:   15,
+		},
 		// {
 		// 	EvalFunc: trappedEvaluation,
 		// 	Weight:   15,
@@ -400,6 +404,31 @@ func luckEvaluation(board Board, context *EvaluationContext) []float64 {
 		if context.LuckMatrix[i] {
 			scores[i] = -4
 		}
+	}
+
+	return scores
+}
+
+// luckEvaluation checks if the snake's move relies on luck for this branch.
+// luck means another snake could have moved into our head at the same time and we both died.
+func otherSnakeEvaluation(board Board, context *EvaluationContext) []float64 {
+	scores := make([]float64, len(board.Snakes))
+
+	aliveSnakes := 0
+	for _, snake := range board.Snakes {
+		if isSnakeDead(snake) {
+			continue
+		}
+		aliveSnakes++
+	}
+
+	// count how many other snakes are alive by subtracting 1 if we are alive from total alive snakes
+	for i, snake := range board.Snakes {
+		snakeAliveValue := 0
+		if !isSnakeDead(snake) {
+			snakeAliveValue = 1
+		}
+		scores[i] = -float64(aliveSnakes - snakeAliveValue)
 	}
 
 	return scores
