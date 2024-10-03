@@ -22,7 +22,7 @@ var (
 		},
 		{
 			EvalFunc: lengthEvaluation,
-			Weight:   40,
+			Weight:   30,
 		},
 		{
 			EvalFunc: luckEvaluation,
@@ -30,7 +30,7 @@ var (
 		},
 		{
 			EvalFunc: otherSnakeEvaluation,
-			Weight:   5,
+			Weight:   15,
 		},
 		// {
 		// 	EvalFunc: trappedEvaluation,

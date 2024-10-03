@@ -183,9 +183,9 @@ func handleMove(w http.ResponseWriter, r *http.Request) {
 	}
 
 	reorderedBoard := reorderSnakes(game.Board, game.You.ID)
-	// fmt.Println(visualizeBoard(reorderedBoard))
-	// b, _ := json.Marshal(reorderedBoard)
-	// fmt.Println(string(b))
+	fmt.Println(visualizeBoard(reorderedBoard))
+	b, _ := json.Marshal(reorderedBoard)
+	fmt.Println(string(b))
 
 	// timeout to signify end of move
 	ctx, cancel := context.WithDeadline(context.Background(), start.Add(time.Duration(allowedThinkingTime)*time.Millisecond))
@@ -209,6 +209,7 @@ func handleMove(w http.ResponseWriter, r *http.Request) {
 		"depth", mctsResult.Visits,
 	)
 
+	fmt.Println("yoooooooooo", bestMove)
 	// reset this gamestate and load in new nodes
 	gameSaveStart := time.Now()
 	gameStates[game.Game.ID] = make(map[string]*Node)
