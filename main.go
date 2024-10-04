@@ -32,7 +32,7 @@ var (
 	loc *time.Location
 )
 
-const lagBufferMS = 110
+const lagBufferMS = 200
 
 func getSecret(secretName string) (string, error) {
 	ctx := context.Background()
@@ -172,7 +172,7 @@ func handleMove(w http.ResponseWriter, r *http.Request) {
 	if latency == game.Game.Timeout {
 		log.Error("timed out on last move", "latency", latency)
 		// double the buffer if we timed out last turn
-		allowedThinkingTime = allowedThinkingTime - lagBufferMS
+		// allowedThinkingTime = allowedThinkingTime - lagBufferMS
 	}
 
 	// get the nodemap for this game
@@ -183,9 +183,9 @@ func handleMove(w http.ResponseWriter, r *http.Request) {
 	}
 
 	reorderedBoard := reorderSnakes(game.Board, game.You.ID)
-	fmt.Println(visualizeBoard(reorderedBoard))
-	b, _ := json.Marshal(reorderedBoard)
-	fmt.Println(string(b))
+	// fmt.Println(visualizeBoard(reorderedBoard))
+	// b, _ := json.Marshal(reorderedBoard)
+	// fmt.Println(string(b))
 
 	// timeout to signify end of move
 	ctx, cancel := context.WithDeadline(context.Background(), start.Add(time.Duration(allowedThinkingTime)*time.Millisecond))
@@ -209,12 +209,13 @@ func handleMove(w http.ResponseWriter, r *http.Request) {
 		"depth", mctsResult.Visits,
 	)
 
-	fmt.Println("yoooooooooo", bestMove)
+	// fmt.Println("yoooooooooo", bestMove)
 	// reset this gamestate and load in new nodes
 	gameSaveStart := time.Now()
 	gameStates[game.Game.ID] = make(map[string]*Node)
 	saveNodesAtDepth2(mctsResult, gameStates[game.Game.ID])
 	log.Debug("finished saving game state", "duration", time.Since(gameSaveStart).Milliseconds())
+	fmt.Println(mctsResult.Visits)
 
 	// slog.Info("Visualized board", "board", visualizeBoard(game.Board))
 	// fmt.Println(visualizeBoard(reorderedBoard))
