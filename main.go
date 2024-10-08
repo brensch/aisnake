@@ -32,7 +32,7 @@ var (
 	loc *time.Location
 )
 
-const lagBufferMS = 200
+const lagBufferMS = 100
 
 func getSecret(secretName string) (string, error) {
 	ctx := context.Background()
