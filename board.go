@@ -67,9 +67,16 @@ func resolveCollisions(board *Board, snakeIndex int, newHead Point) {
 		if i != snakeIndex && board.Snakes[i].Health > 0 { // Skip dead snakes
 			// Check for head-to-head collision
 			if newHead == board.Snakes[i].Head {
+				// if we just ate (last two tails in same place)
+				// then we should give ourselves a bonus for the ghost food they just ate
+				ghostFoodBonus := 0
+				if board.Snakes[i].Body[len(board.Snakes[i].Body)-1] ==
+					board.Snakes[i].Body[len(board.Snakes[i].Body)-2] {
+					ghostFoodBonus = 1
+				}
+
 				// Kill the shorter snake; if equal length, both die
-				// we truncated the snake at snakeindex, so add 1 to it
-				usLength := len(board.Snakes[snakeIndex].Body) + 1
+				usLength := len(board.Snakes[snakeIndex].Body) + ghostFoodBonus
 				if len(board.Snakes[i].Body) == usLength {
 					deadSnakes[snakeIndex] = true
 					deadSnakes[i] = true

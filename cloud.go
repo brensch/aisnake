@@ -10,8 +10,9 @@ import (
 
 // Define a custom handler for Google Cloud logging
 type GoogleCloudHandler struct {
-	writer *os.File
-	level  slog.Level
+	writer     *os.File
+	level      slog.Level
+	extraAttrs map[string]interface{} // Store additional attributes
 }
 
 // NewGoogleCloudHandler creates a new handler for Google Cloud
@@ -38,6 +39,11 @@ func (h *GoogleCloudHandler) Handle(_ context.Context, r slog.Record) error {
 		return true
 	})
 
+	// Merge any extra attributes (from WithAttrs) with the current ones
+	for k, v := range h.extraAttrs {
+		attrs[k] = v
+	}
+
 	// Structure the log entry for Google Cloud
 	logEntry := map[string]interface{}{
 		"severity": severity,
@@ -61,11 +67,12 @@ func (h *GoogleCloudHandler) Handle(_ context.Context, r slog.Record) error {
 // WithAttrs returns a new handler with additional attributes
 func (h *GoogleCloudHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
 	// Add the new attributes to the current handler and return it
-	newHandler := *h // Create a shallow copy
+	newHandler := *h
+	if newHandler.extraAttrs == nil {
+		newHandler.extraAttrs = map[string]interface{}{}
+	}
 	for _, attr := range attrs {
-		newHandler.Handle(context.Background(), slog.Record{
-			Message: attr.Key,
-		})
+		newHandler.extraAttrs[attr.Key] = attr.Value.Any()
 	}
 	return &newHandler
 }
