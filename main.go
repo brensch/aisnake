@@ -130,7 +130,7 @@ func handleStart(w http.ResponseWriter, r *http.Request) {
 		if snake.Name == game.You.Name {
 			continue
 		}
-		if snake.Name == "Cucumber Cat" {
+		if snake.Name == "Cucumber Cat" || snake.Name == "Pesto Penguin" {
 			foundPaul = true
 		}
 		otherSnakes = append(otherSnakes, snake.Name)
@@ -165,7 +165,7 @@ func handleMove(w http.ResponseWriter, r *http.Request) {
 
 	reorderedBoard := reorderSnakes(game.Board, game.You.ID)
 	// timeout to signify end of move
-	ctx, cancel := context.WithDeadline(context.Background(), start.Add(time.Duration(game.Game.Timeout-110)*time.Millisecond))
+	ctx, cancel := context.WithDeadline(context.Background(), start.Add(time.Duration(game.Game.Timeout-170)*time.Millisecond))
 	defer cancel()
 
 	workers := runtime.NumCPU()
