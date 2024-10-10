@@ -425,9 +425,21 @@ func TestMCTSVisualizationJSON(t *testing.T) {
 		// 	Iterations:   math.MaxInt,
 		// },
 
+		// {
+		// 	Description:  "left will kill us",
+		// 	InitialBoard: `{"height":11,"width":11,"food":[{"X":3,"Y":1},{"X":2,"Y":5},{"X":3,"Y":9}],"hazards":[],"snakes":[{"id":"gs_Rp48WwRj6gYrVpx87HGWrXxG","name":"Gregory-Devory","health":82,"body":[{"X":3,"Y":5},{"X":3,"Y":4},{"X":3,"Y":3},{"X":3,"Y":2}],"latency":"377","head":{"X":3,"Y":5},"shout":"This is a nice move."},{"id":"gs_Vr6bGPmHHVWT6dfmdFGXpbgV","name":"soba","health":96,"body":[{"X":2,"Y":4},{"X":1,"Y":4},{"X":1,"Y":3},{"X":1,"Y":2},{"X":0,"Y":2}],"latency":"409","head":{"X":2,"Y":4},"shout":"swag"}]}`,
+		// 	Iterations:   math.MaxInt,
+		// },
+
+		// {
+		// 	Description:  "don't go down",
+		// 	InitialBoard: `{"height":11,"width":11,"food":[{"X":1,"Y":9},{"X":2,"Y":0},{"X":0,"Y":9},{"X":2,"Y":3},{"X":1,"Y":5},{"X":3,"Y":2},{"X":0,"Y":5},{"X":0,"Y":4},{"X":1,"Y":0},{"X":6,"Y":9}],"hazards":[],"snakes":[{"id":"gs_ccrfVvfpSVfqQqvyKvH3CvBR","name":"Gregory","health":1,"body":[{"X":2,"Y":4},{"X":3,"Y":4},{"X":4,"Y":4},{"X":5,"Y":4},{"X":6,"Y":4},{"X":7,"Y":4}],"latency":"356","head":{"X":2,"Y":4},"shout":"This is a nice move."},{"id":"gs_Y7fSKpSvqFrKmctQYBk76Rf4","name":"trentren-vilu","health":99,"body":[{"X":3,"Y":3},{"X":4,"Y":3},{"X":5,"Y":3},{"X":6,"Y":3},{"X":7,"Y":3},{"X":8,"Y":3},{"X":9,"Y":3},{"X":9,"Y":2},{"X":9,"Y":1},{"X":9,"Y":0},{"X":8,"Y":0},{"X":7,"Y":0},{"X":6,"Y":0},{"X":5,"Y":0},{"X":4,"Y":0},{"X":3,"Y":0}],"latency":"54","head":{"X":3,"Y":3},"shout":""}]}`,
+		// 	Iterations:   math.MaxInt,
+		// },
+
 		{
-			Description:  "left will kill us",
-			InitialBoard: `{"height":11,"width":11,"food":[{"X":3,"Y":1},{"X":2,"Y":5},{"X":3,"Y":9}],"hazards":[],"snakes":[{"id":"gs_Rp48WwRj6gYrVpx87HGWrXxG","name":"Gregory-Devory","health":82,"body":[{"X":3,"Y":5},{"X":3,"Y":4},{"X":3,"Y":3},{"X":3,"Y":2}],"latency":"377","head":{"X":3,"Y":5},"shout":"This is a nice move."},{"id":"gs_Vr6bGPmHHVWT6dfmdFGXpbgV","name":"soba","health":96,"body":[{"X":2,"Y":4},{"X":1,"Y":4},{"X":1,"Y":3},{"X":1,"Y":2},{"X":0,"Y":2}],"latency":"409","head":{"X":2,"Y":4},"shout":"swag"}]}`,
+			Description:  "don't go down",
+			InitialBoard: `{"height":11,"width":11,"food":[{"X":1,"Y":9},{"X":2,"Y":0},{"X":0,"Y":9},{"X":2,"Y":3},{"X":1,"Y":5},{"X":3,"Y":2},{"X":0,"Y":5},{"X":0,"Y":4},{"X":1,"Y":0},{"X":6,"Y":9}],"hazards":[],"snakes":[{"id":"gs_ccrfVvfpSVfqQqvyKvH3CvBR","name":"Gregory","health":50,"body":[{"X":2,"Y":4},{"X":3,"Y":4},{"X":4,"Y":4},{"X":5,"Y":4},{"X":6,"Y":4},{"X":7,"Y":4}],"latency":"356","head":{"X":2,"Y":4},"shout":"This is a nice move."},{"id":"gs_Y7fSKpSvqFrKmctQYBk76Rf4","name":"trentren-vilu","health":99,"body":[{"X":3,"Y":3},{"X":4,"Y":3},{"X":5,"Y":3},{"X":6,"Y":3},{"X":7,"Y":3},{"X":8,"Y":3},{"X":9,"Y":3}],"latency":"54","head":{"X":3,"Y":3},"shout":""}]}`,
 			Iterations:   math.MaxInt,
 		},
 	}

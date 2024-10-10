@@ -305,7 +305,7 @@ func handleEnd(w http.ResponseWriter, r *http.Request) {
 
 	slog.Info("Game ended", "game", game, "rank", rank, "score", score, "duration_ms", gameDuration.Milliseconds())
 
-	err = sendDiscordWebhook(webhookURL, fmt.Sprintf("%s [%s](https://play.battlesnake.com/game/%s) | %s", outcomeEmoji, strings.Join(gameMeta.otherSnakes, ", "), game.Game.ID, description), []Embed{})
+	err = sendDiscordWebhook(webhookURL, fmt.Sprintf("%s [%s](<https://play.battlesnake.com/game/%s>) | %s", outcomeEmoji, strings.Join(gameMeta.otherSnakes, ", "), game.Game.ID, description), []Embed{})
 	if err != nil {
 		slog.Error("failed to send discord webhook", "error", err.Error())
 	}
