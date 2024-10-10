@@ -14,7 +14,7 @@ const (
 func describeGameOutcome(game BattleSnakeGame) (GameOutcome, string) {
 	// Check if you lost by colliding with a wall
 	if game.You.Head.X < 0 || game.You.Head.X >= game.Board.Width || game.You.Head.Y < 0 || game.You.Head.Y >= game.Board.Height {
-		return Loss, "You lost by crashing into a wall."
+		return Loss, "You crashed into a wall"
 	}
 
 	// Check if you lost by colliding with another snake
@@ -27,7 +27,7 @@ func describeGameOutcome(game BattleSnakeGame) (GameOutcome, string) {
 			}
 		} else {
 			// check for collisions with ourself
-			for _, segment := range snake.Body[0 : len(snake.Body)-1] {
+			for _, segment := range snake.Body[1 : len(snake.Body)-1] {
 				if game.You.Head == segment {
 					return Loss, "You ran into yourself"
 
@@ -49,7 +49,7 @@ func describeGameOutcome(game BattleSnakeGame) (GameOutcome, string) {
 		}
 	}
 	if livingSnakes == 0 {
-		return Draw, "It's a draw! All snakes died."
+		return Draw, "All snakes died"
 	}
 
 	// Check if you won because all other snakes starved or collided

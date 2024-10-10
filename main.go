@@ -290,13 +290,28 @@ func handleEnd(tidBytSecret, webhookURL string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		end := time.Now()
 		var game BattleSnakeGame
-		if err := json.NewDecoder(r.Body).Decode(&game); err != nil {
+		err := json.NewDecoder(r.Body).Decode(&game)
+		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 
-		// tidy the cache
-		delete(gameStates, game.Game.ID)
+		outcome, description := describeGameOutcome(game)
+		var outcomeEmoji string
+
+		switch outcome {
+		case Win:
+			outcomeEmoji = "✅"
+		case Loss:
+			outcomeEmoji = "❌"
+		case Draw:
+			outcomeEmoji = "🦍"
+		}
+
+		ranks, err := GetCompetitionResults()
+		if err != nil {
+			slog.Error("failed to get ranks", "error", err)
+		}
 
 		gameMeta, ok := gameMetaRegistry[game.Game.ID]
 		if !ok {
@@ -305,76 +320,69 @@ func handleEnd(tidBytSecret, webhookURL string) http.HandlerFunc {
 				start:       time.Now(),
 			}
 		}
-		delete(gameMetaRegistry, game.Game.ID)
 
-		go func() {
+		gameDuration := end.Sub(gameMeta.start)
 
-			outcome, description := describeGameOutcome(game)
+		slog.Info("Game ended", "game", game, "ranks", ranks, "duration_ms", gameDuration.Milliseconds())
 
-			// TODO: only works for duels
-			ranks, err := GetCompetitionResults()
-			if err != nil {
-				slog.Error("failed to get ranks", "error", err)
-			}
+		err = sendDiscordWebhook(webhookURL, fmt.Sprintf("%s [%s](<https://play.battlesnake.com/game/%s>) | %s", outcomeEmoji, strings.Join(gameMeta.otherSnakes, ", "), game.Game.ID, description), []Embed{})
+		if err != nil {
+			slog.Error("failed to send discord webhook", "error", err.Error())
+		}
+		err = downloadAndUploadFile(context.Background(), game.Game.ID)
+		if err != nil {
+			slog.Error("failed to download and upload", "error", err.Error())
+		}
+		// if err != nil {
+		// } else {
+		// 	sendDiscordWebhook(
+		// 		webhookURL,
+		// 		"",
+		// 		[]Embed{
+		// 			{
+		// 				Title:       strings.Join(gameMeta.otherSnakes, ", "),
+		// 				Description: description,
+		// 				Image: &Image{
+		// 					URL: fmt.Sprintf("https://storage.googleapis.com/gregorywebp/%s.gif", game.Game.ID),
+		// 				},
+		// 				Color: getColorForOutcome(outcome),
+		// 				URL:   fmt.Sprintf("https://play.battlesnake.com/game/%s", game.Game.ID),
+		// 				Fields: []EmbedField{
+		// 					{
+		// 						Name:   "turns",
+		// 						Value:  fmt.Sprint(game.Turn),
+		// 						Inline: true,
+		// 					},
+		// 					{
+		// 						Name:   "latency",
+		// 						Value:  game.You.Latency,
+		// 						Inline: true,
+		// 					},
+		// 					{
+		// 						Name:   "rank",
+		// 						Value:  fmt.Sprint(rank),
+		// 						Inline: true,
+		// 					},
+		// 					{
+		// 						Name:   "score",
+		// 						Value:  fmt.Sprint(score),
+		// 						Inline: true,
+		// 					},
+		// 					{
+		// 						Name:   "game duration",
+		// 						Value:  fmt.Sprint(gameDuration.String()),
+		// 						Inline: true,
+		// 					},
+		// 				},
+		// 				Footer: &Footer{
+		// 					Text: time.Now().In(loc).Format(time.RFC3339),
+		// 				},
+		// 			},
+		// 		},
+		// 	)
+		// }
 
-			var ranksEmbeds []EmbedField
-			inline := false
-			for _, rank := range ranks {
-				ranksEmbeds = append(ranksEmbeds, EmbedField{
-					Name:   fmt.Sprintf("%s rating", rank.Name),
-					Value:  fmt.Sprintf("%d [%d]", rank.Score, rank.Rank),
-					Inline: inline,
-				})
-				inline = true
-			}
-
-			gameDuration := end.Sub(gameMeta.start)
-
-			slog.Info("Game ended", "game", game, "ranks", ranks, "duration_ms", gameDuration.Milliseconds())
-
-			err = downloadAndUploadFile(context.Background(), game.Game.ID)
-			if err != nil {
-				sendDiscordWebhook(webhookURL, fmt.Sprintf("%s | %s", description, strings.Join(gameMeta.otherSnakes, ", ")), []Embed{})
-			} else {
-				sendDiscordWebhook(
-					webhookURL,
-					"",
-					[]Embed{
-						{
-							Title:       strings.Join(gameMeta.otherSnakes, ", "),
-							Description: description,
-							Image: &Image{
-								URL: fmt.Sprintf("https://storage.googleapis.com/gregorywebp/%s.gif", game.Game.ID),
-							},
-							Color: getColorForOutcome(outcome),
-							URL:   fmt.Sprintf("https://play.battlesnake.com/game/%s", game.Game.ID),
-							Fields: append([]EmbedField{
-								{
-									Name:   "turns",
-									Value:  fmt.Sprint(game.Turn),
-									Inline: true,
-								},
-								{
-									Name:   "latency",
-									Value:  game.You.Latency,
-									Inline: true,
-								},
-								{
-									Name:   "game duration",
-									Value:  fmt.Sprint(gameDuration.String()),
-									Inline: true,
-								},
-							}, ranksEmbeds...),
-							Footer: &Footer{
-								Text: time.Now().In(loc).Format(time.RFC3339),
-							},
-						},
-					},
-				)
-			}
-
-			RetrieveGameRenderAndSendToTidbyt(tidBytSecret, game.Game.ID)
-		}()
+		RetrieveGameRenderAndSendToTidbyt(tidBytSecret, game.Game.ID)
 
 		writeJSON(w, map[string]string{})
 	}

@@ -66,6 +66,7 @@ func (h *GoogleCloudHandler) Handle(_ context.Context, r slog.Record) error {
 
 // Modify WithAttrs to store attributes in the handler
 func (h *GoogleCloudHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
+	// Add the new attributes to the current handler and return it
 	newHandler := *h
 	if newHandler.extraAttrs == nil {
 		newHandler.extraAttrs = map[string]interface{}{}
