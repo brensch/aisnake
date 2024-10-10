@@ -36,4 +36,11 @@ gcloud run deploy battlesnake-server-ping \
   --cpu 1 \
   --memory 2Gi \
   --max-instances 1
+
+
+docker run -d -p 8081:8080 --restart always --name snek-container-duals \
+  -v /home/brensch/key.json:/home/brensch/key.json \
+  -e GOOGLE_APPLICATION_CREDENTIALS="/home/brensch/key.json" \
+  snekduals
+
 ```

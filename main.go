@@ -283,6 +283,16 @@ func handleEnd(w http.ResponseWriter, r *http.Request) {
 	delete(gameMetaRegistry, game.Game.ID)
 
 	outcome, description := describeGameOutcome(game)
+	var outcomeEmoji string
+
+	switch outcome {
+	case Win:
+		outcomeEmoji = "✅"
+	case Loss:
+		outcomeEmoji = "❌"
+	case Draw:
+		outcomeEmoji = "🦍"
+	}
 
 	// TODO: only works for duels
 	rank, score, err := GetDuelsRankAndScore()
@@ -295,56 +305,62 @@ func handleEnd(w http.ResponseWriter, r *http.Request) {
 
 	slog.Info("Game ended", "game", game, "rank", rank, "score", score, "duration_ms", gameDuration.Milliseconds())
 
+	err = sendDiscordWebhook(webhookURL, fmt.Sprintf("%s [%s](https://play.battlesnake.com/game/%s) | %s", outcomeEmoji, strings.Join(gameMeta.otherSnakes, ", "), game.Game.ID, description), []Embed{})
+	if err != nil {
+		slog.Error("failed to send discord webhook", "error", err.Error())
+	}
 	err = downloadAndUploadFile(context.Background(), game.Game.ID)
 	if err != nil {
-		sendDiscordWebhook(webhookURL, fmt.Sprintf("%s | %s", description, strings.Join(gameMeta.otherSnakes, ", ")), []Embed{})
-	} else {
-		sendDiscordWebhook(
-			webhookURL,
-			"",
-			[]Embed{
-				{
-					Title:       strings.Join(gameMeta.otherSnakes, ", "),
-					Description: description,
-					Image: &Image{
-						URL: fmt.Sprintf("https://storage.googleapis.com/gregorywebp/%s.gif", game.Game.ID),
-					},
-					Color: getColorForOutcome(outcome),
-					URL:   fmt.Sprintf("https://play.battlesnake.com/game/%s", game.Game.ID),
-					Fields: []EmbedField{
-						{
-							Name:   "turns",
-							Value:  fmt.Sprint(game.Turn),
-							Inline: true,
-						},
-						{
-							Name:   "latency",
-							Value:  game.You.Latency,
-							Inline: true,
-						},
-						{
-							Name:   "rank",
-							Value:  fmt.Sprint(rank),
-							Inline: true,
-						},
-						{
-							Name:   "score",
-							Value:  fmt.Sprint(score),
-							Inline: true,
-						},
-						{
-							Name:   "game duration",
-							Value:  fmt.Sprint(gameDuration.String()),
-							Inline: true,
-						},
-					},
-					Footer: &Footer{
-						Text: time.Now().In(loc).Format(time.RFC3339),
-					},
-				},
-			},
-		)
+		slog.Error("failed to download and upload", "error", err.Error())
 	}
+	// if err != nil {
+	// } else {
+	// 	sendDiscordWebhook(
+	// 		webhookURL,
+	// 		"",
+	// 		[]Embed{
+	// 			{
+	// 				Title:       strings.Join(gameMeta.otherSnakes, ", "),
+	// 				Description: description,
+	// 				Image: &Image{
+	// 					URL: fmt.Sprintf("https://storage.googleapis.com/gregorywebp/%s.gif", game.Game.ID),
+	// 				},
+	// 				Color: getColorForOutcome(outcome),
+	// 				URL:   fmt.Sprintf("https://play.battlesnake.com/game/%s", game.Game.ID),
+	// 				Fields: []EmbedField{
+	// 					{
+	// 						Name:   "turns",
+	// 						Value:  fmt.Sprint(game.Turn),
+	// 						Inline: true,
+	// 					},
+	// 					{
+	// 						Name:   "latency",
+	// 						Value:  game.You.Latency,
+	// 						Inline: true,
+	// 					},
+	// 					{
+	// 						Name:   "rank",
+	// 						Value:  fmt.Sprint(rank),
+	// 						Inline: true,
+	// 					},
+	// 					{
+	// 						Name:   "score",
+	// 						Value:  fmt.Sprint(score),
+	// 						Inline: true,
+	// 					},
+	// 					{
+	// 						Name:   "game duration",
+	// 						Value:  fmt.Sprint(gameDuration.String()),
+	// 						Inline: true,
+	// 					},
+	// 				},
+	// 				Footer: &Footer{
+	// 					Text: time.Now().In(loc).Format(time.RFC3339),
+	// 				},
+	// 			},
+	// 		},
+	// 	)
+	// }
 
 	RetrieveGameRenderAndSendToTidbyt(game.Game.ID)
 
