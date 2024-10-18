@@ -299,6 +299,9 @@ func handleEnd(tidBytSecret, webhookURL string) http.HandlerFunc {
 		outcome, description := describeGameOutcome(game)
 		var outcomeEmoji string
 
+		// tidy the cache
+		delete(gameStates, game.Game.ID)
+
 		switch outcome {
 		case Win:
 			outcomeEmoji = "✅"
@@ -320,6 +323,8 @@ func handleEnd(tidBytSecret, webhookURL string) http.HandlerFunc {
 				start:       time.Now(),
 			}
 		}
+
+		delete(gameMetaRegistry, game.Game.ID)
 
 		gameDuration := end.Sub(gameMeta.start)
 
