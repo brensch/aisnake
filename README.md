@@ -1,3 +1,14 @@
+This is a snake to compete on battlesnake.com.
+
+It specialises in head to head. It's basically a mcts without the mc because that takes too long. I found out after implementing it that a mcts with mc is a thing that exists called 'upper confidence bound for trees', so i basically invented that.
+
+It reached #4 in the world at duels through some lucky outages of other top snakes occurring all at once, although it's still pretty good to be fair. Performance is extremely dependent on the amount of compute you give it. Ie like all good things it's pay to win. After a while i decided i was paying too much in cloud costs so turned it off.
+
+There's a visualiser package which was how i debugged tree searches. you can give it a starting point and it will generate a whole tree including assets to render in a browser, at which point you can click through and see when it starts thinking a mad sus route is the best choice, and then you can look at why it thought that, figure out the bug, and then run it again and see if it does better.
+
+One day i will come back and build a snake that uses actual ML.
+
+
 ```bash
 gcloud config set project snakey
 
