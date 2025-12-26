@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"sort"
@@ -214,17 +215,27 @@ func VisualizeVoronoi(voronoi [][]int, snakes []Snake, options ...func(*boardOpt
 	return sb.String()
 }
 
+var evals = []string{"control", "length", "luck", "others"}
+
 // visualizeNode generates the DOT representation of a single node, including its label, visits, score, board state, and controlled positions
 func visualizeNode(node *Node) string {
 	if node == nil {
 		return ""
 	}
 
+	scoresInterface := node.MyScore.Load()
+	scores := make([]float64, len(node.Board.Snakes))
+	if scoresInterface != nil {
+		scores = scoresInterface.([]float64)
+	}
+
 	nodeID := fmt.Sprintf("Node_%p", node)
 	// Using <br/> instead of \n to create HTML-based line breaks that D3 can interpret
-	nodeLabel := fmt.Sprintf("%s\nVisits: %d\nAvg Score: %.3f\nMy Score: %.3f\nSnake moving: %c\n\n",
-		nodeID, node.Visits, node.Score/float64(node.Visits), node.MyScore, 'A'+node.SnakeIndex)
+	nodeLabel := fmt.Sprintf("%s\nVisits: %d\nAvg Score: %.3f\nSnake moving: %c\n\n",
+		nodeID, node.Visits, node.Score/float64(node.Visits), 'A'+node.SnakeIndex)
 	voronoi := GenerateVoronoi(node.Board)
+	// voronoi := resolveOwnership(paths)
+
 	controlledPositions := make([]int, len(node.Board.Snakes))
 	for _, row := range voronoi {
 		for _, owner := range row {
@@ -234,7 +245,17 @@ func visualizeNode(node *Node) string {
 		}
 	}
 	for i, count := range controlledPositions {
-		nodeLabel += fmt.Sprintf("Snake %c: %d cells, %d len\n", 'A'+i, count, len(node.Board.Snakes[i].Body))
+		luck := '.'
+		if node.LuckMatrix[i] {
+			luck = '🎲'
+		}
+		nodeLabel += fmt.Sprintf("%c: ◾%d 📏%d 🌟%.3f %c\n", 'A'+i, count, len(node.Board.Snakes[i].Body), scores[i], luck)
+		if len(node.ScoreBreakdown) == 0 {
+			continue
+		}
+		for j := range evals {
+			nodeLabel += fmt.Sprintf("%s: %2f\n", evals[j], node.ScoreBreakdown[j][i])
+		}
 	}
 	// Add the board state visualization
 	boardVisualization := visualizeBoard(node.Board, WithNewlineCharacter("\n"))
@@ -260,7 +281,15 @@ type TreeNode struct {
 	Board         Board       `json:"board"`
 }
 
-func GenerateMostVisitedPathWithAlternativesHtmlTree(node *Node) error {
+type GenericNode interface {
+	Visualise() string
+	GetBoard() Board
+	GetVisits() int64
+	GetChildren() []GenericNode
+	UCTer() float64
+}
+
+func GenerateMostVisitedPathWithAlternativesHtmlTree(node GenericNode) error {
 
 	treeNode := generateTreeData(node)
 	timestamp := time.Now().Format("20060102_150405.000000")
@@ -287,19 +316,19 @@ func GenerateMostVisitedPathWithAlternativesHtmlTree(node *Node) error {
 }
 
 // generateTreeData recursively generates the tree structure in JSON format
-func generateTreeData(node *Node) *TreeNode {
+func generateTreeData(node GenericNode) *TreeNode {
 	if node == nil {
 		return nil
 	}
 
 	rootNode := &TreeNode{
 		ID:            fmt.Sprintf("Node_%p", node),
-		Visits:        node.Visits,
+		Visits:        node.GetVisits(),
 		UCB:           0.0, // Root has no UCB
 		IsMostVisited: true,
 		Children:      make([]*TreeNode, 0),
-		Body:          visualizeNode(node),
-		Board:         node.Board,
+		Body:          node.Visualise(),
+		Board:         node.GetBoard(),
 	}
 
 	// Traverse children
@@ -308,25 +337,43 @@ func generateTreeData(node *Node) *TreeNode {
 }
 
 // traverseAndBuildTree populates the TreeNode structure with children and marks the most visited path
-func traverseAndBuildTree(node *Node, treeNode *TreeNode) {
+func traverseAndBuildTree(node GenericNode, treeNode *TreeNode) {
 	if node == nil {
 		return
 	}
 
+	children := node.GetChildren()
+
 	// Sort children by visit count, descending
-	sort.Slice(node.Children, func(i, j int) bool {
-		return node.Children[i].Visits > node.Children[j].Visits
+	sort.Slice(children, func(i, j int) bool {
+		// Handle cases where both children[i] and children[j] are nil
+		if children[i] == nil && children[j] == nil {
+			return false // They are considered equal in terms of sorting
+		}
+		// Handle cases where only one of the children is nil
+		if children[i] == nil {
+			return false // nil is considered less than non-nil
+		}
+		if children[j] == nil {
+			return true // non-nil is considered greater than nil
+		}
+		// Both children are non-nil, proceed to compare their visits
+		return children[i].GetVisits() > children[j].GetVisits()
 	})
 
-	for i, child := range node.Children {
+	for i, child := range children {
+		if child == nil {
+			continue
+		}
 		childNode := &TreeNode{
-			ID:            fmt.Sprintf("Node_%p", child),
-			Visits:        child.Visits,
-			UCB:           child.UCT(1.41),
+			ID:     fmt.Sprintf("Node_%p", child),
+			Visits: child.GetVisits(),
+			UCB:    child.UCTer(),
+			// UCB:           child.UCT(1.41),
 			IsMostVisited: i == 0, // Only mark the most visited path
 			Children:      make([]*TreeNode, 0),
-			Body:          visualizeNode(child),
-			Board:         child.Board,
+			Body:          child.Visualise(),
+			Board:         child.GetBoard(),
 		}
 
 		treeNode.Children = append(treeNode.Children, childNode)
@@ -335,5 +382,19 @@ func traverseAndBuildTree(node *Node, treeNode *TreeNode) {
 		// if i == 0 {
 		traverseAndBuildTree(child, childNode)
 		// }
+	}
+}
+
+func visualisePQ(grid [][]dijkstraNode) {
+	for y := len(grid) - 1; y >= 0; y-- { // Start from the last row
+		for x := range grid[y] {
+			node := grid[y][x]
+			if node.distance == math.MaxInt32 { // Assuming unvisited nodes have max distance
+				fmt.Print("  - -  ") // Unvisited node
+			} else {
+				fmt.Printf(" %- 2d,%-2d ", node.snakeIndex, node.distance)
+			}
+		}
+		fmt.Println()
 	}
 }

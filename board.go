@@ -1,5 +1,7 @@
 package main
 
+import "fmt"
+
 // Direction represents possible movement directions for a snake.
 type Direction int
 
@@ -9,6 +11,7 @@ const (
 	Down
 	Left
 	Right
+	NoMove
 )
 
 // AllDirections provides a slice of all possible directions.
@@ -16,6 +19,10 @@ var AllDirections = []Direction{Up, Down, Left, Right}
 
 // applyMove applies the move of a single snake directly to the provided board without returning a new board.
 func applyMove(board *Board, snakeIndex int, direction Direction) {
+	snake := &board.Snakes[snakeIndex]
+	if len(snake.Body) == 0 {
+		return
+	}
 	// Track the initial head position of the snake
 	initialHead := board.Snakes[snakeIndex].Head
 
@@ -23,7 +30,6 @@ func applyMove(board *Board, snakeIndex int, direction Direction) {
 	newHead := moveHead(initialHead, direction)
 
 	// Move the snake's head and body
-	snake := &board.Snakes[snakeIndex]
 	snake.Body = append([]Point{newHead}, snake.Body...) // Add new head to the body
 	snake.Head = newHead                                 // Update the head position
 
@@ -46,6 +52,10 @@ func applyMove(board *Board, snakeIndex int, direction Direction) {
 		}
 	}
 
+	if len(snake.Body) == 1 {
+		fmt.Println("got 0 snake", snakeIndex)
+		fmt.Println(visualizeBoard(*board))
+	}
 	// remove the last segment for the move
 	snake.Body = snake.Body[:len(snake.Body)-1]
 	// If the snake ate food, reset health and add an additional segment on the tail
@@ -229,8 +239,8 @@ func markDangerZones(board *Board, snakeIndex int) [][]int {
 	return dangerZones
 }
 
-// Generate safe moves (directions), taking into account other snakes' potential movements
-// and only marking them dangerous if the snake is larger or the same size.
+// Generate safe moves (directions), not counting heads, and ignoring tails of snakes that have moved after it.
+// needs to generate move in the board to avoid panics.
 func generateSafeMoves(board Board, snakeIndex int) []Direction {
 	snake := board.Snakes[snakeIndex]
 	if isSnakeDead(snake) {
@@ -246,6 +256,7 @@ func generateSafeMoves(board Board, snakeIndex int) []Direction {
 
 	possibleDirections := []Direction{Up, Down, Left, Right}
 	safeMoves := []Direction{}
+	backupMoves := []Direction{}
 
 	for _, direction := range possibleDirections {
 		nextMove := moveInDirection(head, direction)
@@ -260,8 +271,44 @@ func generateSafeMoves(board Board, snakeIndex int) []Direction {
 			continue // Move is into the snake's own neck
 		}
 
+		// backups are moves that stay inbounds and aren't our neck
+		backupMoves = append(backupMoves, direction)
+
+		// don't collide with bodies of other snakes
+		foundCollision := false
+		for i, snake := range board.Snakes {
+
+			if len(snake.Body) == 0 {
+				continue
+			}
+
+			lengthToCheck := len(snake.Body)
+			if i >= snakeIndex {
+				lengthToCheck--
+			}
+
+			// don't include the head ever. don't include the tail if the snake has not moved yet.
+			for _, body := range snake.Body[1:lengthToCheck] {
+				if nextMove != body {
+					continue
+				}
+				foundCollision = true
+				break
+			}
+			if foundCollision {
+				break
+			}
+		}
+		if foundCollision {
+			continue
+		}
+
 		// Otherwise, it's a safe move
 		safeMoves = append(safeMoves, direction)
+	}
+
+	if len(safeMoves) == 0 {
+		return backupMoves
 	}
 
 	return safeMoves

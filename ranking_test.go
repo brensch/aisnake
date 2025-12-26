@@ -2,20 +2,15 @@ package main
 
 import (
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 )
 
-func TestGetDuelsRankAndScore(t *testing.T) {
+func TestGetCompetitionResults(t *testing.T) {
+	results, err := GetCompetitionResults()
+	assert.NoError(t, err, "should not have an error getting rankings")
 
-	start := time.Now()
-	// Call the function with the mock server URL
-	rank, score, err := GetDuelsRankAndScore()
-
-	t.Log(rank, score, time.Since(start))
-	// Assertions
-	assert.NoError(t, err)
-	assert.NotZero(t, rank, "Rank should not be 0")
-	assert.NotZero(t, score, "Score should be 9,166")
+	for _, result := range results {
+		t.Log(result.Name, result.Rank, result.Score)
+	}
 }

@@ -66,7 +66,7 @@ type FrameEvent struct {
 	} `json:"Data"`
 }
 
-func RetrieveGameRenderAndSendToTidbyt(gameID string) {
+func RetrieveGameRenderAndSendToTidbyt(gameID, tidbytSecret string) {
 
 	// WebSocket URL for the game
 	wsURL := fmt.Sprintf("wss://engine.battlesnake.com/games/%s/events", gameID)
@@ -79,7 +79,7 @@ func RetrieveGameRenderAndSendToTidbyt(gameID string) {
 	slog.Info("got frames from websocket", "turns", len(frames), "outcome", outcome)
 
 	// Render frames to WebP and push to Tidbyt
-	err = renderGameToGIF(frames, deviceID, outcome)
+	err = renderGameToGIF(tidbytSecret, frames, deviceID, outcome)
 	if err != nil {
 		slog.Error("Failed to render game to gif", "error", err.Error())
 	}
@@ -178,7 +178,7 @@ func GetOutcomeForGregory(data FrameEvent) (GameOutcome, error) {
 
 	// Find Gregory and the other snake
 	for i := range data.Data.Snakes {
-		if data.Data.Snakes[i].Name == "Gregory" {
+		if strings.Contains(data.Data.Snakes[i].Name, "Gregory") {
 			gregory = &data.Data.Snakes[i]
 		} else {
 			opponent = &data.Data.Snakes[i]
@@ -363,7 +363,7 @@ func drawCell(img *image.RGBA, x, y int, c color.RGBA) {
 }
 
 // Stitch together frames and encode as GIF animation with dynamic delay to fit within 15 seconds
-func renderGameToGIF(frames []*Board, deviceID string, outcome GameOutcome) error {
+func renderGameToGIF(tidbytSecret string, frames []*Board, deviceID string, outcome GameOutcome) error {
 
 	if len(frames) == 0 {
 		slog.Warn("no frames to be rendered")
@@ -431,7 +431,7 @@ func renderGameToGIF(frames []*Board, deviceID string, outcome GameOutcome) erro
 
 	// Encode the GIF as base64 and send it to Tidbyt (only one push)
 	webpBase64 := base64.StdEncoding.EncodeToString(buf.Bytes())
-	if err := PushToTidbyt(deviceID, webpBase64); err != nil {
+	if err := PushToTidbyt(tidbytSecret, deviceID, webpBase64); err != nil {
 		return fmt.Errorf("failed to push to Tidbyt: %v", err)
 	}
 

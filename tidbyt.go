@@ -19,7 +19,7 @@ type PushRequest struct {
 	Background     bool   `json:"background"`
 }
 
-func PushToTidbyt(deviceID, webpBase64 string) error {
+func PushToTidbyt(tidbytSecret, deviceID, webpBase64 string) error {
 
 	// Prepare the request body
 	requestBody := PushRequest{

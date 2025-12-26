@@ -28,11 +28,11 @@ func (h *GoogleCloudHandler) Enabled(_ context.Context, level slog.Level) bool {
 	return level >= h.level
 }
 
-// Handle writes the log entry in JSON format for Google Cloud
+// Modify Handle to merge attributes
 func (h *GoogleCloudHandler) Handle(_ context.Context, r slog.Record) error {
 	severity := convertToSeverity(r.Level)
 
-	// Collect attributes as a map
+	// Collect attributes from the record
 	attrs := map[string]interface{}{}
 	r.Attrs(func(attr slog.Attr) bool {
 		attrs[attr.Key] = attr.Value.Any()
@@ -64,7 +64,7 @@ func (h *GoogleCloudHandler) Handle(_ context.Context, r slog.Record) error {
 	return nil
 }
 
-// WithAttrs returns a new handler with additional attributes
+// Modify WithAttrs to store attributes in the handler
 func (h *GoogleCloudHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
 	// Add the new attributes to the current handler and return it
 	newHandler := *h
