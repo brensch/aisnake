@@ -29,7 +29,9 @@ fn painted(c: Rgb) -> bool {
     let (mx, mn) = (r.max(g).max(b), r.min(g).min(b));
     // the faint "Battlesnake" logo: low-saturation lilac (colour spread <= 58 in every
     // render seen), so pastel snakes such as pink #f0a0f0 still count as paint
-    let lilac = b > g && r > g && b >= 150 && (mx - mn) < 65 && !near(c, FOOD, 40);
+    // ...bluish (blue above red) and never brighter than ~218 red, unlike pastel pinks
+    // such as #f5b4f0 or #f7bef9
+    let lilac = b > g && r > g && b > r && r <= 225 && b >= 150 && (mx - mn) < 65 && !near(c, FOOD, 40);
     !lilac
 }
 
@@ -44,9 +46,11 @@ fn belongs(c: Rgb, own: Rgb, others: &[Rgb]) -> bool {
     d <= 90 && others.iter().all(|&o| dist(c, o) >= d)
 }
 
+/// The exporter's dead-snake grey, ~#cdcdcd. Live snakes can be grey too (#888, #999...),
+/// so only this narrow band counts as a dead body.
 fn grey(c: Rgb) -> bool {
     let (mx, mn) = (c.0.max(c.1).max(c.2), c.0.min(c.1).min(c.2));
-    mx - mn < 12 && c.0 > 150 && c.0 < 235
+    mx - mn < 10 && (195..=216).contains(&c.0)
 }
 
 /// Counts in first-seen order; ties go to the earliest (as Python's Counter.most_common).
@@ -74,6 +78,10 @@ struct CellInfo {
     samples: [Rgb; 36],
     paint: usize,
     dom: Option<Rgb>,
+    /// coloured samples even where a dead snake's grey body dominates (a live head can be
+    /// drawn over it)
+    raw: usize,
+    raw_dom: Option<Rgb>,
     /// bare board: no snake paint and no dead (grey) body either
     blank: bool,
     /// some of a dead snake's grey body shows in this cell
@@ -101,8 +109,13 @@ fn read_frame(px: &[u8], w: usize) -> (Vec<CellInfo>, HashSet<Cell>) {
                 }
             }
             let mut votes = Votes::default();
-            let (mut paint, mut foods, mut greys) = (0, 0, 0);
-            for &c in &samples {
+            let (mut paint, mut foods, mut greys, mut ring) = (0, 0, 0, 0);
+            for (k, &c) in samples.iter().enumerate() {
+                // outer ring of the 6x6 sample grid: a food dot never reaches it, a segment does
+                let (a, b) = (k / 6, k % 6);
+                if (a == 0 || a == 5 || b == 0 || b == 5) && painted(c) && !grey(c) {
+                    ring += 1;
+                }
                 if painted(c) {
                     // grey is a dead snake's body; it doesn't count as paint
                     if grey(c) {
@@ -117,8 +130,9 @@ fn read_frame(px: &[u8], w: usize) -> (Vec<CellInfo>, HashSet<Cell>) {
                 }
             }
             let mut dom = if paint > 0 { Some(votes.top()) } else { None };
+            let (raw, raw_dom) = (paint, dom);
             // food can sit on a dead snake's grey body: judge it against the coloured paint only
-            if foods >= 3 && foods as f64 >= paint as f64 * 0.4 {
+            if foods >= 3 && foods as f64 >= paint as f64 * 0.4 && ring <= 4 {
                 food.insert((i, j));
                 paint = 0;
                 dom = None;
@@ -128,7 +142,7 @@ fn read_frame(px: &[u8], w: usize) -> (Vec<CellInfo>, HashSet<Cell>) {
                 paint = 0;
                 dom = None;
             }
-            cells.push(CellInfo { samples, paint, dom, blank: paint == 0 && greys < 3, greyish: greys >= 3, by_grey: false, stale_art: false });
+            cells.push(CellInfo { samples, paint, dom, raw, raw_dom, blank: paint == 0 && greys < 3, greyish: greys >= 3, by_grey: false, stale_art: false });
         }
     }
     // a cell touching a dead (grey) body: where a dead snake's coloured end art can sit
@@ -258,11 +272,12 @@ fn candidates(snakes: &[Snake], cells: &[CellInfo], prev: &[CellInfo]) -> Vec<Ve
                 }
                 let ci = &cells[idx(c)];
                 let d = changed(&ci.samples, &prev[idx(c)].samples);
-                let same = ci.dom.is_some_and(|dc| belongs(dc, col, &others));
-                let score = if ci.paint >= 13 { 1000 } else { 0 } + if same { 500 } else { 0 } + d + ci.paint;
-                if ci.paint >= 13 || (ci.paint >= 4 && d >= 4) {
+                let (p, dom) = (ci.raw, ci.raw_dom);
+                let same = dom.is_some_and(|dc| belongs(dc, col, &others));
+                let score = if p >= 13 { 1000 } else { 0 } + if same { 500 } else { 0 } + d + p;
+                if p >= 13 || (p >= 4 && d >= 4) {
                     out.push((score, c));
-                } else if d + ci.paint > 0 {
+                } else if d + p > 0 {
                     // faint head art: kept as a last resort (a live snake must move somewhere)
                     weak.push((score, c));
                 }
@@ -321,7 +336,8 @@ fn mark_ghost(ghosts: &mut [u8; N * N], body: &[Cell]) {
 /// A painted cell nobody covers is fine if a dead snake left it: its grey body, or coloured
 /// end art attached to that grey body. A wrongly killed snake shows no grey, so stays an error.
 fn excused(ghost: u8, ci: &CellInfo) -> bool {
-    ghost > 0 && (ci.by_grey || ci.stale_art)
+    // partial paint is leftover art; a solid segment (34-36 of 36) would be a live snake
+    ghost > 0 && (ci.by_grey || ci.stale_art || ci.paint <= 30)
 }
 
 /// Cells where these bodies disagree with the picture: painted but uncovered, covered
@@ -329,16 +345,20 @@ fn excused(ghost: u8, ci: &CellInfo) -> bool {
 fn mismatch(bodies: &[Option<Vec<Cell>>], snakes: &[Snake], cells: &[CellInfo], ghosts: &[u8; N * N]) -> usize {
     let idx = |c: Cell| c.0 * N + c.1;
     let mut cover = [false; N * N];
+    let mut ends = [false; N * N];
     for b in bodies.iter().flatten() {
         for &c in b {
             cover[idx(c)] = true;
         }
+        ends[idx(b[0])] = true;
+        ends[idx(*b.last().unwrap())] = true;
     }
     let mut bad = cells
         .iter()
         .zip(cover)
         .zip(ghosts)
-        .filter(|((ci, cov), ghost)| (ci.paint >= 20 && !cov && !excused(**ghost, ci)) || (ci.blank && *cov))
+        .zip(ends)
+        .filter(|(((ci, cov), ghost), end)| (ci.paint >= 20 && !cov && !excused(**ghost, ci)) || (ci.blank && *cov && !end))
         .count();
     for (b, s) in bodies.iter().zip(snakes) {
         if let Some(b) = b {
@@ -472,8 +492,8 @@ fn decode(bytes: Vec<u8>, id: &str) -> Result<Game, String> {
             // eliminated this turn: the body behind the head is now grey or empty
             for s in snakes.iter_mut().filter(|s| s.alive) {
                 let rest: HashSet<Cell> = s.body[1..].iter().copied().collect();
-                let empty = rest.iter().filter(|&&c| cells[idx(c)].paint == 0).count();
-                if empty as f64 > rest.len() as f64 / 2.0 {
+                let grey = rest.iter().filter(|&&c| cells[idx(c)].paint == 0 && cells[idx(c)].greyish).count();
+                if grey as f64 > rest.len() as f64 / 2.0 {
                     if debug {
                         eprintln!("DEATH {id} turn {f} body went grey/empty at {:?}", s.body[0]);
                     }
@@ -506,13 +526,14 @@ fn decode(bytes: Vec<u8>, id: &str) -> Result<Game, String> {
             }
         }
         let covered: HashSet<Cell> = snakes.iter().filter(|s| s.alive).flat_map(|s| s.body.iter().copied()).collect();
+        let ends: HashSet<Cell> = snakes.iter().filter(|s| s.alive).flat_map(|s| [s.body[0], *s.body.last().unwrap()]).collect();
         for i in 0..N {
             for j in 0..N {
                 let p = cells[idx((i, j))].paint;
                 let cov = covered.contains(&(i, j));
                 let ci = &cells[idx((i, j))];
                 was_excused[idx((i, j))] = p >= 20 && !cov && excused(ghosts[idx((i, j))], ci);
-                if (p >= 20 && !cov && !excused(ghosts[idx((i, j))], ci)) || (ci.blank && cov) {
+                if (p >= 20 && !cov && !excused(ghosts[idx((i, j))], ci)) || (ci.blank && cov && !ends.contains(&(i, j))) {
                     errors += 1;
                     if debug && first_bad.is_none() {
                         first_bad = Some(f);
