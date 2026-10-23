@@ -1,0 +1,17 @@
+[package]
+name = "bsscrape"
+version = "0.1.0"
+edition = "2024"
+description = "Scrapes every turn of Battlesnake games involving top leaderboard snakes into a compact SQLite store"
+
+[dependencies]
+regex = "1"
+rusqlite = { version = "0.37", features = ["bundled"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+ureq = "2"
+zstd = "0.13"
+
+[profile.release]
+lto = true
+codegen-units = 1

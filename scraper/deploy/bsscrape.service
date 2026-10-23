@@ -1,0 +1,29 @@
+[Unit]
+Description=bsscrape: Battlesnake games of the top snakes, into /var/lib/bsscrape
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+ExecStart=/usr/local/bin/bsscrape run --db /var/lib/bsscrape/games.sqlite --top 100 --every 1800
+DynamicUser=yes
+StateDirectory=bsscrape
+Restart=always
+RestartSec=30
+Nice=10
+# the e2-micro has 1 GB
+MemoryMax=600M
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_INET AF_INET6
+RestrictNamespaces=yes
+LockPersonality=yes
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target
